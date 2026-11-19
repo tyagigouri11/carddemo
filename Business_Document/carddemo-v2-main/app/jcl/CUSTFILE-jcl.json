@@ -1,0 +1,153 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CUSTFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/CUSTFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job reinitializes the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) by closing it in CICS, deleting and recreating it with fresh definitions, reloading it from a sequential source file, and then reopening it in CICS \u2014 ensuring the customer data store is refreshed with up-to-date records.Key Functionalities:\nCloses the CICS-managed Customer Data file (CUSTDAT) to prevent concurrent access during the refresh operation.\nDeletes the existing Customer Data VSAM KSDS cluster (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS), suppressing any warnings (condition codes up to 08 are treated as success).\nRecreates the Customer Data VSAM KSDS cluster with a fixed record size of 500 bytes, a 9-byte key starting at position 0, allocated on 1 primary and 5 secondary cylinders on volume AWSHJ1, with share options (2,3) and erase-on-delete enabled.\nReloads the newly created VSAM cluster with customer records sourced from the sequential flat file (AWS.M2.CARDDEMO.CUSTDATA.PS).\nReopens the CICS-managed Customer Data file (CUSTDAT) to resume normal online transaction processing after the refresh is complete.",
+    "rules": [
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data file (CUSTDAT) is currently open and accessible to online users in the CICS region CICSAWSA, and the Customer Data file batch refresh process is about to begin",
+                "When": "The batch refresh job is initiated and the first step (CLCIFIL) executes",
+                "Then": "The Customer Data file (CUSTDAT) must be closed in the CICS online region CICSAWSA, suspending all online access to customer records, so that no online transactions can read or modify customer data until the batch refresh is fully completed and the file is explicitly reopened"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close Customer Data File in CICS Before Batch Refresh",
+            "Rule_Description": "Before the Customer Data file refresh process begins, the Customer Data file (CUSTDAT) must be closed in the CICS online system (region CICSAWSA) to prevent online users from reading or updating customer records while the batch refresh is in progress. This ensures data integrity throughout the refresh cycle.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data file refresh process has been initiated AND the CICS online Customer Data file (CUSTDAT) has already been closed to suspend online user access",
+                "When": "The system attempts to delete the entire Customer Data VSAM file cluster named AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, including both its customer records data component and its Customer ID key index component",
+                "Then": "The entire Customer Data VSAM file cluster is removed from the system \u2014 all stored customer records and the associated Customer ID key index are deleted \u2014 making the storage available for the new Customer Data VSAM file to be created in the next step"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Customer Data VSAM File Deletion",
+            "Rule_Description": "Before a fresh Customer Data VSAM file can be created and reloaded, the existing Customer Data VSAM file cluster \u2014 including all stored customer records and the Customer ID key index \u2014 must be fully removed from the system to ensure a clean, conflict-free rebuild.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The DELETE operation on the Customer Data VSAM file cluster (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) has completed and produced a return code",
+                "When": "The return code from the DELETE operation is evaluated to determine whether it is less than or equal to 8",
+                "Then": "IF the return code is 0 (the Customer Data VSAM file existed and was successfully deleted), THEN the return code is reset to 0 (success) and the refresh process continues to the file creation step; IF the return code is 8 (the Customer Data VSAM file did not exist \u2014 acceptable in a re-run scenario where a prior execution already deleted it), THEN the return code is also reset to 0 (success) and the refresh process continues to the file creation step; IF the return code is greater than 8 (a critical error prevented the deletion from completing), THEN the return code remains elevated, the deletion is considered failed, and the refresh process must not proceed to subsequent steps"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Customer Data File Deletion Outcome Validation",
+            "Rule_Description": "After the Customer Data VSAM file deletion is attempted, the outcome must be evaluated to determine whether the refresh process can safely continue. The job is designed to be re-runnable \u2014 a missing file is treated as an acceptable condition, not a failure, so that a previously interrupted refresh can be restarted without manual intervention.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file does not yet exist and needs to be created for the CardDemo application",
+                "When": "The Customer Data VSAM file creation process is initiated",
+                "Then": "A new Key-Sequenced (INDEXED) VSAM file named 'AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS' must be created, consisting of exactly two components: (1) a DATA component named 'AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.DATA' that physically stores all customer records, and (2) an INDEX component named 'AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.INDEX' that maintains the Customer ID key index to enable direct record lookup by Customer ID"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Data VSAM File Identity and Component Structure",
+            "Rule_Description": "Defines the Customer Data VSAM file with its unique name and establishes its two physical storage components \u2014 a Data component for customer records and an Index component for key-based retrieval \u2014 organized as a Key-Sequenced (indexed) file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file is being defined with its record structure",
+                "When": "The key field configuration is applied to the file",
+                "Then": "The Customer ID must be defined as the unique key for each customer record, occupying exactly 9 characters starting at the very first position (position 0) of every record; no two customer records may share the same Customer ID, and all record retrieval and ordering must be based on this 9-character Customer ID key"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Record Unique Key Definition",
+            "Rule_Description": "Establishes the Customer ID as the unique identifier for every customer record, defining its exact position and length within the record structure to enable direct retrieval and uniqueness enforcement.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file is being defined with its record format",
+                "When": "The record size parameters are applied to the file definition",
+                "Then": "Every customer record written to the file must be exactly 500 bytes in length; both the average record size and the maximum record size are set to 500 bytes, meaning variable-length records are not permitted \u2014 all customer records must conform to this fixed 500-byte structure"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Record Fixed-Length Size Constraint",
+            "Rule_Description": "Enforces that every customer record stored in the Customer Data VSAM file must be exactly 500 bytes in length, establishing a fixed-length record structure with no variation permitted.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file is being created and requires disk storage allocation",
+                "When": "The storage parameters are applied during file creation",
+                "Then": "The Customer Data VSAM file must be allocated 1 cylinder of primary storage on disk volume 'AWSHJ1'; if the initial storage becomes full as the customer base grows, the file must automatically expand by allocating additional storage in increments of 5 cylinders at a time from the same volume 'AWSHJ1'"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Data File Storage Capacity and Expansion",
+            "Rule_Description": "Defines the initial disk storage allocation for the Customer Data VSAM file and its automatic expansion capacity to accommodate growth in the customer base, on a designated storage volume.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file is active and multiple jobs or systems need to access it simultaneously",
+                "When": "The concurrent access sharing rules are applied to the file definition",
+                "Then": "The file must permit multiple jobs within the same system to read customer records simultaneously (Share Option 2 \u2014 cross-region); AND the file must permit write access from jobs running on different systems (Share Option 3 \u2014 cross-system), enabling both batch and online CardDemo transactions to access customer data concurrently without exclusive locking"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Data File Concurrent Access Policy",
+            "Rule_Description": "Establishes the rules governing how multiple jobs or systems may simultaneously access the Customer Data VSAM file, balancing availability for concurrent reads with controlled write access across systems.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data VSAM file has been defined with the ERASE security attribute",
+                "When": "A deletion of the Customer Data VSAM file is executed at any future point",
+                "Then": "All customer records stored in the file must be physically overwritten and erased from the disk storage \u2014 no residual customer data must remain readable or recoverable on the disk after the file is deleted, ensuring full data security compliance"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Customer Data Physical Security on File Deletion",
+            "Rule_Description": "Enforces a data security policy requiring that all customer data stored in the VSAM file is physically wiped from disk whenever the file is deleted, ensuring no residual customer information remains recoverable after deletion.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data source flat file (AWS.M2.CARDDEMO.CUSTDATA.PS) is available and accessible in shared read mode, AND the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) has been freshly created and is empty and accessible in shared mode",
+                "When": "The Customer Data reload process is triggered to transfer all customer records from the sequential flat file into the Customer Data VSAM file",
+                "Then": "1. Every customer record from the source flat file (AWS.M2.CARDDEMO.CUSTDATA.PS) is read sequentially from start to finish AND transferred into the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS), AND 2. Each customer record is stored and indexed in the VSAM file by its unique 9-character Customer ID, enabling direct retrieval by Customer ID, AND 3. If a customer record being loaded has a Customer ID that already exists in the VSAM file (duplicate Customer ID), that duplicate record is REJECTED and an error is written to the processing log, while all remaining non-duplicate records continue to be loaded, AND 4. The process constitutes a FULL replacement reload \u2014 every customer record present in the source flat file is transferred, resulting in the VSAM file being a complete mirror of the flat file upon successful completion, AND 5. The source flat file remains unchanged and accessible to other concurrent readers throughout the load process"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Full Customer Data Reload from Flat File to VSAM",
+            "Rule_Description": "This step performs a complete reload of all customer records from the authoritative sequential flat file into the Customer Data VSAM file. All existing VSAM content has already been removed in prior steps, and this step repopulates it entirely from the source flat file.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data reload from the flat file (AWS.M2.CARDDEMO.CUSTDATA.PS) into the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) is in progress",
+                "When": "A customer record being loaded from the flat file contains a 9-character Customer ID that is identical to a Customer ID already loaded into the VSAM file",
+                "Then": "1. The duplicate customer record is REJECTED and NOT written into the Customer Data VSAM file, AND 2. An error message identifying the duplicate Customer ID is written to the processing log (SYSPRINT), AND 3. The reload process continues processing all remaining customer records from the flat file without interruption \u2014 a single duplicate does not stop the entire load"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Customer Record Uniqueness Enforcement During Load",
+            "Rule_Description": "During the customer data reload, the VSAM file enforces that each customer record must have a unique Customer ID. Any record from the source flat file that carries a Customer ID already present in the VSAM file is rejected to maintain data integrity.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Data reload step (STEP15) is executing and transferring customer records from the flat file to the VSAM file",
+                "When": "Other jobs or processes attempt to access the Customer Data source flat file (AWS.M2.CARDDEMO.CUSTDATA.PS) or the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) during the reload",
+                "Then": "1. Other jobs are PERMITTED to read the source Customer Data flat file (AWS.M2.CARDDEMO.CUSTDATA.PS) concurrently while the reload is in progress, AND 2. Other jobs are PERMITTED to access the Customer Data VSAM file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) in shared mode during the reload, consistent with the file's defined sharing policy"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Concurrent Access Policy During Customer Data Reload",
+            "Rule_Description": "Both the source Customer Data flat file and the target Customer Data VSAM file are opened in shared access mode during the reload, defining the concurrent access policy for other processes during the refresh window.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CUSTFILE-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The batch Customer Data file refresh process (delete, define, and reload of the Customer Data VSAM file) has completed successfully, and the Customer Data file CUSTDAT is currently in a CLOSED state within the CICS online region CICSAWSA \u2014 as it was closed at the beginning of the batch refresh job to protect data integrity during processing",
+                "When": "The system sends an operator command to the CICS region CICSAWSA instructing it to OPEN the Customer Data file identified by the name CUSTDAT",
+                "Then": "The Customer Data file CUSTDAT transitions from CLOSED to OPEN status within the CICS online region CICSAWSA, and online CardDemo application transactions are immediately able to read and access the refreshed customer records from the updated Customer Data VSAM file"
+            },
+            "Rule_Name": "OPCIFIL - SDSF - Reopen Customer Data File in CICS Online System After Batch Refresh",
+            "Rule_Description": "After the Customer Data VSAM file has been fully refreshed in batch (deleted, recreated, and reloaded), the Customer Data file must be reopened in the CICS online system to restore access for online users. This step sends an operator command to the CICS region CICSAWSA to open the Customer Data file CUSTDAT, making it available for online CardDemo transactions.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#fff\n\n    A([Job Start:\nCustomer Data VSAM File Refresh]):::start\n\n    B[CLCIFIL - SDSF\nClose Customer Data File CUSTDAT in CICS Online System\nPrevent Online User Access During Batch Refresh]:::process\n\n    C[STEP05 - IDCAMS\nDelete Existing Customer Data VSAM File\nRemove Old Customer Records from System]:::process\n\n    D{STEP05 - Delete Result:\nReturn Code \u2264 8 ?}:::decision\n\n    ERR([Job Ends with Error:\nCritical Failure During\nCustomer Data VSAM File Deletion]):::error\n\n    E[STEP10 - IDCAMS\nCreate New Empty Customer Data VSAM File\nDefine Fresh File Structure Keyed on Customer ID]:::process\n\n    F[STEP15 - IDCAMS REPRO\nLoad All Customer Records\ninto Refreshed Customer Data VSAM File]:::process\n\n    G[OPCIFIL - SDSF\nReopen Customer Data File CUSTDAT in CICS Online System\nRestore Online User Access to Refreshed Customer Data]:::process\n\n    H([Job End:\nCustomer Data Refresh Complete\nOnline Access to Refreshed Customer Data Restored]):::final\n\n    DS1[(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS\nCustomer Data VSAM File)]:::datasource\n\n    A --> B\n    B --> C\n    C -.->|DELETE - Remove Old\nCustomer Data VSAM File| DS1\n    C --> D\n    D -->|Yes - File Successfully Deleted\nor File Did Not Exist - Both Acceptable| E\n    D -->|No - Critical Delete\nError Occurred| ERR\n    E -.->|CREATE - Define New\nEmpty VSAM File Structure| DS1\n    E --> F\n    F -.->|LOAD - Write All\nCustomer Records into VSAM File| DS1\n    F --> G\n    G --> H"
+}

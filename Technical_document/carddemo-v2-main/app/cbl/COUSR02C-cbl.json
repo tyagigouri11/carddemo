@@ -1,0 +1,397 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COUSR02C.cbl",
+        "type": "cobol",
+        "transaction_id": "CU02"
+      },
+      "overview": "COUSR02C is part of the CardDemo application, a credit card management system that handles administrative functions including user account management. This program operates within the administrative workflow, allowing authorized personnel to look up and modify existing user records in the security file. The program provides a CICS interactive screen (transaction CU02) that enables administrators to update user profile information — including first name, last name, password, and user type — stored in the USRSEC security file, ensuring user credentials and roles remain current and accurate.",
+      "key_features": [
+        {
+          "feature": "User Lookup",
+          "description": "Retrieves an existing user record from the USRSEC file by User ID, displaying current profile details on screen for review before editing."
+        },
+        {
+          "feature": "Field Validation",
+          "description": "Validates that all required fields (User ID, First Name, Last Name, Password, User Type) are non-empty before allowing an update to proceed."
+        },
+        {
+          "feature": "Change Detection",
+          "description": "Compares screen input against the existing record and only triggers a file update if at least one field has actually been modified, preventing unnecessary writes."
+        },
+        {
+          "feature": "User Record Update",
+          "description": "Rewrites the modified user record back to the USRSEC file using a CICS UPDATE/REWRITE pattern, ensuring data integrity with locked record reads."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Supports multiple PF key actions: PF3 saves and returns to the previous screen, PF4 clears the screen, PF5 saves updates in place, and PF12 cancels and returns to the admin menu."
+        },
+        {
+          "feature": "Error Messaging",
+          "description": "Provides contextual error messages for conditions such as empty fields, user not found, and file access failures, guiding the administrator to correct input."
+        },
+        {
+          "feature": "Screen Header Population",
+          "description": "Dynamically populates the screen header with the current date, time, transaction ID, and program name on every screen send."
+        },
+        {
+          "feature": "Communication Area Management",
+          "description": "Uses a shared COMMAREA to maintain session context, track the originating program, and support navigation back to the appropriate calling screen."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "USRSEC",
+        "type": "Read/Write",
+        "description": "User security file - reads user records by user ID to retrieve first name, last name, password, and user type; rewrites updated user records when modifications are made"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN; if zero, redirects to sign-on screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA and determines if this is a first-time entry or re-entry.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-CU02-USR-SELECTED"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "First Entry Screen Initialization",
+          "description": "On first entry, sets re-enter flag, clears output map, and if a user ID was pre-selected from a prior screen (CDEMO-CU02-USR-SELECTED), populates the user ID input field and triggers a read of the user record before sending the update screen.",
+          "records": [
+            "CDEMO-CU02-USR-SELECTED",
+            "USRIDINI OF COUSR2AI",
+            "USRIDINL OF COUSR2AI",
+            "COUSR2AO"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive User Update Screen Input",
+          "description": "On re-entry, receives the BMS map COUSR2A from the terminal into COUSR2AI, capturing all user-entered field values including user ID, first name, last name, password, and user type.",
+          "records": [
+            "COUSR2AI",
+            "USRIDINI",
+            "FNAMEI",
+            "LNAMEI",
+            "PASSWDI",
+            "USRTYPEI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Evaluation and Routing",
+          "description": "Evaluates the EIBAID to determine user intent: ENTER triggers lookup, PF3 triggers update then navigates back, PF4 clears the screen, PF5 triggers update in place, PF12 navigates back without update. Invalid keys set error flag.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "DFHPF4",
+            "DFHPF5",
+            "DFHPF12",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Validate User ID for Lookup",
+          "description": "PROCESS-ENTER-KEY validates that the user ID input field is not empty. If empty, sets error flag and sends error screen. If valid, clears other input fields and moves user ID to the file key field.",
+          "records": [
+            "USRIDINI OF COUSR2AI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "USRIDINL OF COUSR2AI",
+            "SEC-USR-ID"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read User Security Record",
+          "description": "Issues a CICS READ with UPDATE intent against the USRSEC file using SEC-USR-ID as the key. On success, populates screen fields with existing user data and prompts for edits. On NOTFND or error, sets error flag and displays appropriate message.",
+          "records": [
+            "SEC-USR-ID",
+            "SEC-USER-DATA",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-PWD",
+            "SEC-USR-TYPE",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Populate Screen with Retrieved User Data",
+          "description": "After a successful read, moves the retrieved user fields (first name, last name, password, user type) from the security record into the screen input map fields for display and editing.",
+          "records": [
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-PWD",
+            "SEC-USR-TYPE",
+            "FNAMEI OF COUSR2AI",
+            "LNAMEI OF COUSR2AI",
+            "PASSWDI OF COUSR2AI",
+            "USRTYPEI OF COUSR2AI"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Validate All Fields Before Update",
+          "description": "UPDATE-USER-INFO validates that user ID, first name, last name, password, and user type are all non-empty. Any empty field sets the error flag, positions the cursor on the offending field, and sends the screen with an error message.",
+          "records": [
+            "USRIDINI",
+            "FNAMEI",
+            "LNAMEI",
+            "PASSWDI",
+            "USRTYPEI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "USRIDINL",
+            "FNAMEL",
+            "LNAMEL",
+            "PASSWDL",
+            "USRTYPEL"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Re-read User Record for Update Lock",
+          "description": "Before applying changes, re-reads the USRSEC record with UPDATE intent to establish a record lock, ensuring no concurrent modification. Compares each screen field against the retrieved record to detect actual changes.",
+          "records": [
+            "SEC-USR-ID",
+            "SEC-USER-DATA",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-PWD",
+            "SEC-USR-TYPE",
+            "WS-USR-MODIFIED"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Detect Field-Level Changes",
+          "description": "Compares each input field (first name, last name, password, user type) against the corresponding value in the retrieved record. If any field differs, moves the new value into the record and sets the USR-MODIFIED-YES flag.",
+          "records": [
+            "FNAMEI",
+            "LNAMEI",
+            "PASSWDI",
+            "USRTYPEI",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-PWD",
+            "SEC-USR-TYPE",
+            "WS-USR-MODIFIED"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Rewrite Updated User Security Record",
+          "description": "If modifications were detected, issues a CICS REWRITE to persist the updated SEC-USER-DATA record to the USRSEC file. On success, displays a green confirmation message. On NOTFND or error, sets error flag and displays appropriate message.",
+          "records": [
+            "SEC-USER-DATA",
+            "SEC-USR-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-MESSAGE",
+            "ERRMSGC OF COUSR2AO"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Populate Screen Header Information",
+          "description": "Before each screen send, populates the header area with application titles, transaction ID, program name, current date, and current time derived from FUNCTION CURRENT-DATE.",
+          "records": [
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-TRANID",
+            "WS-PGMNAME",
+            "WS-CURDATE-DATA",
+            "WS-CURDATE-MM-DD-YY",
+            "WS-CURTIME-HH-MM-SS",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Send User Update Screen",
+          "description": "Sends the BMS map COUSR2A from mapset COUSR02 to the terminal with ERASE and CURSOR options, displaying current field values, header info, and any error or status messages.",
+          "records": [
+            "COUSR2AO",
+            "ERRMSGO",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Return to Previous Screen via XCTL",
+          "description": "On PF3 or PF12, transfers control to the calling program (CDEMO-FROM-PROGRAM or defaulting to COADM01C) via CICS XCTL, passing the updated COMMAREA with from-program and from-transaction identifiers.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "CICS Pseudo-Conversational Return",
+          "description": "Program ends with CICS RETURN specifying transaction ID CU02 and the COMMAREA, enabling pseudo-conversational processing so the next user interaction re-invokes the program.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA presence required for operation",
+          "description": "If EIBCALEN is zero, the program cannot function and immediately redirects to the sign-on screen COSGN00C. All subsequent logic depends on a valid CARDDEMO-COMMAREA being passed from a prior program."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER state flag controls flow branching",
+          "description": "The CDEMO-PGM-REENTER flag in CARDDEMO-COMMAREA distinguishes first-time entry from subsequent interactions. On first entry the flag is set to TRUE and the screen is initialized; on re-entry the received screen data is processed. Incorrect state leads to wrong processing path."
+        },
+        {
+          "dependency": "CDEMO-CU02-USR-SELECTED pre-population dependency",
+          "description": "If a calling program (e.g., a user list screen) places a user ID in CDEMO-CU02-USR-SELECTED within the COMMAREA, the update screen auto-populates and reads the user record on first entry. If this field is blank, the operator must manually enter a user ID."
+        },
+        {
+          "dependency": "READ-with-UPDATE lock must precede REWRITE",
+          "description": "The CICS READ with UPDATE option establishes an exclusive record lock on the USRSEC record. The subsequent REWRITE depends on this lock being held. If the READ fails or is not performed, the REWRITE will fail. This lock is acquired twice: once in PROCESS-ENTER-KEY and once in UPDATE-USER-INFO, which may cause the second READ to encounter a lock held from the first."
+        },
+        {
+          "dependency": "WS-ERR-FLG gates all downstream processing",
+          "description": "The error flag WS-ERR-FLG is checked with NOT ERR-FLG-ON before proceeding to file I/O in both PROCESS-ENTER-KEY and UPDATE-USER-INFO. Any validation failure sets this flag and short-circuits further processing, preventing file reads or writes."
+        },
+        {
+          "dependency": "WS-USR-MODIFIED flag gates REWRITE execution",
+          "description": "The REWRITE to USRSEC is only performed if USR-MODIFIED-YES is set, meaning at least one field differed from the stored record. If no changes are detected, a warning message is displayed and no write occurs, preventing unnecessary I/O."
+        },
+        {
+          "dependency": "Field validation order in UPDATE-USER-INFO",
+          "description": "Validation is performed sequentially using EVALUATE TRUE with WHEN clauses. Only the first failing field is reported per invocation. All five fields (user ID, first name, last name, password, user type) must be non-empty before the file read and comparison logic executes."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM determines return navigation target",
+          "description": "On PF3, the program returns to CDEMO-FROM-PROGRAM if set, otherwise defaults to COADM01C. On PF12, it always returns to COADM01C. The correct population of CDEMO-FROM-PROGRAM by the calling program is required for proper navigation."
+        },
+        {
+          "dependency": "BMS map COUSR02 / COUSR2A field name alignment",
+          "description": "All screen I/O depends on the BMS map definitions in copybook COUSR02.cpy. Field names such as USRIDINI, FNAMEI, LNAMEI, PASSWDI, USRTYPEI (input) and their output counterparts must match the compiled BMS mapset COUSR02 exactly."
+        },
+        {
+          "dependency": "SEC-USER-DATA record layout alignment with USRSEC file",
+          "description": "The READ and REWRITE operations use SEC-USER-DATA as defined in CSUSR01Y.cpy. The record length and field layout must exactly match the VSAM USRSEC file definition. Any mismatch causes data corruption or CICS length errors."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS BMS (Basic Mapping Support)",
+          "type": "Terminal I/O middleware",
+          "purpose": "Sends and receives the user update screen (map COUSR2A, mapset COUSR02) to and from the 3270 terminal, handling field-level cursor positioning, attribute control (color, intensity), and ERASE operations."
+        },
+        {
+          "system": "CICS File Control (VSAM)",
+          "type": "Transactional file I/O service",
+          "purpose": "Provides READ with UPDATE and REWRITE services against the USRSEC VSAM file for retrieving and persisting user security records (user ID, password, user type, name fields) with record-level locking."
+        },
+        {
+          "system": "CICS Program Control (XCTL)",
+          "type": "Inter-program transfer service",
+          "purpose": "Transfers control to other CardDemo programs (COADM01C, COSGN00C, or the originating program) passing the shared COMMAREA, enabling pseudo-conversational navigation between screens."
+        },
+        {
+          "system": "CICS Task Control (RETURN with TRANSID)",
+          "type": "Pseudo-conversational transaction management",
+          "purpose": "Returns control to CICS specifying transaction ID CU02 and the COMMAREA, suspending the task between user interactions and re-invoking the program on the next terminal input without holding server resources."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates mandatory fields (User ID, First Name, Last Name, Password, User Type) before any file operation. When a field is empty or contains LOW-VALUES, WS-ERR-FLG is set to 'Y', a descriptive message is moved to WS-MESSAGE, cursor is positioned to the offending field via negative length value (e.g., USRIDINL, FNAMEL), and SEND-USRUPD-SCREEN is performed to redisplay the screen with the error. Validation is sequential using EVALUATE TRUE, stopping at the first failed field."
+      },
+      {
+        "category": "File Read Errors (READ-USER-SEC-FILE)",
+        "description": "After CICS READ with UPDATE, WS-RESP-CD is evaluated. DFHRESP(NORMAL) continues processing and prompts user to press PF5. DFHRESP(NOTFND) sets ERR-FLG-ON, displays 'User ID NOT found...' with cursor on User ID field. Any OTHER response logs RESP and REAS codes via DISPLAY to SYSOUT, sets ERR-FLG-ON, and displays 'Unable to lookup User...' with cursor on First Name field. All error paths redisplay the screen via SEND-USRUPD-SCREEN."
+      },
+      {
+        "category": "File Update Errors (UPDATE-USER-SEC-FILE)",
+        "description": "After CICS REWRITE, WS-RESP-CD is evaluated. DFHRESP(NORMAL) displays a green success message with the updated user ID. DFHRESP(NOTFND) sets ERR-FLG-ON and displays 'User ID NOT found...' with cursor on User ID field. Any OTHER response logs RESP and REAS codes via DISPLAY, sets ERR-FLG-ON, and displays 'Unable to Update User...' with cursor on First Name field. All paths redisplay the screen."
+      },
+      {
+        "category": "No-Modification Guard",
+        "description": "Before performing the file update, the program compares each input field against the currently read record values. If no field has changed, USR-MODIFIED-YES is never set, and instead of updating, a red warning message 'Please modify to update...' is displayed, preventing unnecessary or duplicate REWRITE operations."
+      },
+      {
+        "category": "Invalid Key / Unsupported AID Errors",
+        "description": "In the EVALUATE EIBAID block, any attention identifier key not explicitly handled (ENTER, PF3, PF4, PF5, PF12) falls into WHEN OTHER, which sets WS-ERR-FLG to 'Y', moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, and redisplays the screen to inform the user of the unsupported key press."
+      },
+      {
+        "category": "Session Initialization / Missing COMMAREA Errors",
+        "description": "If EIBCALEN equals zero, indicating no communication area was passed (e.g., direct transaction invocation without prior sign-on), the program immediately transfers control to 'COSGN00C' via RETURN-TO-PREV-SCREEN, enforcing proper application entry flow and preventing uninitialized data access."
+      },
+      {
+        "category": "Navigation Safety / Missing Target Program Errors",
+        "description": "In RETURN-TO-PREV-SCREEN, if CDEMO-TO-PROGRAM contains LOW-VALUES or SPACES, it defaults to 'COSGN00C' before executing XCTL, ensuring the program never attempts to transfer control to an undefined or blank program name."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COUSR02",
+        "map_name": "COUSR2A",
+        "business_function": "Provides a CICS 3270 terminal interface for updating an existing user record in the CardDemo application. The screen allows an administrator to look up a user by User ID and modify their First Name, Last Name, Password, and User Type (Admin or User). Changes are persisted to the USRSEC security file via CICS REWRITE commands."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COUSR02 - Update User</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background-color:#000;color:#00ff00;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .blue{color:#4444ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff0000;} .turquoise{color:#00ffff;} .white{color:#ffffff;} .neutral{color:#ffffff;font-weight:bold;} .input-field{background-color:#000;border-bottom:1px solid #00ff00;color:#00ff00;display:inline-block;} .input-dark{background-color:#000;border-bottom:1px solid #00ff00;color:#000;display:inline-block;} .row{white-space:pre;height:1.5em;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CU02</span><span class='blue'>          </span><span class='yellow'>    CardDemo - User Management      </span><span class='blue'>  Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COUSR02C</span><span class='blue'>      </span><span class='yellow'>      Update User Screen             </span><span class='blue'>  Time: </span><span class='blue'>23:12:34</span></div><div class='row'></div><div class='row'><span class='white' style='font-weight:bold'>                                  Update User</span></div><div class='row'></div><div class='row'><span class='green'>     Enter User ID: </span><span class='input-field' style='width:8ch;'>USER0001</span></div><div class='row'></div><div class='row'><span class='yellow'>     *****************************************************************************</span></div><div class='row'></div><div class='row'></div><div class='row'><span class='turquoise'>     First Name: </span><span class='input-field' style='width:20ch;'>John                </span><span class='turquoise'>    Last Name: </span><span class='input-field' style='width:20ch;'>Smith               </span></div><div class='row'></div><div class='row'><span class='turquoise'>     Password: </span><span class='input-dark' style='width:8ch;'>        </span><span class='blue'> (8 Char)</span></div><div class='row'></div><div class='row'><span class='turquoise'>     User Type:  </span><span class='input-field' style='width:1ch;'>U</span><span class='blue'> (A=Admin, U=User)</span></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'><span class='red'>Press PF5 key to save your updates ...                                        </span></div><div class='row'><span class='yellow'>ENTER=Fetch  F3=Save&amp;Exit  F4=Clear  F5=Save  F12=Cancel                     </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Fetch user record - looks up the user by the entered User ID and populates First Name, Last Name, Password, and User Type fields from the USRSEC file"
+        },
+        {
+          "key": "F3",
+          "action": "Save and Exit - validates and saves any modifications to the user record, then returns to the previous screen (COADM01C admin menu or the calling program)"
+        },
+        {
+          "key": "F4",
+          "action": "Clear - clears all input fields on the current screen and resets the form to blank"
+        },
+        {
+          "key": "F5",
+          "action": "Save - validates and saves any modifications to the user record in the USRSEC file without navigating away from the screen"
+        },
+        {
+          "key": "F12",
+          "action": "Cancel - returns to the admin menu (COADM01C) without saving any changes"
+        }
+      ]
+    }
+  }
+}

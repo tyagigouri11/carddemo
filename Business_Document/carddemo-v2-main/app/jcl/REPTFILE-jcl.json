@@ -1,0 +1,32 @@
+{
+    "created_on": "2026-11-05",
+    "name": "REPTFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/REPTFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job defines a Generation Data Group (GDG) named AWS.M2.CARDDEMO.TRANREPT to manage multiple generations of transaction report files, allowing up to 10 generations to be retained at any given time.Key Functionalities:\nDefines a new Generation Data Group (GDG) base entry named AWS.M2.CARDDEMO.TRANREPT to organize and manage versioned transaction report files.\nSets a retention limit of 10 generations, meaning up to 10 historical versions of the transaction report file can be stored and tracked simultaneously.\nEstablishes the catalog structure required before any actual transaction report files can be created and stored under this GDG.",
+    "rules": [
+        {
+            "Rule_Id": "R-REPTFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The system catalog does not already contain a Generation Data Group entry named AWS.M2.CARDDEMO.TRANREPT",
+                "When": "The Transaction Report storage group initialization job is executed",
+                "Then": "A Generation Data Group named AWS.M2.CARDDEMO.TRANREPT is successfully registered in the system catalog, making it available for all future Card Demo Transaction Report generation processes"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Define Transaction Report Generation Data Group",
+            "Rule_Description": "Establishes a versioned storage group named AWS.M2.CARDDEMO.TRANREPT in the system catalog, enabling the Card Demo application to store and manage multiple rolling versions of its Transaction Reports.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-REPTFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Report Generation Data Group AWS.M2.CARDDEMO.TRANREPT is registered in the system catalog with a maximum retention limit of 10 versions",
+                "When": "A new version of the Card Demo Transaction Report is produced and stored, causing the total number of retained versions to exceed 10",
+                "Then": "The oldest version of the Transaction Report is automatically retired and removed from the catalog, ensuring that at no point more than 10 versions of the Transaction Report are retained simultaneously"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Transaction Report Version Retention Limit",
+            "Rule_Description": "Enforces a rolling retention policy that limits the number of simultaneously available Transaction Report versions to a maximum of 10, ensuring automatic retirement of the oldest version when the limit is exceeded.",
+            "Rule_Type": "Validation Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START]):::start\n    B[_STEP05 - IDCAMS\n    Define Transaction Report GDG Base\n    AWS.M2.CARDDEMO.TRANREPT\n    Retain Up To 10 Rolling Report Versions_]:::process\n    C{STEP05\n    Completed\n    Successfully?}:::decision\n    D[_Transaction Report GDG Catalog Entry\n    Successfully Registered\n    AWS.M2.CARDDEMO.TRANREPT\n    \u2714 Up to 10 Generations of Transaction\n    Reports Can Now Be Stored & Managed_]:::process\n    E([JOB COMPLETED SUCCESSFULLY\n    Transaction Report GDG Base\n    Is Ready For Use]):::success\n    F([JOB FAILED\n    GDG Base Already Exists\n    OR Catalog Registration Error\n    Manual Intervention Required]):::error\n\n    A --> B\n    B --> C\n    C -->|Yes - GDG Base Created| D\n    D --> E\n    C -->|No - Duplicate or Error| F\n\n    classDef start fill:#ff6666,color:#fff,font-weight:bold\n    classDef process fill:#6699ff,color:#fff,font-weight:bold\n    classDef decision fill:#ffcc00,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,color:#000,font-weight:bold\n    classDef final fill:#ae74de,color:#fff,font-weight:bold\n    classDef success fill:#22c55e,color:#fff,font-weight:bold\n    classDef error fill:#ef4444,color:#fff,font-weight:bold"
+}

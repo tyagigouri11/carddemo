@@ -1,0 +1,87 @@
+{
+    "created_on": "2026-11-05",
+    "name": "REPRTEST.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/REPRTEST.jcl",
+    "type": "jcl",
+    "description": "This JCL job performs a backup of the CardDemo transaction VSAM file by using the IDCAMS REPRO utility to copy all transaction records from the active VSAM KSDS file into a new sequential backup Generation Data Group (GDG) dataset. The job creates a new generation of the backup file each time it runs, preserving historical copies of the transaction data.Key Functionalities:\nReads all transaction records from the active CardDemo transaction VSAM KSDS file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) as the source input.\nCreates a new generation backup copy (+1) of the transaction data in a sequential GDG dataset (AWS.M2.CARDDEMO.TRANSACT.BKUP) with fixed-length records of 350 bytes per record.\nThe newly created backup dataset is cataloged and allocated on disk with an initial space of 1 cylinder with 1 cylinder extension, and unused space is released upon job completion.",
+    "rules": [
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The live Card Demo Transaction VSAM master file (FILEIN: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) is available and accessible",
+                "When": "The REPRO utility is executed with INFILE pointing to the live transaction file and OUTFILE pointing to the backup destination",
+                "Then": "Every card transaction record from the live transaction master file is copied in full to the backup file \u2014 no records are skipped, filtered, or partially extracted"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Full Copy of All Card Transaction Records",
+            "Rule_Description": "All card transaction records from the live transaction master file must be completely copied to the backup file without any filtering, selection, or exclusion criteria.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The live Card Demo Transaction VSAM master file may be actively accessed by other business processes or users",
+                "When": "The backup process begins reading records from the live transaction file",
+                "Then": "The transaction file is accessed in shared mode, allowing all other concurrent processes to continue reading from or writing to the live transaction file without any interruption or lock-out"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Non-Disruptive Shared Access to Live Transaction File",
+            "Rule_Description": "The backup process must not block or interrupt other business processes that are concurrently accessing the live Card Demo Transaction file during the backup window.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo Transaction Backup Generation Data Group (AWS.M2.CARDDEMO.TRANSACT.BKUP) exists in the system catalog",
+                "When": "The backup copy process is initiated",
+                "Then": "A brand new generation (+1) of the backup file is created as the next sequential version, and all previously created backup generations remain intact and accessible for historical reference or recovery"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - New Versioned Backup Generation Creation",
+            "Rule_Description": "Each execution of the backup job must produce a new, uniquely versioned snapshot of the Card Demo Transaction data, while all prior backup generations are preserved.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "A new backup generation has been created and the REPRO copy process is running",
+                "When": "The REPRO utility completes all record copying without any errors",
+                "Then": "The new backup generation is permanently cataloged in the system, making it available and retrievable for any future card transaction data recovery, audit, or reference needs"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Backup Cataloged Upon Successful Completion",
+            "Rule_Description": "A successfully completed backup generation must be permanently cataloged and made available for business recovery or audit use.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A new backup generation has been initiated and the REPRO copy process is running",
+                "When": "The REPRO utility encounters an error or fails to complete successfully",
+                "Then": "The incomplete backup generation is automatically deleted from the system entirely, ensuring that no partial, corrupt, or unreliable backup data is ever retained, cataloged, or made available for recovery use"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Incomplete Backup Automatically Deleted on Failure",
+            "Rule_Description": "If the backup process fails for any reason, the incomplete or partial backup generation must be automatically discarded to prevent corrupt or unreliable data from being retained.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "Card transaction records are being written to the new backup generation file",
+                "When": "The backup file is created and records are stored",
+                "Then": "Every record in the backup file is stored at a fixed length of exactly 350 characters in fixed-block format, ensuring that the backup data is structurally consistent and reliable for any downstream recovery or audit process"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Fixed Record Length Enforcement for Backup File",
+            "Rule_Description": "All card transaction records written to the backup file must conform to a fixed record length of 350 characters to ensure structural consistency and data integrity of the backup.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-REPRTEST-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The backup file has been written with all card transaction records and the copy process has completed",
+                "When": "The backup job finishes writing data to the new backup generation",
+                "Then": "Any pre-allocated disk space that was not consumed by the backup data is automatically released back to the system, ensuring efficient and optimized use of storage resources without requiring manual intervention"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Automatic Release of Unused Backup Storage Space",
+            "Rule_Description": "After the backup data has been written, any pre-allocated disk space that was not used must be automatically released back to the system to optimize storage utilization.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start:\nCard Transaction Backup Job]):::start\n\n    B[PRC001 - IDCAMS\nCreate Full Backup of Card Transaction Data]:::process\n\n    DS1[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\nCard Demo Transaction VSAM Master File)]:::datasource\n\n    DS2[(AWS.M2.CARDDEMO.TRANSACT.BKUP - New Generation\nCard Demo Transaction Backup GDG File)]:::datasource\n\n    D{PRC001\nBackup Completed\nSuccessfully?}:::decision\n\n    S[New Versioned Backup Generation\nCataloged and Retained on Disk\nfor Recovery and Audit Use]:::success\n\n    E[Incomplete Backup Generation\nAutomatically Deleted\nNo Partial Backup Retained]:::error\n\n    Z([Job End]):::final\n\n    A --> B\n    DS1 -.->|Read All Card Transaction Records| B\n    B -.->|Write Full Backup Copy as New Generation| DS2\n    DS2 --> D\n    D -->|Yes| S\n    D -->|No| E\n    S --> Z\n    E --> Z\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

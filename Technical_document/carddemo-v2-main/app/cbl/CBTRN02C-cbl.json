@@ -1,0 +1,332 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBTRN02C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBTRN02C is a batch COBOL program within the CardDemo credit card processing application, operating as a daily end-of-day transaction posting engine. It sits at a critical point in the payment processing workflow, responsible for moving validated daily transactions into permanent records and updating account balances accordingly. The program reads a sequential daily transaction file, validates each transaction against card cross-reference and account master data, and posts approved transactions to the permanent transaction file while routing rejected transactions to a separate rejects file. It solves the core business problem of ensuring only valid, within-limit, non-expired card transactions are permanently recorded and that account balances remain accurate and current.",
+      "key_features": [
+        {
+          "feature": "Daily Transaction Ingestion",
+          "description": "Sequentially reads all transactions from the daily transaction input file (DALYTRAN) for processing."
+        },
+        {
+          "feature": "Card Number Validation",
+          "description": "Looks up each transaction's card number in the card-to-account cross-reference file (XREF) to confirm the card is recognized; rejects transactions with invalid card numbers."
+        },
+        {
+          "feature": "Account Validation",
+          "description": "Retrieves the associated account record to verify the account exists and is valid before allowing a transaction to post."
+        },
+        {
+          "feature": "Credit Limit Enforcement",
+          "description": "Calculates a projected balance including the new transaction amount and rejects any transaction that would cause the account to exceed its credit limit."
+        },
+        {
+          "feature": "Account Expiration Check",
+          "description": "Compares the transaction origination timestamp against the account expiration date, rejecting transactions submitted after the account has expired."
+        },
+        {
+          "feature": "Transaction Posting",
+          "description": "Writes validated transactions to the permanent indexed transaction file (TRANSACT), capturing full transaction details including a DB2-formatted processing timestamp."
+        },
+        {
+          "feature": "Account Balance Update",
+          "description": "Updates the account master record with the new current balance and cycle-to-date credit or debit totals to reflect each posted transaction."
+        },
+        {
+          "feature": "Transaction Category Balance Tracking",
+          "description": "Maintains running balance totals by account, transaction type, and category in the TCATBAL file, creating new category records as needed."
+        },
+        {
+          "feature": "Reject File Writing",
+          "description": "Writes failed transactions along with a validation failure reason code and description to a daily rejects file for downstream review and reconciliation."
+        },
+        {
+          "feature": "Processing Summary Reporting",
+          "description": "Displays total transactions processed and total rejections at job completion, and sets a non-zero return code if any rejections occurred to signal downstream job steps."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "DALYTRAN-FILE",
+        "type": "Read",
+        "description": "Daily transaction input file (DALYTRAN) - sequentially read to obtain each daily transaction record including transaction ID, type, category, amount, card number, merchant details, and timestamps for processing"
+      },
+      {
+        "name": "XREF-FILE",
+        "type": "Read",
+        "description": "Card cross-reference file (XREFFILE) - randomly accessed by card number to look up the associated customer ID and account ID for transaction validation"
+      },
+      {
+        "name": "ACCOUNT-FILE",
+        "type": "Read-Write",
+        "description": "Account master file (ACCTFILE) - randomly read to validate credit limit, expiration date, and current balances; updated (rewritten) to reflect posted transaction amounts in current balance, cycle credit, and cycle debit fields"
+      },
+      {
+        "name": "TCATBAL-FILE",
+        "type": "Read-Write",
+        "description": "Transaction category balance file (TCATBALF) - randomly read and updated to accumulate transaction amounts by account ID, transaction type code, and category code; new records are created if no matching key exists"
+      },
+      {
+        "name": "TRANSACT-FILE",
+        "type": "Write",
+        "description": "Transaction master file (TRANFILE) - indexed output file where validated and posted transaction records are written, including all transaction details and a processing timestamp"
+      },
+      {
+        "name": "DALYREJS-FILE",
+        "type": "Write",
+        "description": "Daily rejects file (DALYREJS) - sequential output file where failed/rejected transaction records are written along with a validation trailer containing the failure reason code and description"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Open All Files",
+          "description": "Opens DALYTRAN (input sequential), TRANSACT (output indexed), XREF (input indexed), DALYREJS (output sequential), ACCOUNT (I-O indexed), and TCATBAL (I-O indexed) files. Any open failure causes immediate abend.",
+          "records": [
+            "DALYTRAN-STATUS",
+            "TRANFILE-STATUS",
+            "XREFFILE-STATUS",
+            "DALYREJS-STATUS",
+            "ACCTFILE-STATUS",
+            "TCATBALF-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Daily Transaction Record",
+          "description": "Sequentially reads the next record from the daily transaction input file (DALYTRAN) into DALYTRAN-RECORD. Sets END-OF-FILE flag to 'Y' on EOF, abends on any other read error.",
+          "records": [
+            "FD-TRAN-ID",
+            "FD-CUST-DATA",
+            "DALYTRAN-CARD-NUM",
+            "DALYTRAN-ID",
+            "DALYTRAN-AMT",
+            "DALYTRAN-TYPE-CD",
+            "DALYTRAN-CAT-CD",
+            "DALYTRAN-ORIG-TS"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Increment Transaction Counter",
+          "description": "Increments WS-TRANSACTION-COUNT for each record read. Resets validation failure reason and description to zero/spaces before validation begins.",
+          "records": [
+            "WS-TRANSACTION-COUNT",
+            "WS-VALIDATION-FAIL-REASON",
+            "WS-VALIDATION-FAIL-REASON-DESC"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Validate Transaction - Cross-Reference Lookup",
+          "description": "Uses DALYTRAN-CARD-NUM as key to perform a random READ on the XREF-FILE (XREFFILE). If the card number is not found, sets WS-VALIDATION-FAIL-REASON to 100 and description to 'INVALID CARD NUMBER FOUND'. On success, CARD-XREF-RECORD is populated including XREF-ACCT-ID.",
+          "records": [
+            "DALYTRAN-CARD-NUM",
+            "FD-XREF-CARD-NUM",
+            "FD-XREF-DATA",
+            "XREF-ACCT-ID",
+            "WS-VALIDATION-FAIL-REASON",
+            "WS-VALIDATION-FAIL-REASON-DESC"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Validate Transaction - Account Lookup and Business Rules",
+          "description": "Uses XREF-ACCT-ID to perform a random READ on ACCOUNT-FILE. If not found, sets fail reason 101. If found, computes a temporary balance (ACCT-CURR-CYC-CREDIT - ACCT-CURR-CYC-DEBIT + DALYTRAN-AMT) and checks against ACCT-CREDIT-LIMIT (fail reason 102 if over limit). Also checks ACCT-EXPIRAION-DATE against DALYTRAN-ORIG-TS (fail reason 103 if expired). ACCOUNT-RECORD is retained in memory for later update.",
+          "records": [
+            "XREF-ACCT-ID",
+            "FD-ACCT-ID",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-EXPIRAION-DATE",
+            "DALYTRAN-AMT",
+            "DALYTRAN-ORIG-TS",
+            "WS-TEMP-BAL",
+            "WS-VALIDATION-FAIL-REASON",
+            "WS-VALIDATION-FAIL-REASON-DESC"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Route Transaction - Post or Reject",
+          "description": "If WS-VALIDATION-FAIL-REASON equals 0, the transaction proceeds to posting. Otherwise, WS-REJECT-COUNT is incremented and the transaction is written to the reject file.",
+          "records": [
+            "WS-VALIDATION-FAIL-REASON",
+            "WS-REJECT-COUNT"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Write Reject Record",
+          "description": "For failed validations, copies DALYTRAN-RECORD into REJECT-TRAN-DATA and WS-VALIDATION-TRAILER (containing fail reason code and description) into VALIDATION-TRAILER. Writes the combined REJECT-RECORD to DALYREJS-FILE sequentially. Abends on write error.",
+          "records": [
+            "DALYTRAN-RECORD",
+            "REJECT-TRAN-DATA",
+            "WS-VALIDATION-FAIL-REASON",
+            "WS-VALIDATION-FAIL-REASON-DESC",
+            "VALIDATION-TRAILER",
+            "FD-REJS-RECORD"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Build Transaction Posting Record",
+          "description": "Maps all DALYTRAN fields to the TRAN-RECORD structure (from CVTRA05Y). Calls Z-GET-DB2-FORMAT-TIMESTAMP to generate a DB2-compatible processing timestamp from FUNCTION CURRENT-DATE and stores it in TRAN-PROC-TS.",
+          "records": [
+            "DALYTRAN-ID",
+            "DALYTRAN-TYPE-CD",
+            "DALYTRAN-CAT-CD",
+            "DALYTRAN-SOURCE",
+            "DALYTRAN-DESC",
+            "DALYTRAN-AMT",
+            "DALYTRAN-MERCHANT-ID",
+            "DALYTRAN-MERCHANT-NAME",
+            "DALYTRAN-MERCHANT-CITY",
+            "DALYTRAN-MERCHANT-ZIP",
+            "DALYTRAN-CARD-NUM",
+            "DALYTRAN-ORIG-TS",
+            "TRAN-ID",
+            "TRAN-PROC-TS",
+            "DB2-FORMAT-TS"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Update Transaction Category Balance (TCATBAL)",
+          "description": "Constructs a composite key from XREF-ACCT-ID, DALYTRAN-TYPE-CD, and DALYTRAN-CAT-CD. Attempts a random READ on TCATBAL-FILE. If the record does not exist (status '23'), initializes a new TRAN-CAT-BAL-RECORD, sets the key fields, adds DALYTRAN-AMT to TRAN-CAT-BAL, and WRITEs the new record. If the record exists, adds DALYTRAN-AMT to the existing TRAN-CAT-BAL and REWRITEs it. Abends on unexpected file errors.",
+          "records": [
+            "XREF-ACCT-ID",
+            "DALYTRAN-TYPE-CD",
+            "DALYTRAN-CAT-CD",
+            "FD-TRANCAT-ACCT-ID",
+            "FD-TRANCAT-TYPE-CD",
+            "FD-TRANCAT-CD",
+            "FD-TRAN-CAT-KEY",
+            "TRAN-CAT-BAL",
+            "TRAN-CAT-BAL-RECORD",
+            "WS-CREATE-TRANCAT-REC",
+            "TCATBALF-STATUS"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Update Account Record Balances",
+          "description": "Adds DALYTRAN-AMT to ACCT-CURR-BAL unconditionally. If DALYTRAN-AMT >= 0, also adds to ACCT-CURR-CYC-CREDIT; otherwise adds to ACCT-CURR-CYC-DEBIT. REWRITEs the updated ACCOUNT-RECORD back to ACCOUNT-FILE using the previously read record. Sets fail reason 109 if the rewrite key is not found.",
+          "records": [
+            "DALYTRAN-AMT",
+            "ACCT-CURR-BAL",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "FD-ACCTFILE-REC",
+            "ACCOUNT-RECORD",
+            "WS-VALIDATION-FAIL-REASON"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Write Posted Transaction to Transaction File",
+          "description": "Writes the fully populated TRAN-RECORD to the indexed TRANSACT-FILE (TRANFILE) using WRITE. Abends on any write error.",
+          "records": [
+            "TRAN-RECORD",
+            "FD-TRANFILE-REC",
+            "FD-TRANS-ID",
+            "TRANFILE-STATUS"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Close All Files and Report Counts",
+          "description": "Closes all six files in sequence. Displays total transactions processed and total rejected. Sets RETURN-CODE to 4 if any rejections occurred, signaling a warning condition to the job scheduler.",
+          "records": [
+            "WS-TRANSACTION-COUNT",
+            "WS-REJECT-COUNT",
+            "RETURN-CODE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "XREF Lookup Must Precede Account Lookup",
+          "description": "The account ID (XREF-ACCT-ID) used to key into ACCOUNT-FILE and TCATBAL-FILE is only available after a successful read of XREF-FILE using DALYTRAN-CARD-NUM. If the XREF lookup fails (reason code 100), the account lookup (step 1500-B) is skipped entirely via conditional branching."
+        },
+        {
+          "dependency": "Account Record Must Be Read Before Update",
+          "description": "The ACCOUNT-RECORD populated during validation step 1500-B-LOOKUP-ACCT is reused directly in 2800-UPDATE-ACCOUNT-REC. No second read is performed before the REWRITE. This means the in-memory record from validation must remain unmodified between validation and posting, creating a strict sequential dependency between these two phases."
+        },
+        {
+          "dependency": "Validation State Controls Posting Path",
+          "description": "WS-VALIDATION-FAIL-REASON acts as a gate. A non-zero value at the end of 1500-VALIDATE-TRAN unconditionally routes the transaction to the reject path (2500-WRITE-REJECT-REC) and bypasses all posting logic (2000-POST-TRANSACTION). This single field controls the entire transaction disposition."
+        },
+        {
+          "dependency": "TCATBAL Record Existence Determines Write vs. Rewrite",
+          "description": "The WS-CREATE-TRANCAT-REC flag is set based on whether the TCATBAL READ returns status '23' (not found) or '00' (found). A WRITE is issued for new records and a REWRITE for existing ones. Issuing the wrong operation would cause a file status error and abend."
+        },
+        {
+          "dependency": "TRANSACT-FILE Opened as OUTPUT (Destructive)",
+          "description": "TRANSACT-FILE (TRANFILE) is opened with OPEN OUTPUT, which clears any existing content before writing. This means the program is designed for a full daily reload of the transaction file, not an incremental append. Running this program twice on the same day without regenerating DALYTRAN would result in data loss."
+        },
+        {
+          "dependency": "Account Balance Computation Uses Cycle Credit/Debit Fields",
+          "description": "The overlimit check computes WS-TEMP-BAL as ACCT-CURR-CYC-CREDIT minus ACCT-CURR-CYC-DEBIT plus DALYTRAN-AMT. This depends on these cycle fields being accurately maintained. The subsequent 2800-UPDATE-ACCOUNT-REC also updates these same fields, so the correctness of future transactions within the same run depends on the accuracy of prior account updates within the same batch execution."
+        },
+        {
+          "dependency": "Timestamp Generation Dependency on System Clock",
+          "description": "TRAN-PROC-TS is generated via FUNCTION CURRENT-DATE at posting time in Z-GET-DB2-FORMAT-TIMESTAMP. All transactions posted in a single run will have timestamps reflecting actual wall-clock time at the moment of processing, not a single batch run timestamp. This creates a dependency on system clock accuracy and consistency."
+        },
+        {
+          "dependency": "Abend Routine Dependency on CEE3ABD",
+          "description": "The 9999-ABEND-PROGRAM paragraph calls the IBM Language Environment routine CEE3ABD with ABCODE=999 to force an abnormal termination. This is a hard dependency on the LE runtime being available in the execution environment. Without it, error handling for fatal file I/O failures cannot complete properly."
+        },
+        {
+          "dependency": "Copybook Data Structure Alignment",
+          "description": "The program relies on CVTRA06Y for DALYTRAN-RECORD layout, CVTRA05Y for TRAN-RECORD layout, CVACT03Y for CARD-XREF-RECORD layout, CVACT01Y for ACCOUNT-RECORD layout, and CVTRA01Y for TRAN-CAT-BAL-RECORD layout. Field-level moves between file buffers and working storage records (e.g., DALYTRAN-CARD-NUM to FD-XREF-CARD-NUM) depend on exact length and type compatibility defined in these copybooks."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "Each of the six files (DALYTRAN, TRANSACT, XREF, DALYREJS, ACCOUNT, TCATBAL) has a dedicated open paragraph. After each OPEN, the file status is checked against '00'. If not successful, APPL-RESULT is set to 12, an error message is DISPLAYed identifying the specific file, the IO-STATUS is populated, 9910-DISPLAY-IO-STATUS is performed to format and display the status code, and 9999-ABEND-PROGRAM is called to terminate the program abnormally."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "Each of the six files has a dedicated close paragraph mirroring the open error handling. After each CLOSE, the file status is checked against '00'. Failures set APPL-RESULT to 12, display a file-specific error message, invoke 9910-DISPLAY-IO-STATUS, and call 9999-ABEND-PROGRAM. A notable bug exists in 9300-DALYREJS-CLOSE where XREFFILE-STATUS is incorrectly moved to IO-STATUS instead of DALYREJS-STATUS."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "In 1000-DALYTRAN-GET-NEXT, the sequential read checks for status '00' (success), '10' (EOF sets APPL-EOF/END-OF-FILE='Y' to gracefully end processing), or any other value (sets APPL-RESULT to 12, displays error, calls 9910-DISPLAY-IO-STATUS and 9999-ABEND-PROGRAM). In 2700-UPDATE-TCATBAL, a READ on TCATBAL-FILE accepts both '00' and '23' (record not found) as valid, using the '23' case to trigger record creation via WS-CREATE-TRANCAT-REC flag."
+      },
+      {
+        "category": "File Write Errors",
+        "description": "Write operations in 2500-WRITE-REJECT-REC (DALYREJS), 2700-A-CREATE-TCATBAL-REC (TCATBAL WRITE), 2700-B-UPDATE-TCATBAL-REC (TCATBAL REWRITE), and 2900-WRITE-TRANSACTION-FILE (TRANSACT) all check file status for '00'. Failures set APPL-RESULT to 12, display a file-specific error message, invoke 9910-DISPLAY-IO-STATUS, and call 9999-ABEND-PROGRAM to halt processing."
+      },
+      {
+        "category": "Transaction Validation Errors",
+        "description": "Business rule violations are handled as soft errors using a numeric reason code (WS-VALIDATION-FAIL-REASON) and description (WS-VALIDATION-FAIL-REASON-DESC). Code 100 = invalid card number (XREF lookup failure via INVALID KEY), Code 101 = account record not found, Code 102 = overlimit transaction (computed balance exceeds credit limit), Code 103 = transaction after account expiration. Any non-zero reason code routes the transaction to 2500-WRITE-REJECT-REC, increments WS-REJECT-COUNT, and writes the record with its failure reason to the DALYREJS reject file rather than aborting."
+      },
+      {
+        "category": "Account Update Errors",
+        "description": "In 2800-UPDATE-ACCOUNT-REC, the REWRITE of the account record uses an INVALID KEY clause that sets WS-VALIDATION-FAIL-REASON to 109 and WS-VALIDATION-FAIL-REASON-DESC to 'ACCOUNT RECORD NOT FOUND'. However, this error is inconsistently handled — it sets the validation fields but does not write a reject record or abend, representing a gap in error handling since the transaction has already been partially posted at this stage."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "9999-ABEND-PROGRAM is the centralized fatal error termination routine. It DISPLAYs 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then CALLs the IBM LE routine 'CEE3ABD' to force an abnormal termination with a user abend code, ensuring the job fails visibly and any dependent downstream jobs are not triggered."
+      },
+      {
+        "category": "IO Status Display",
+        "description": "9910-DISPLAY-IO-STATUS is a shared diagnostic routine called before every abend. It handles both standard two-character numeric file status codes and non-numeric or '9x' platform-specific status codes. For '9x' codes, it converts the second byte to a binary integer to extract the platform-specific reason code. The formatted four-digit status is displayed to the system log for operator diagnosis."
+      },
+      {
+        "category": "Batch Completion and Return Code",
+        "description": "At normal end of processing, the program displays transaction and reject counts. If WS-REJECT-COUNT is greater than zero, RETURN-CODE is set to 4, providing a non-zero condition code to the JCL so downstream job steps or operators can detect that rejected transactions exist, without treating the run as a full failure."
+      }
+    ]
+  }
+}

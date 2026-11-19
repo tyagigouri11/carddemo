@@ -1,0 +1,119 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CUSTFILE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **CUSTFILE**, is responsible for defining and populating a VSAM Customer Data file for the CardDemo application. It manages the full lifecycle of the file setup by first closing the file in the CICS region, deleting any existing VSAM cluster, recreating it with the required structure, and loading it with data from a flat file source. Finally, it reopens the file in CICS, making the refreshed customer data available for online transaction processing.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "CUSTFILE",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It is the first positional parameter on the JOB statement."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'DEFINE CUSTOMER FILE'",
+          "description": "A positional parameter providing accounting or descriptive information for the job. In this case it serves as a description of the job's purpose. It may be used for billing or identification purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A determines the scheduling priority and resource allocation group, directing the job to the appropriate initiator for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job's system messages (JES job log). This controls where the job's log output (including JCL listing, allocation/termination messages) is routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes or abends."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "CLCIFIL",
+        "purpose": "Closes the CUSTDAT file in the CICS region named CICSAWSA before any file operations are performed, ensuring the file is not in use during subsequent delete and redefine steps.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline command: /F CICSAWSA,'CEMT SET FIL(CUSTDAT ) CLO')",
+        "outputs": "ISFOUT (SYSOUT=*), CMDOUT (SYSOUT=*)"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS if it already exists, suppressing condition codes up to 8 to allow the job to continue even if the dataset does not exist.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline DELETE command for AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS CLUSTER)",
+        "outputs": "SYSPRINT (SYSOUT=*); deletion of AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS and its components if they exist"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM KSDS cluster named AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS with specific attributes including size, key definition, record size, and share options to hold customer data.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline DEFINE CLUSTER command specifying: NAME(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS), CYLINDERS(1 5), VOLUMES(AWSHJ1), KEYS(9 0), RECORDSIZE(500 500), SHAREOPTIONS(2 3), ERASE, INDEXED; DATA component NAME(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.DATA); INDEX component NAME(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.INDEX))",
+        "outputs": "SYSPRINT (SYSOUT=*); newly created VSAM KSDS cluster AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS with data component AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.DATA and index component AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.INDEX on volume AWSHJ1"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies customer data records from the flat file (Physical Sequential dataset) into the newly defined VSAM KSDS cluster, populating it with the source customer data.",
+        "programs": "IDCAMS*",
+        "inputs": "CUSTDATA: AWS.M2.CARDDEMO.CUSTDATA.PS (DISP=SHR); SYSIN (inline REPRO command: REPRO INFILE(CUSTDATA) OUTFILE(CUSTVSAM))",
+        "outputs": "CUSTVSAM: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS (DISP=SHR) populated with records; SYSPRINT (SYSOUT=*)"
+      },
+      {
+        "step": "OPCIFIL",
+        "purpose": "Reopens the CUSTDAT file in the CICS region named CICSAWSA after all file operations are complete, making the refreshed VSAM customer file available to CICS applications.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline command: /F CICSAWSA,'CEMT SET FIL(CUSTDAT ) OPE')",
+        "outputs": "ISFOUT (SYSOUT=*), CMDOUT (SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CUSTDAT",
+        "operations": "CLOSE",
+        "description": "Issues CEMT SET FIL(CUSTDAT) CLO command to the CICSAWSA region via SDSF, closing the CUSTDAT file in CICS before file redefinition"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS if it exists; sets MAXCC to 0 if return code is 8 or less to suppress not-found errors"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS, AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.INDEX",
+        "operations": "DEFINE CLUSTER",
+        "description": "Defines a new VSAM KSDS cluster named AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS on volume AWSHJ1 with 1 primary and 5 secondary cylinders, 9-byte key at offset 0, fixed record size of 500 bytes, share options (2 3), ERASE, and INDEXED; also defines the DATA component AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.DATA and INDEX component AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS.INDEX"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) dataset AWS.M2.CARDDEMO.CUSTDATA.PS as the REPRO input source (INFILE CUSTDATA)"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the newly defined VSAM KSDS cluster AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS as the REPRO output target (OUTFILE CUSTVSAM), copying all data from the flat file"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "CUSTDAT",
+        "operations": "OPEN",
+        "description": "Issues CEMT SET FIL(CUSTDAT) OPE command to the CICSAWSA region via SDSF, reopening the CUSTDAT file in CICS after the VSAM file has been redefined and loaded"
+      }
+    ]
+  }
+}

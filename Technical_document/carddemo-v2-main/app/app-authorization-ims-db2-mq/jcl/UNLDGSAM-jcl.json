@@ -1,0 +1,178 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "UNLDGSAM.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **UNLDGSAM**, executes an IMS batch program (DFSRRC00) in DL/I mode to unload data from an IMS database as part of the CardDemo application, an AWS Mainframe Modernization reference application. It reads from an IMS PAUTHDB (Payment Authorization) database and writes the extracted data to two GSAM (Generalized Sequential Access Method) output datasets — a root segment file and a child segment file. The primary business purpose is to extract payment authorization data from the IMS hierarchical database into sequential flat files, likely for migration, archival, or downstream processing purposes.",
+      "parameters": [
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class for scheduling and execution. Class A determines the job's priority and resource allocation within the job entry subsystem (JES), controlling when and how the job is selected for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Defines the output class for the job log and system messages. Class H routes the job's message output (JCL listing, allocation/termination messages) to a specific output queue for printing or viewing."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all allocation and termination messages to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. A value of 0M indicates that the job can use all available memory without an explicit upper limit, effectively removing memory constraints on the job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending them a completion notification message."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Sets the maximum CPU time limit for the entire job in minutes. A value of 1440 minutes (24 hours) effectively allows the job to run without a practical time constraint, preventing premature cancellation for long-running jobs."
+        },
+        {
+          "name": "ACCOUNTING",
+          "value": "M2APP",
+          "description": "The positional accounting information parameter provided as the first positional parameter on the JOB statement. It is used for job accounting, billing, and tracking purposes to associate the job with a specific application or cost center identifier."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP01",
+        "purpose": "Executes the IMS application program DBUNLDGS under IMS DLI control using PSB DLIGSAMP to unload data from the IMS PAUTHDB database (DBPAUTP0), writing the parent (root) and child segment data to GSAM sequential output datasets.",
+        "programs": "DFSRRC00 (DBUNLDGS)*",
+        "inputs": "IMS PSB library: OEM.IMS.IMSP.PSBLIB; IMS DBD library: OEM.IMS.IMSP.DBDLIB; IMS database (PAUTHDB): OEM.IMS.IMSP.PAUTHDB (DD: DDPAUTP0); IMS database index (PAUTHDBX): OEM.IMS.IMSP.PAUTHDBX (DD: DDPAUTX0); IMS VSO/buffer pool parameters: OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB) (DD: DFSVSAMP)",
+        "outputs": "GSAM root/parent output dataset: AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM (DD: PASFILOP, DISP=OLD,KEEP,KEEP); GSAM child output dataset: AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM (DD: PADFILOP, DISP=OLD,KEEP,KEEP); SYSPRINT (DD: SYSOUT=*); SYSUDUMP (DD: SYSOUT=*); IMSERR (DD: SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "STEPLIB - IMS SDFSRESL load library accessed for IMS region controller and related modules"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL.V151",
+        "operations": "READ",
+        "description": "STEPLIB - IMS SDFSRESL V151 load library accessed for additional IMS modules"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB - Application load library accessed to load the DBUNLDGS application program"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "DFSRESLB - IMS resident library used by the IMS region controller"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PSBLIB",
+        "operations": "READ",
+        "description": "IMS DD - PSB library accessed to load the DLIGSAMP PSB definition"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.DBDLIB",
+        "operations": "READ",
+        "description": "IMS DD - DBD library accessed to load database definitions for DBPAUTP0, PASFLDBD, and PADFLDBD"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM",
+        "operations": "WRITE",
+        "description": "PASFILOP - GSAM root output dataset written by the DBUNLDGS program via the PASFLDBD GSAM PCB (PROCOPT=LS - Load Sequential)"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM",
+        "operations": "WRITE",
+        "description": "PADFILOP - GSAM child output dataset written by the DBUNLDGS program via the PADFLDBD GSAM PCB (PROCOPT=LS - Load Sequential)"
+      },
+      {
+        "step": "STEP01",
+        "type": "IMS",
+        "objects": "DBPAUTP0, PAUTSUM0, PAUTDTL1",
+        "operations": "READ",
+        "description": "DBUNLDGS reads IMS database DBPAUTP0 via PCB with PROCOPT=GOTP (Get Only with path), accessing root segment PAUTSUM0 and child segment PAUTDTL1"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PAUTHDB",
+        "operations": "READ",
+        "description": "DDPAUTP0 - Physical IMS database dataset for DBPAUTP0 accessed during IMS DL/I calls"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PAUTHDBX",
+        "operations": "READ",
+        "description": "DDPAUTX0 - IMS database index dataset for DBPAUTP0 accessed during IMS DL/I calls"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB)",
+        "operations": "READ",
+        "description": "DFSVSAMP - IMS buffer pool and virtual storage options member read by the IMS region controller"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "DUMMY",
+        "operations": "WRITE",
+        "description": "IMSLOGR - IMS log records directed to DUMMY, suppressing IMS log output"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "DUMMY",
+        "operations": "WRITE",
+        "description": "IEFRDER - IMS system log directed to DUMMY, suppressing system log output"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSOUT=*",
+        "operations": "WRITE",
+        "description": "SYSPRINT - Program print output written to system output"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSOUT=*",
+        "operations": "WRITE",
+        "description": "SYSUDUMP - Abnormal termination dump output written to system output"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSOUT=*",
+        "operations": "WRITE",
+        "description": "IMSERR - IMS error messages written to system output"
+      }
+    ]
+  }
+}

@@ -1,0 +1,307 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CARDFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/CARDFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job manages the complete rebuild of the Card Data VSAM file structure used by the CardDemo application. It closes the CICS-managed card data files, deletes and recreates the primary VSAM cluster and alternate index, loads card data from a flat file source, builds the alternate index, and reopens the files for CICS use.Key Functionalities:\nCloses the CICS-managed card data files (CARDDAT and CARDAIX) in the CICSAWSA region to allow exclusive access for file restructuring operations.\nDeletes the existing primary VSAM Key-Sequenced Data Set (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) and its associated Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX), suppressing warnings for return codes up to 8.\nRecreates the primary VSAM KSDS cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) with a 16-byte key starting at position 0, fixed record size of 150 bytes, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders.\nLoads card data records from the sequential flat file (AWS.M2.CARDDEMO.CARDDATA.PS) into the newly created VSAM KSDS cluster.\nDefines a new Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) related to the primary KSDS, using an 11-byte key at position 16, configured as non-unique to support multiple cards per customer, with automatic upgrade enabled.\nCreates an Access Path (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH) to enable access to the KSDS through the Alternate Index.\nBuilds the Alternate Index entries by reading the primary KSDS and populating the AIX dataset.\nReopens both CICS-managed card data files (CARDDAT and CARDAIX) in the CICSAWSA region to resume normal online transaction processing.",
+    "rules": [
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the primary Card Data file CARDDAT is currently open and available to online transactions",
+                "When": "The Card Data file refresh batch job is initiated and the pre-processing preparation step begins",
+                "Then": "The CARDDAT file in CICS region CICSAWSA must be closed immediately, making it unavailable to online transactions, so that the batch process can safely proceed with deleting and recreating the Card Data VSAM file without risk of data corruption or access conflicts"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CICS Primary Card Data File Before Batch Processing",
+            "Rule_Description": "Before any batch operations can modify, delete, or recreate the Card Data files, the primary Card Data file (CARDDAT) currently open in the online CICS system must be closed. This prevents data conflicts between live online transactions and the batch file refresh process.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the Card Data Alternate Index file CARDAIX is currently open and available to online transactions for Account Number-based card lookups",
+                "When": "The Card Data file refresh batch job is initiated and the pre-processing preparation step begins",
+                "Then": "The CARDAIX file in CICS region CICSAWSA must be closed immediately, making Account Number-based card lookups unavailable to online transactions, so that the batch process can safely proceed with deleting and rebuilding the Card Data Alternate Index without risk of data corruption or inconsistent index entries"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CICS Card Data Alternate Index File Before Batch Processing",
+            "Rule_Description": "Before any batch operations can modify, delete, or recreate the Card Data Alternate Index, the CARDAIX file currently open in the online CICS system must be closed. This ensures the Alternate Index is not accessed by online transactions while it is being rebuilt by the batch process.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM KSDS Cluster named AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS may or may not exist in the system catalog",
+                "When": "A request is made to delete the Card Data VSAM KSDS Cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS along with all its associated components (DATA and INDEX)",
+                "Then": "The Card Data VSAM KSDS Cluster and all its components must be completely removed from the system catalog and storage, making way for a fresh recreation of the Card Data file"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Card Data Primary VSAM File",
+            "Rule_Description": "Before recreating the Card Data VSAM file infrastructure, the existing primary Card Data VSAM file (KSDS Cluster) must be deleted to ensure a clean rebuild with no residual data or structural conflicts.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "A deletion of the Card Data VSAM KSDS Cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS has been attempted",
+                "When": "The return code from the deletion attempt is less than or equal to 8 (indicating either successful deletion or that the file did not exist)",
+                "Then": "The return code must be reset to 0 (Success) so that subsequent steps \u2014 including the deletion of the Alternate Index and the recreation of the Card Data VSAM file \u2014 are allowed to proceed without interruption; if the return code is greater than 8, it must be preserved as-is, signaling a critical failure that prevents further processing"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Tolerate Missing Card Data Primary VSAM File During Deletion",
+            "Rule_Description": "When deleting the primary Card Data VSAM file, a return code of 8 or less (including file-not-found) must be treated as a successful outcome so that the job can run safely in both first-time setup environments and normal refresh scenarios without failing.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index named AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX may or may not exist in the system catalog, and the primary Card Data VSAM KSDS deletion has already been processed",
+                "When": "A request is made to delete the Card Data Alternate Index AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX along with all its associated components (DATA and INDEX)",
+                "Then": "The Card Data Alternate Index and all its components must be completely removed from the system catalog and storage, ensuring no stale Account Number index entries remain before the Alternate Index is recreated"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Card Data Alternate Index",
+            "Rule_Description": "After the primary Card Data VSAM file is deleted, the existing Card Data Alternate Index (AIX), which enables Account Number-based card lookups, must also be deleted to allow a clean rebuild of the complete Card Data file infrastructure.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "A deletion of the Card Data Alternate Index AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX has been attempted",
+                "When": "The return code from the Alternate Index deletion attempt is less than or equal to 8 (indicating either successful deletion or that the Alternate Index did not exist)",
+                "Then": "The return code must be reset to 0 (Success) so that subsequent steps \u2014 including the recreation of the Card Data VSAM file and Alternate Index \u2014 are allowed to proceed without interruption; if the return code is greater than 8, it must be preserved as-is, signaling a critical failure that prevents further Card Data file rebuild processing"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Tolerate Missing Card Data Alternate Index During Deletion",
+            "Rule_Description": "When deleting the Card Data Alternate Index, a return code of 8 or less (including index-not-found) must be treated as a successful outcome so that the job can safely proceed to recreate the Alternate Index in both first-time setup and normal refresh scenarios.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "A new Card Data VSAM file named AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being created",
+                "When": "The Card Data VSAM file structure is defined",
+                "Then": "The file must be organized as an INDEXED (Key-Sequenced) file, meaning all card records are physically stored and maintained in Card Number sequence, enabling direct and sequential access by Card Number"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Card Data VSAM File as Indexed Organization",
+            "Rule_Description": "The Card Data VSAM file must be defined as an indexed (KSDS) file so that card records can be stored and retrieved in an organized, key-sequenced manner by their unique Card Number.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined as an indexed file",
+                "When": "The primary key attribute is configured for the Card Data VSAM file",
+                "Then": "The Card Number key must be exactly 16 characters in length and must start at position 0 (the very first byte) of every card record, ensuring each card record is uniquely identified and directly accessible by its Card Number"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Card Number as Primary Key",
+            "Rule_Description": "The Card Number must be established as the primary unique identifier for every card record in the Card Data VSAM file, defining its length and starting position within each record.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined",
+                "When": "The record size attribute is configured for the Card Data VSAM file",
+                "Then": "Both the minimum and maximum record size must be set to exactly 150 bytes, meaning every card record \u2014 without exception \u2014 must be exactly 150 bytes long; records shorter or longer than 150 bytes are not permitted"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed-Length Card Record Size",
+            "Rule_Description": "Every card record stored in the Card Data VSAM file must conform to a fixed length of exactly 150 bytes \u2014 both the minimum and maximum record size are identical, enforcing strict uniformity across all card records.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined with the ERASE attribute",
+                "When": "The Card Data VSAM file is deleted at any point in the future",
+                "Then": "All card data stored in the file must be physically erased (overwritten) on the disk \u2014 the data must not be recoverable after deletion, ensuring sensitive credit card information is permanently destroyed upon file removal"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Secure Erasure of Card Data on File Deletion",
+            "Rule_Description": "When the Card Data VSAM file is deleted, all card data stored within it must be physically overwritten and erased from disk to protect sensitive credit card information from unauthorized recovery.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined with SHAREOPTIONS(2 3)",
+                "When": "Multiple jobs, regions, or users attempt to access the Card Data VSAM file concurrently",
+                "Then": "The file must allow multiple readers to access card data simultaneously within the same system (Share Option 2), AND across different systems (Share Option 3), while ensuring that only one writer can update card records at a time to prevent data corruption"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Concurrent Access Rules for Card Data File",
+            "Rule_Description": "The Card Data VSAM file must support multiple simultaneous readers while restricting write access to one writer at a time, balancing availability for online card inquiries with data integrity during updates.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined",
+                "When": "The storage volume is assigned for the Card Data VSAM file",
+                "Then": "The file must be allocated exclusively on storage volume AWSHJ1 \u2014 no other volume is permitted for this file's physical storage"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Assign Card Data File to Designated Storage Volume",
+            "Rule_Description": "The Card Data VSAM file must be physically allocated on the designated storage volume AWSHJ1, ensuring the file resides in the correct and approved storage location.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM file AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined on volume AWSHJ1",
+                "When": "The storage space is allocated for the Card Data VSAM file",
+                "Then": "The file must be initially allocated 1 cylinder of primary storage space, AND must be configured with 5 cylinders of secondary (extension) storage space that is automatically acquired when the primary space is exhausted, ensuring the file can grow to accommodate additional card records without failure"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Allocate Initial and Secondary Storage for Card Data File",
+            "Rule_Description": "The Card Data VSAM file must be allocated with a defined initial storage space and a secondary extension allowance to accommodate the current card data volume and support future growth without manual intervention.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data VSAM cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS is being defined",
+                "When": "The internal components of the Card Data VSAM file are created",
+                "Then": "The physical card record storage component must be named AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.DATA, AND the Card Number key index component must be named AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.INDEX \u2014 both components must be created as part of the same cluster definition"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Separate Named Components for Card Data File",
+            "Rule_Description": "The Card Data VSAM file must be structured with separately named DATA and INDEX components to allow independent management, monitoring, and identification of the card data storage and its corresponding key index.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data source flat file (AWS.M2.CARDDEMO.CARDDATA.PS) exists and contains card account records, AND the target Card Data VSAM KSDS file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) has been freshly defined and is empty and ready to receive records, AND both files are accessible with shared access (no exclusive lock is required)",
+                "When": "The card data load process is initiated by executing the REPRO operation reading from the Card Data flat file (CARDDATA) and writing to the Card Data VSAM file (CARDVSAM)",
+                "Then": "Every card account record from the source flat file must be copied into the Card Data VSAM file without any filtering, transformation, or omission, AND all copied records must be automatically indexed by their Card Number (16-character primary key at position 0 of each record) within the VSAM file, AND the Card Data VSAM file must contain the complete and current set of card account records after the load completes, AND the source flat file must remain unchanged and intact after the operation"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Load All Card Account Records into Card Data VSAM File",
+            "Rule_Description": "This step populates the Card Data VSAM file by copying every card account record from the authoritative source sequential flat file. All records are transferred without filtering, and the VSAM file automatically organizes them by Card Number for indexed access.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The primary Card Data VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) exists and has been freshly created and loaded with card account records",
+                "When": "The system creates the Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) linked to the primary Card Data VSAM file",
+                "Then": "The Alternate Index must be successfully defined with the name AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, associated with its physical data component (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.DATA) and index component (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.INDEX)"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Define Card Data Alternate Index Structure",
+            "Rule_Description": "Define a new Alternate Index (AIX) on the Card Data VSAM file to enable secondary access to card records using Account Number as the lookup key, in addition to the primary Card Number key.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) is being defined",
+                "When": "The relationship between the Alternate Index and the primary file is established",
+                "Then": "The Alternate Index must be bound to the primary Card Data VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) so that any Account Number-based lookup through the AIX returns the corresponding full card record(s) from the primary file"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Link Alternate Index to Primary Card Data File",
+            "Rule_Description": "The Card Data Alternate Index must be explicitly associated with the primary Card Data VSAM file so that Account Number-based lookups navigate through the AIX to retrieve full card records from the primary file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index is being defined and each card record is exactly 150 bytes in fixed length",
+                "When": "The secondary key definition is applied to the Alternate Index",
+                "Then": "The Account Number key must be defined as exactly 11 characters in length, starting at byte position 16 within each card record \u2014 meaning the system will extract characters at positions 16 through 26 of every card record as the Account Number for indexing purposes"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Define Account Number as Secondary Key for Card Lookup",
+            "Rule_Description": "The Account Number must be defined as the secondary key within each card record, specifying its exact length and position, so that the system can correctly extract and index Account Numbers from all card records.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index is being defined with Account Number as the secondary key",
+                "When": "Multiple card records exist in the primary Card Data VSAM file that share the same Account Number",
+                "Then": "The Alternate Index must allow non-unique Account Number keys \u2014 meaning a single Account Number key entry in the AIX can point to multiple Card Number records, and the system must not reject or fail when two or more cards share the same Account Number"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Allow Multiple Cards per Account Number",
+            "Rule_Description": "The Alternate Index must support a one-to-many relationship between Account Numbers and Card Numbers, reflecting the real-world business scenario where a single customer account can hold multiple credit cards.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index has been defined and is operational",
+                "When": "Any card record in the primary Card Data VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) is added, updated, or deleted",
+                "Then": "The Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) must be automatically updated to reflect the change \u2014 no manual intervention or separate index rebuild is required to keep Account Number lookups accurate and current"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Enforce Automatic Synchronization of Account Number Index",
+            "Rule_Description": "The Card Data Alternate Index must be kept automatically and continuously in sync with the primary Card Data VSAM file so that Account Number-based lookups always reflect the current state of card records without requiring manual index rebuilds.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00021",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index is being defined",
+                "When": "The record size specification is applied to the Alternate Index",
+                "Then": "Both the minimum and maximum record size of the Alternate Index must be set to exactly 150 bytes \u2014 no card index record may be shorter or longer than 150 bytes, enforcing a strictly fixed-length record structure"
+            },
+            "Rule_Name": "STEP40 - IDCAMS - Enforce Fixed Record Size for Alternate Index",
+            "Rule_Description": "All records within the Card Data Alternate Index must conform to a fixed length of 150 bytes, consistent with the primary Card Data VSAM file record structure, ensuring uniform data processing across all card data access paths.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00022",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) has been successfully defined in the previous step and is registered in the system catalog, and no logical access PATH named AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH currently exists",
+                "When": "The system is instructed to define a new logical access PATH with the name AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH and link it to the Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) as its PATH entry point",
+                "Then": "A logical access PATH named AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH must be successfully registered in the system catalog, permanently linked to the Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX), so that any application program or CICS transaction that opens AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH can retrieve card records by Account Number through the Alternate Index"
+            },
+            "Rule_Name": "STEP50 - IDCAMS - Define Logical Access Path for Account Number-Based Card Lookup",
+            "Rule_Description": "A logical access PATH must be defined and registered in the system catalog to enable application programs and online CICS transactions to retrieve card records using an Account Number as the search key. This PATH acts as the named gateway that connects Account Number queries to the Card Data Alternate Index, which in turn resolves to the full card records in the primary Card Data VSAM file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00023",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data primary VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) has been created and loaded with card records, and the Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) has been defined with Account Number as the secondary key",
+                "When": "The logical access PATH (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH) is defined and linked to the Card Data Alternate Index as part of the Card Data file rebuild sequence",
+                "Then": "The Account Number-based card lookup route is established in the catalog, enabling the subsequent index population step (BLDINDEX) and the eventual reopening of CICS card data files to function correctly, so that online transactions can search for all cards belonging to a given Account Number once CICS access is restored"
+            },
+            "Rule_Name": "STEP50 - IDCAMS - Establish Account Number Lookup Route as Part of Card Data File Setup Workflow",
+            "Rule_Description": "The definition of the logical access PATH is a mandatory workflow step in the Card Data file rebuild process. The PATH must be created after the Alternate Index is defined and before the Alternate Index is populated, ensuring the complete Account Number-based card lookup infrastructure is in place before online CICS access is restored.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00024",
+            "Acceptance_Criteria": {
+                "Given": "The primary Card Data VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) has been successfully created and loaded with all card account records, AND the Card Data Alternate Index structure (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) has been defined with Account Number as the secondary key (11 characters at position 16 of each card record) and is currently empty",
+                "When": "The BLDINDEX process is executed by scanning every card record in the primary Card Data VSAM file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) from beginning to end, extracting the Account Number value from each card record, and writing the corresponding Account Number-to-Card Number mapping entries into the Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX)",
+                "Then": "The Card Data Alternate Index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) must be fully populated with index entries for every card record in the primary file, WHERE each unique Account Number in the index points to all Card Numbers associated with that Account Number (one-to-many relationship), AND the Alternate Index is fully operational enabling any program or CICS transaction to retrieve all card records belonging to a given Account Number by navigating through the Alternate Index PATH (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH)"
+            },
+            "Rule_Name": "STEP60 - IDCAMS BLDINDEX - Build Account Number Alternate Index from Card Data",
+            "Rule_Description": "This step scans all card account records stored in the primary Card Data VSAM file and constructs the Alternate Index that enables card record lookups by Account Number. Each card record is read, its Account Number is extracted, and an index entry is created linking that Account Number to its corresponding Card Number(s). Since one Account Number can be associated with multiple Card Numbers, the resulting index supports one-to-many Account-to-Card relationships. After this step, the Alternate Index is fully populated and operational for both batch and online (CICS) Account Number-based card lookups.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00025",
+            "Acceptance_Criteria": {
+                "Given": "All batch operations on the Card Data VSAM file have completed, and the CICS region CICSAWSA is running with the primary Card Data file (CARDDAT) currently in a closed state",
+                "When": "The OPCIFIL step executes and issues the command to open the CARDDAT file in the CICS region CICSAWSA",
+                "Then": "The CARDDAT file in CICS region CICSAWSA must be set to OPEN status, restoring the ability for online CICS transactions to read and update card account records by Card Number"
+            },
+            "Rule_Name": "OPCIFIL - SDSF - Restore Online Access to Primary Card Data File After Batch Processing",
+            "Rule_Description": "After all batch Card Data file operations (deletion, recreation, and data loading) have completed, the primary Card Data file (CARDDAT) must be reopened in the CICS online region CICSAWSA so that online card account transactions can resume.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00026",
+            "Acceptance_Criteria": {
+                "Given": "All batch operations on the Card Data Alternate Index have completed, and the CICS region CICSAWSA is running with the Card Data Alternate Index file (CARDAIX) currently in a closed state",
+                "When": "The OPCIFIL step executes and issues the command to open the CARDAIX file in the CICS region CICSAWSA",
+                "Then": "The CARDAIX file in CICS region CICSAWSA must be set to OPEN status, restoring the ability for online CICS transactions to retrieve all Card Numbers associated with a given Account Number"
+            },
+            "Rule_Name": "OPCIFIL - SDSF - Restore Online Access to Card Data Alternate Index File After Batch Processing",
+            "Rule_Description": "After all batch Card Data file operations have completed, the Card Data Alternate Index file (CARDAIX) must be reopened in the CICS online region CICSAWSA so that online Account Number-based card lookup transactions can resume.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CARDFILE-jcl-00027",
+            "Acceptance_Criteria": {
+                "Given": "The OPCIFIL step is executing after all batch Card Data file operations have completed, and both CARDDAT and CARDAIX files in CICS region CICSAWSA are in a closed state",
+                "When": "The OPCIFIL step issues the open command for CARDDAT first, followed immediately by the open command for CARDAIX, both targeting the CICS region CICSAWSA",
+                "Then": "CARDDAT must be opened first, followed by CARDAIX, so that both files are in OPEN status in CICS region CICSAWSA \u2014 only when both files are open is the full Card Data online processing capability (Card Number lookup AND Account Number lookup) fully restored for online users"
+            },
+            "Rule_Name": "OPCIFIL - SDSF - Enforce Sequential Reopening of Both Card Data Files to Restore Full Online Card Processing",
+            "Rule_Description": "Both the primary Card Data file (CARDDAT) and the Card Data Alternate Index file (CARDAIX) must be reopened in sequence within the same step to ensure the CardDemo online application is fully operational. Partial reopening would leave the application in an inconsistent state where some card functions work and others do not.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start:\nCard Data VSAM File Refresh]):::start\n\n    CLCIFIL[CLCIFIL - SDSF\nClose Card Data Files in CICS Region CICSAWSA\nCARDDAT & CARDAIX Taken Offline]:::process\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Card Data VSAM Files\nRemove Old KSDS Primary File & Alternate Index]:::process\n\n    KSDS[(AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS\nCard Data Primary VSAM File\nKeyed by Card Number)]:::datasource\n\n    AIX[(AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX\nCard Data Alternate Index\nKeyed by Account Number)]:::datasource\n\n    D{STEP05 - Deletion Result\nFiles Deleted or Not Found?\nMAXCC \u2264 8?}:::decision\n\n    STEP10[STEP10 - IDCAMS\nDefine New Card Data VSAM KSDS\nPrimary Key: 16-Char Card Number\nFixed 150-Byte Records with Secure Erase]:::process\n\n    STEP15[STEP15 - IDCAMS\nLoad All Card Account Records\nfrom Source Flat File into Card Data VSAM KSDS\n150-Byte Fixed Records Indexed by Card Number]:::process\n\n    STEP40[STEP40 - IDCAMS\nDefine Card Data Alternate Index\nSecondary Key: 11-Char Account Number\nSupports Multiple Cards per Account]:::process\n\n    STEP50[STEP50 - IDCAMS\nDefine Logical PATH over Alternate Index\nEnable Account Number-Based Card Lookups\nvia PATH: CARDDATA.VSAM.AIX.PATH]:::process\n\n    STEP60[STEP60 - IDCAMS\nBuild and Populate Alternate Index\nScan All Card Records and Link\nAccount Numbers to Card Numbers]:::process\n\n    OPCIFIL[OPCIFIL - SDSF\nReopen Card Data Files in CICS Region CICSAWSA\nCARDDAT & CARDAIX Restored Online]:::process\n\n    K([Job End:\nCard Data VSAM Files Fully Refreshed\nOnline Card Processing Restored]):::final\n\n    ERR([Job Failed:\nCritical VSAM File Deletion Error\nMAXCC Greater Than 8]):::error\n\n    A --> CLCIFIL\n    CLCIFIL --> STEP05\n\n    STEP05 -.->|Delete Old Primary Card Data File| KSDS\n    STEP05 -.->|Delete Old Alternate Index| AIX\n    STEP05 --> D\n\n    D -->|Yes - Files Successfully Deleted\nor Files Did Not Exist\nReset Return Code to Success| STEP10\n    D -->|No - Critical Deletion Error\nSecurity or File-In-Use Violation| ERR\n\n    STEP10 -.->|Create New Empty KSDS\nCard Number Primary Key 16 Chars at Position 0| KSDS\n    STEP10 --> STEP15\n\n    KSDS -.->|Write All Card Account Records\nIndexed by Card Number| STEP15\n    STEP15 -.->|Populate KSDS with Card Records\nfrom Source Flat File| KSDS\n    STEP15 --> STEP40\n\n    STEP40 -.->|Create New Empty Alternate Index\nAccount Number Secondary Key 11 Chars at Position 16\nNon-Unique: Multiple Cards per Account Allowed| AIX\n    STEP40 --> STEP50\n\n    STEP50 -.->|Define Logical PATH Entry\nover Alternate Index for Account Number Access| AIX\n    STEP50 --> STEP60\n\n    KSDS -.->|Read All Card Records\nto Extract Account Number Values| STEP60\n    STEP60 -.->|Populate Index Entries\nLinking Account Numbers to Card Numbers| AIX\n    STEP60 --> OPCIFIL\n\n    OPCIFIL --> K\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

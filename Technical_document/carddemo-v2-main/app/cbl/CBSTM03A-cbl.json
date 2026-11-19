@@ -1,0 +1,400 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBSTM03A.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBSTM03A is a batch COBOL program within the CardDemo application, a credit card management system. It operates as a statement generation component in the end-of-period batch processing workflow, consuming transaction data to produce customer-facing account statements. The program reads transaction, cross-reference, customer, and account files to produce account statements in two formats simultaneously: plain text (80-character fixed-width) and HTML. It solves the business need of generating formatted, mailable or viewable account statements that summarize a cardholder's transactions, current balance, and credit profile for a given period.",
+      "key_features": [
+        {
+          "feature": "Dual-Format Statement Output",
+          "description": "Generates account statements in both plain text and HTML formats in a single pass, writing to STMTFILE and HTMLFILE respectively."
+        },
+        {
+          "feature": "Transaction Aggregation",
+          "description": "Reads all transactions from TRNXFILE and organizes them into a two-dimensional in-memory table (up to 51 cards, 10 transactions each) grouped by card number before statement generation."
+        },
+        {
+          "feature": "Multi-File Data Integration",
+          "description": "Combines data from four input sources — transaction file, card-to-account cross-reference, customer file, and account file — to produce a complete statement for each cardholder."
+        },
+        {
+          "feature": "Subroutine-Based File I/O",
+          "description": "Delegates all file open, close, read, and keyed-read operations to the external subroutine CBSTM03B, using a shared communication area (WS-M03B-AREA) to pass operation codes and return data."
+        },
+        {
+          "feature": "Customer Address and Profile Formatting",
+          "description": "Formats customer name, multi-line address, account ID, current balance, and FICO credit score into both plain text and styled HTML output sections."
+        },
+        {
+          "feature": "Transaction Line Detail Writing",
+          "description": "Writes individual transaction lines including transaction ID, description, and amount for each transaction associated with a card account, and computes a running total expenditure."
+        },
+        {
+          "feature": "Mainframe Control Block Inspection",
+          "description": "Navigates PSA, TCB, and TIOT mainframe control blocks at startup to display JCL job name, step name, and DD names with UCB validity, supporting diagnostics and modernization analysis."
+        },
+        {
+          "feature": "ALTER/GO TO Based Flow Control",
+          "description": "Uses legacy COBOL ALTER and GO TO statements to implement a dispatch mechanism for sequentially opening multiple files (TRNXFILE, XREFFILE, CUSTFILE, ACCTFILE) before entering the main processing loop."
+        },
+        {
+          "feature": "Error Handling and Abnormal Termination",
+          "description": "Checks return codes after every file operation and calls CEE3ABD to force an abnormal termination with a diagnostic display message if any unexpected condition occurs."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRNXFILE",
+        "type": "Read",
+        "description": "Transaction file - read sequentially to load all transaction records (card number, transaction ID, type, category, description, amount, merchant details, timestamps) into an in-memory table for statement generation"
+      },
+      {
+        "name": "XREFFILE",
+        "type": "Read",
+        "description": "Card cross-reference file - read sequentially to retrieve card-to-customer and card-to-account mappings (XREF-CARD-NUM, XREF-CUST-ID, XREF-ACCT-ID) driving the main processing loop"
+      },
+      {
+        "name": "CUSTFILE",
+        "type": "Read",
+        "description": "Customer master file - read by key (XREF-CUST-ID) to retrieve customer name, address, FICO credit score, and other personal details used in statement output"
+      },
+      {
+        "name": "ACCTFILE",
+        "type": "Read",
+        "description": "Account master file - read by key (XREF-ACCT-ID) to retrieve account ID, current balance, credit limit, and other account details used in statement output"
+      },
+      {
+        "name": "STMT-FILE",
+        "type": "Write",
+        "description": "Plain text statement output file (80-byte records) - written with formatted account statements including customer name, address, account details, transaction summary lines, and totals"
+      },
+      {
+        "name": "HTML-FILE",
+        "type": "Write",
+        "description": "HTML statement output file (100-byte records) - written with fully structured HTML account statements including styled tables, customer information, account details, and transaction rows"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Initialize Control Blocks",
+          "description": "Program starts by resolving mainframe system control blocks (PSA, TCB, TIOT) via pointer addressing to enumerate DD names and validate UCB entries. Output files STMT-FILE and HTML-FILE are opened.",
+          "records": [
+            "PSAPTR",
+            "TCB-POINT",
+            "TIOT-POINT",
+            "TIOCDDNM",
+            "TIO-LEN",
+            "UCB-ADDR"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Open Transaction File (TRNXFILE)",
+          "description": "Using ALTER/GO TO dispatch logic from 0000-START, CBSTM03B subroutine is called to open TRNXFILE. First record is read immediately after open to prime the read loop.",
+          "records": [
+            "WS-FL-DD",
+            "WS-M03B-DD",
+            "WS-M03B-OPER",
+            "WS-M03B-RC",
+            "TRNX-RECORD",
+            "TRNX-CARD-NUM"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Load Transaction Table into Memory",
+          "description": "All transaction records from TRNXFILE are read sequentially via 8500-READTRNX-READ and loaded into a 2-dimensional in-memory array (WS-TRNX-TABLE) organized by card number. A counter table (WS-TRN-TBL-CNTR) tracks transaction counts per card.",
+          "records": [
+            "TRNX-CARD-NUM",
+            "TRNX-ID",
+            "TRNX-REST",
+            "WS-CARD-NUM",
+            "WS-TRAN-NUM",
+            "WS-TRAN-REST",
+            "WS-TRCT",
+            "CR-CNT",
+            "TR-CNT",
+            "WS-SAVE-CARD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Open Cross-Reference File (XREFFILE)",
+          "description": "After transaction table is fully loaded, control returns to 0000-START which dispatches to open XREFFILE via CBSTM03B.",
+          "records": [
+            "WS-FL-DD",
+            "WS-M03B-DD",
+            "WS-M03B-OPER",
+            "WS-M03B-RC"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Open Customer File (CUSTFILE)",
+          "description": "Control dispatches from 0000-START to open CUSTFILE via CBSTM03B.",
+          "records": [
+            "WS-FL-DD",
+            "WS-M03B-DD",
+            "WS-M03B-OPER",
+            "WS-M03B-RC"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Open Account File (ACCTFILE)",
+          "description": "Control dispatches from 0000-START to open ACCTFILE via CBSTM03B, then falls through to 1000-MAINLINE.",
+          "records": [
+            "WS-FL-DD",
+            "WS-M03B-DD",
+            "WS-M03B-OPER",
+            "WS-M03B-RC"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Read Cross-Reference Record Sequentially",
+          "description": "1000-XREFFILE-GET-NEXT reads the next XREFFILE record sequentially via CBSTM03B. The record is moved into CARD-XREF-RECORD (from CVACT03Y). End-of-file flag is set when RC=10.",
+          "records": [
+            "WS-M03B-FLDT",
+            "CARD-XREF-RECORD",
+            "XREF-CARD-NUM",
+            "XREF-CUST-ID",
+            "XREF-ACCT-ID",
+            "END-OF-FILE"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Retrieve Customer Record by Key",
+          "description": "2000-CUSTFILE-GET performs a keyed read on CUSTFILE using XREF-CUST-ID as the key via CBSTM03B. Result is moved into CUSTOMER-RECORD (from CUSTREC).",
+          "records": [
+            "XREF-CUST-ID",
+            "WS-M03B-KEY",
+            "WS-M03B-KEY-LN",
+            "WS-M03B-FLDT",
+            "CUSTOMER-RECORD",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-FICO-CREDIT-SCORE"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Retrieve Account Record by Key",
+          "description": "3000-ACCTFILE-GET performs a keyed read on ACCTFILE using XREF-ACCT-ID as the key via CBSTM03B. Result is moved into ACCOUNT-RECORD (from CVACT01Y).",
+          "records": [
+            "XREF-ACCT-ID",
+            "WS-M03B-KEY",
+            "WS-M03B-KEY-LN",
+            "WS-M03B-FLDT",
+            "ACCOUNT-RECORD",
+            "ACCT-ID",
+            "ACCT-CURR-BAL"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Create Statement Header",
+          "description": "5000-CREATE-STATEMENT formats customer name, address lines, account ID, current balance, and FICO score into STATEMENT-LINES structure. Writes plain-text header lines to STMT-FILE and triggers HTML header generation.",
+          "records": [
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-ADDR-ZIP",
+            "ACCT-ID",
+            "ACCT-CURR-BAL",
+            "CUST-FICO-CREDIT-SCORE",
+            "ST-NAME",
+            "ST-ADD1",
+            "ST-ADD2",
+            "ST-ADD3",
+            "ST-ACCT-ID",
+            "ST-CURR-BAL",
+            "ST-FICO-SCORE",
+            "FD-STMTFILE-REC"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Write HTML Statement Header",
+          "description": "5100-WRITE-HTML-HEADER emits full HTML document structure including DOCTYPE, head, body, table tags, account number heading, and bank address block to HTML-FILE.",
+          "records": [
+            "HTML-FIXED-LN",
+            "HTML-L11",
+            "L11-ACCT",
+            "ACCT-ID",
+            "FD-HTMLFILE-REC"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Write HTML Name, Address, and Basic Details Section",
+          "description": "5200-WRITE-HTML-NMADBS writes customer name, address lines, account ID, current balance, and FICO score as HTML table rows. Also writes transaction summary column headers in HTML.",
+          "records": [
+            "ST-NAME",
+            "L23-NAME",
+            "ST-ADD1",
+            "ST-ADD2",
+            "ST-ADD3",
+            "ST-ACCT-ID",
+            "ST-CURR-BAL",
+            "ST-FICO-SCORE",
+            "HTML-ADDR-LN",
+            "HTML-BSIC-LN",
+            "FD-HTMLFILE-REC"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Match and Write Transaction Lines",
+          "description": "4000-TRNXFILE-GET iterates the in-memory WS-TRNX-TABLE to find entries matching XREF-CARD-NUM. For each matching transaction, TRNX-ID, TRNX-DESC, and TRNX-AMT are formatted and written to both STMT-FILE and HTML-FILE via 6000-WRITE-TRANS. Transaction amounts are accumulated into WS-TOTAL-AMT.",
+          "records": [
+            "XREF-CARD-NUM",
+            "WS-CARD-NUM",
+            "WS-TRAN-NUM",
+            "WS-TRAN-REST",
+            "WS-TRCT",
+            "CR-JMP",
+            "TR-JMP",
+            "TRNX-CARD-NUM",
+            "TRNX-ID",
+            "TRNX-REST",
+            "TRNX-DESC",
+            "TRNX-AMT",
+            "WS-TOTAL-AMT",
+            "ST-TRANID",
+            "ST-TRANDT",
+            "ST-TRANAMT",
+            "FD-STMTFILE-REC",
+            "FD-HTMLFILE-REC"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Write Statement Totals and Footer",
+          "description": "After all transactions for a card are written, WS-TOTAL-AMT is moved to ST-TOTAL-TRAMT and the total expense line, separator, and end-of-statement marker are written to STMT-FILE. HTML closing tags (end of table, body, html) are written to HTML-FILE.",
+          "records": [
+            "WS-TOTAL-AMT",
+            "WS-TRN-AMT",
+            "ST-TOTAL-TRAMT",
+            "ST-LINE12",
+            "ST-LINE14A",
+            "ST-LINE15",
+            "HTML-L75",
+            "HTML-L78",
+            "HTML-L79",
+            "HTML-L80",
+            "FD-STMTFILE-REC",
+            "FD-HTMLFILE-REC"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Close All Files and Terminate",
+          "description": "After all XREFFILE records are processed (END-OF-FILE=Y), TRNXFILE, XREFFILE, CUSTFILE, and ACCTFILE are closed via CBSTM03B. STMT-FILE and HTML-FILE are closed directly. Program issues GOBACK.",
+          "records": [
+            "WS-M03B-DD",
+            "WS-M03B-OPER",
+            "WS-M03B-RC",
+            "END-OF-FILE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "File Open Sequencing via ALTER/GO TO Dispatch",
+          "description": "Files must be opened in strict order: TRNXFILE first, then XREFFILE, CUSTFILE, ACCTFILE. This is enforced by a state-machine pattern using WS-FL-DD and ALTER/GO TO statements at 0000-START. Skipping any step or altering WS-FL-DD incorrectly will cause wrong dispatch or premature termination."
+        },
+        {
+          "dependency": "Transaction Table Pre-load Before Mainline Processing",
+          "description": "The entire TRNXFILE must be read and loaded into WS-TRNX-TABLE before 1000-MAINLINE begins processing XREFFILE records. The table is populated during the READTRNX phase (8500-READTRNX-READ). If this phase is incomplete, 4000-TRNXFILE-GET will produce incorrect or missing transaction output."
+        },
+        {
+          "dependency": "XREF Record Drives Customer and Account Lookups",
+          "description": "Each iteration of the mainline loop depends on a valid CARD-XREF-RECORD being read first. XREF-CUST-ID is the key for CUSTFILE lookup and XREF-ACCT-ID is the key for ACCTFILE lookup. If the XREF record is missing or corrupt, both downstream reads will fail or return wrong data."
+        },
+        {
+          "dependency": "XREF-CARD-NUM Must Match WS-CARD-NUM for Transaction Output",
+          "description": "4000-TRNXFILE-GET matches XREF-CARD-NUM against WS-CARD-NUM entries in the in-memory table. If the transaction table is not sorted or grouped consistently with the XREFFILE card numbers, transactions will be silently skipped or misattributed."
+        },
+        {
+          "dependency": "CR-CNT and TR-CNT Array Bounds",
+          "description": "WS-TRNX-TABLE is dimensioned as 51 card entries each with 10 transactions. CR-CNT and TR-CNT must not exceed these bounds (51 and 10 respectively). There is no explicit bounds check in the code; overflow would cause data corruption in adjacent working storage."
+        },
+        {
+          "dependency": "WS-TOTAL-AMT Reset Between Statements",
+          "description": "WS-TOTAL-AMT is reset to ZERO in 1000-MAINLINE before each call to 4000-TRNXFILE-GET. If this reset is missed, transaction totals will accumulate across multiple account statements, producing incorrect totals."
+        },
+        {
+          "dependency": "WS-M03B-FLDT as Shared I/O Buffer",
+          "description": "WS-M03B-FLDT (1000 bytes) is the single shared data buffer passed to CBSTM03B for all file operations. It is explicitly cleared to SPACES before each call. Failure to clear it between calls could result in stale data being interpreted as a valid record."
+        },
+        {
+          "dependency": "CBSTM03B Return Code Validation",
+          "description": "All file operations depend on WS-M03B-RC returned by CBSTM03B. RC=00 indicates success, RC=10 indicates end-of-file, and any other value triggers 9999-ABEND-PROGRAM. The program has no retry logic; any unexpected RC causes immediate abnormal termination via CEE3ABD."
+        },
+        {
+          "dependency": "PSA/TCB/TIOT Pointer Chain Validity",
+          "description": "The program dereferences a chain of mainframe system control block pointers (PSA -> TCB -> TIOT) at startup. This requires execution in a standard MVS/z/OS batch environment where PSA is addressable at address zero. Running outside this environment will cause a protection exception or incorrect DD name display."
+        },
+        {
+          "dependency": "HTML Output Structural Integrity",
+          "description": "HTML output is written as a sequence of individual tag lines across multiple paragraphs (5100, 5200, 4000, 6000). The correct HTML structure depends on all these sections executing in order for every account. An abend mid-statement will produce malformed HTML."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "CBSTM03B.cbl",
+          "purpose": "CBSTM03B is a batch subroutine within the CardDemo credit card management application, serving as a centralized file I/O handler for transaction reporting workflows. It operates as a called subprogram, meaning it is invoked by a parent reporting program rather than running independently, acting as a reusable file access layer. The program abstracts all direct file handling for four core data files — transactions, card-to-account cross-references, customers, and accounts — providing a single, consistent interface for opening, reading, and closing these files so that the calling program can retrieve and correlate data needed to produce transaction reports."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "After each CALL to CBSTM03B for file open operations (TRNXFILE, XREFFILE, CUSTFILE, ACCTFILE), the return code WS-M03B-RC is checked. Codes '00' or '04' are treated as success (CONTINUE). Any other return code triggers a DISPLAY of the file name and return code, followed by PERFORM 9999-ABEND-PROGRAM to terminate the program abnormally."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "Sequential reads (XREFFILE, TRNXFILE) use EVALUATE on WS-M03B-RC: '00' means success, '10' signals end-of-file (sets END-OF-FILE to 'Y' or branches to exit label), and any OTHER code triggers a DISPLAY of the error and PERFORM 9999-ABEND-PROGRAM. Keyed reads (CUSTFILE, ACCTFILE) treat only '00' as success; any other code causes an immediate abend."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "After each CALL to CBSTM03B for close operations on all four files, WS-M03B-RC is checked. Codes '00' or '04' are accepted as success. Any other return code results in a DISPLAY of the file name and return code, followed by PERFORM 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "End-of-File Handling",
+        "description": "End-of-file for sequential reads is detected via return code '10' from CBSTM03B. For XREFFILE, this sets END-OF-FILE to 'Y', which terminates the main processing loop in 1000-MAINLINE. For TRNXFILE during the initial load phase (8500-READTRNX-READ), return code '10' branches to 8599-EXIT to finalize the transaction table and redirect flow."
+      },
+      {
+        "category": "Abnormal Program Termination",
+        "description": "All unrecoverable errors funnel into the 9999-ABEND-PROGRAM paragraph, which DISPLAYs 'ABENDING PROGRAM' and calls the IBM Language Environment routine 'CEE3ABD' to force an abnormal termination with a system dump, ensuring the error is visible in job logs and the program does not continue processing in an inconsistent state."
+      },
+      {
+        "category": "Control Block Addressing Errors",
+        "description": "The program accesses mainframe control blocks (PSA, TCB, TIOT) via pointer manipulation at startup. There is no explicit error handling for invalid pointer dereferences or null UCB entries; the program only logs UCB validity status via DISPLAY statements (valid UCB vs. null UCB) without aborting on null UCBs, representing a gap in error handling for this area."
+      },
+      {
+        "category": "Output File Write Errors",
+        "description": "Writes to STMT-FILE and HTML-FILE using WRITE statements have no explicit error checking (no FILE STATUS clause is defined for these files and no AT END or INVALID KEY clauses are used). Write failures would result in unhandled runtime errors rather than controlled abends, representing an absence of error handling for output operations."
+      }
+    ]
+  }
+}

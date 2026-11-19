@@ -1,0 +1,543 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COTRTUPC.cbl",
+        "type": "cobol",
+        "transaction_id": "CTTU"
+      },
+      "overview": "This program is part of the CardDemo application, a credit card management system that maintains reference data supporting transaction processing. It operates within the administrative layer, allowing authorized users to manage the transaction type reference table — a foundational dataset that categorizes and describes the types of transactions processed by the system. COTRTUPC is a CICS interactive program that handles the full lifecycle of transaction type record maintenance, including searching for existing records, displaying details, validating user input, and performing create, update, and delete operations against the DB2 TRANSACTION_TYPE table. It solves the need for a controlled, user-friendly interface to keep transaction type reference data accurate and current.",
+      "key_features": [
+        {
+          "feature": "Transaction Type Lookup",
+          "description": "Searches the DB2 TRANSACTION_TYPE table by a 2-digit numeric type code and displays the matching record to the user."
+        },
+        {
+          "feature": "Record Update",
+          "description": "Allows users to modify the description of an existing transaction type, with a two-step confirm-before-save workflow to prevent accidental changes."
+        },
+        {
+          "feature": "New Record Creation",
+          "description": "When a searched type code is not found, prompts the user to create a new transaction type record with the entered code and description."
+        },
+        {
+          "feature": "Record Deletion",
+          "description": "Supports deletion of a transaction type record with a mandatory confirmation step, and handles referential integrity errors by prompting the user to remove child records first."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that the transaction type code is a non-zero numeric value and that the description is a non-blank alphanumeric string before allowing any database operation."
+        },
+        {
+          "feature": "Change Detection",
+          "description": "Compares newly entered values against the originally fetched record to detect whether any actual changes were made, preventing unnecessary database updates."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Supports context-sensitive function key handling (F3 exit, F4 delete, F5 save/create, F12 cancel) with dynamic enabling and disabling of keys based on the current workflow state."
+        },
+        {
+          "feature": "Screen Attribute Management",
+          "description": "Dynamically controls field protection, cursor positioning, and color highlighting on the BMS map to guide the user through each step of the maintenance workflow."
+        },
+        {
+          "feature": "Abend Handling",
+          "description": "Implements a centralized abend routine that displays error information and issues a CICS ABEND with a diagnostic code if an unexpected program error occurs."
+        },
+        {
+          "feature": "Navigation Integration",
+          "description": "Integrates with the CardDemo admin menu (COADM01C) and transaction type list program (COTRTLIC), supporting seamless transfer of control and commarea context between programs."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDEMO.TRANSACTION_TYPE",
+        "type": "Read/Write",
+        "description": "DB2 table storing transaction type codes and descriptions. Read to retrieve existing transaction type details for display and validation. Updated to modify transaction type descriptions. New records inserted when a transaction type code does not exist. Records deleted when user confirms deletion."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and Initialization",
+          "description": "Program starts, registers CICS abend handler, initializes working storage areas (CC-WORK-AREA, WS-MISC-STORAGE, WS-COMMAREA), and sets transaction ID to 'CTTU'.",
+          "records": [
+            "WS-TRANID",
+            "CC-WORK-AREA",
+            "WS-MISC-STORAGE",
+            "WS-COMMAREA"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Communication Area Restoration",
+          "description": "Checks EIBCALEN to determine if this is a fresh entry or re-entry. If fresh entry or coming from admin/list programs without re-enter flag, initializes CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA. Otherwise restores both from DFHCOMMAREA passed by CICS.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-REENTER",
+            "EIBCALEN"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "PF Key Storage and Validation",
+          "description": "Stores the current AID (attention identifier) key pressed by the user via CSSTRPFY copybook logic. Validates whether the pressed key is valid in the current program context (PF03, Enter, PF04, PF05, PF12). Sets PFK-VALID or PFK-INVALID flag accordingly.",
+          "records": [
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK04",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "CCARD-AID-ENTER",
+            "WS-PFK-FLAG",
+            "TTUP-CHANGE-ACTION"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "State Reset Evaluation",
+          "description": "Evaluates specific combinations of key presses and program state flags to determine if the program should reset to initial entry state (e.g., after completed update, failed changes, delete done/failed, or PF12 cancel from certain states).",
+          "records": [
+            "CCARD-AID-PFK12",
+            "TTUP-SHOW-DETAILS",
+            "TTUP-CREATE-NEW-RECORD",
+            "TTUP-DETAILS-NOT-FOUND",
+            "TTUP-CHANGES-OKAYED-AND-DONE",
+            "TTUP-CHANGES-FAILED",
+            "TTUP-DELETE-DONE",
+            "TTUP-DELETE-FAILED",
+            "TTUP-OLD-DETAILS"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Main Action Routing",
+          "description": "Large EVALUATE block routes processing based on PF key pressed and current program state. Routes to: XCTL exit (PF03), initial screen display (fresh entry), delete confirmation (PF04+confirm state), delete initiation (PF04+show details), new record prompt (PF05+not found), write processing (PF05+changes confirmed), cancel action (PF12), invalid key handling, or general input processing.",
+          "records": [
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK04",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "TTUP-CHANGE-ACTION",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-TO-TRANID"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "PF03 Exit - Transfer Control",
+          "description": "When PF03 is pressed, sets up return navigation to calling program (admin or list program). Issues CICS SYNCPOINT then XCTL to the target program passing CARDDEMO-COMMAREA.",
+          "records": [
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-TRANID",
+            "CDEMO-TO-PROGRAM",
+            "LIT-ADMINTRANID",
+            "LIT-ADMINPGM",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-LAST-MAP"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Receive Map Input",
+          "description": "Issues CICS RECEIVE MAP command to read user input from the CTRTUPA map in COTRTUP mapset into CTRTUPAI input area. Captures response codes.",
+          "records": [
+            "CTRTUPAI",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "TRTYPCDI",
+            "TRTYDSCI"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Store Map Input to New Details",
+          "description": "Transfers user-entered screen fields into TTUP-NEW-DETAILS working storage. Handles asterisk and space as low-values. Trims transaction type code and description before storing.",
+          "records": [
+            "TRTYPCDI",
+            "TRTYDSCI",
+            "TTUP-NEW-TTYP-TYPE",
+            "TTUP-NEW-TTYP-TYPE-DESC",
+            "TTUP-NEW-DETAILS"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Edit and Validate Map Inputs",
+          "description": "Validates user inputs. For search key context: validates transaction type code is numeric, non-zero, 2-digit via 1210-EDIT-TRANTYPE and 1245-EDIT-NUM-REQD. For update context: validates description is alphanumeric and supplied via 1230-EDIT-ALPHANUM-REQD. Sets INPUT-OK or INPUT-ERROR flags and populates WS-RETURN-MSG on failure.",
+          "records": [
+            "TTUP-NEW-TTYP-TYPE",
+            "TTUP-NEW-TTYP-TYPE-DESC",
+            "WS-EDIT-ALPHANUM-ONLY",
+            "WS-EDIT-ALPHANUM-LENGTH",
+            "WS-EDIT-VARIABLE-NAME",
+            "WS-EDIT-ALPHANUM-ONLY-FLAGS",
+            "WS-EDIT-TTYP-FLAG",
+            "WS-EDIT-DESC-FLAGS",
+            "INPUT-OK",
+            "INPUT-ERROR",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Compare Old and New Values",
+          "description": "Compares TTUP-OLD-DETAILS with TTUP-NEW-DETAILS using case-insensitive UPPER-CASE and TRIM functions to detect whether any changes were actually made. Sets NO-CHANGES-FOUND or CHANGE-HAS-OCCURRED flag and corresponding message.",
+          "records": [
+            "TTUP-OLD-TTYP-TYPE",
+            "TTUP-OLD-TTYP-TYPE-DESC",
+            "TTUP-NEW-TTYP-TYPE",
+            "TTUP-NEW-TTYP-TYPE-DESC",
+            "WS-DATACHANGED-FLAG"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Decide Next Action",
+          "description": "Evaluates current program state and input results to determine next state transition. Handles: fetching data when not yet fetched, cancel/PF12 processing with re-read, delete confirmation, show details with change detection, backing out changes, invalid keys, new record creation, and post-update state reset.",
+          "records": [
+            "TTUP-CHANGE-ACTION",
+            "FLG-TRANFILTER-ISVALID",
+            "INPUT-ERROR",
+            "NO-CHANGES-DETECTED",
+            "WS-INVALID-KEY",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CDEMO-ACCT-STATUS"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Read Transaction Type from Database",
+          "description": "Executes SQL SELECT against CARDDEMO.TRANSACTION_TYPE table using TR_TYPE as key. Stores result in DCL-TR-TYPE and DCL-TR-DESCRIPTION. Sets FOUND-TRANTYPE-IN-TABLE on success, FLG-TRANFILTER-NOT-OK on not-found (SQLCODE +100) or SQL error.",
+          "records": [
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION",
+            "TTUP-NEW-TTYP-TYPE",
+            "SQLCODE",
+            "WS-DISP-SQLCODE",
+            "SQLERRM"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Store Fetched Data to Old Details",
+          "description": "Copies SQL-fetched transaction type data from DCL host variables into TTUP-OLD-DETAILS for later comparison and display. Handles variable-length description using DCL-TR-DESCRIPTION-LEN.",
+          "records": [
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION-TEXT",
+            "DCL-TR-DESCRIPTION-LEN",
+            "TTUP-OLD-TTYP-TYPE",
+            "TTUP-OLD-TTYP-TYPE-DESC"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Write Processing - Update or Insert",
+          "description": "Attempts SQL UPDATE on CARDDEMO.TRANSACTION_TYPE for the given TR_TYPE. If SQLCODE=+100 (row not found), falls through to INSERT. On success issues CICS SYNCPOINT. On lock error (SQLCODE=-911) sets lock error state. On other SQL errors sets update-failed state.",
+          "records": [
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION",
+            "DCL-TR-DESCRIPTION-TEXT",
+            "DCL-TR-DESCRIPTION-LEN",
+            "TTUP-NEW-TTYP-TYPE",
+            "TTUP-NEW-TTYP-TYPE-DESC",
+            "SQLCODE",
+            "WS-DISP-SQLCODE",
+            "TTUP-CHANGE-ACTION"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Insert New Record",
+          "description": "When UPDATE finds no matching row, executes SQL INSERT INTO CARDDEMO.TRANSACTION_TYPE with TR_TYPE and TR_DESCRIPTION values. Issues CICS SYNCPOINT on success. Sets TABLE-UPDATE-FAILED and error message on failure.",
+          "records": [
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION",
+            "SQLCODE",
+            "WS-DISP-SQLCODE",
+            "SQLERRM",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Delete Processing",
+          "description": "Executes SQL DELETE FROM CARDDEMO.TRANSACTION_TYPE WHERE TR_TYPE matches TTUP-OLD-TTYP-TYPE. On success sets TTUP-DELETE-DONE and issues CICS SYNCPOINT. On referential integrity violation (SQLCODE=-532) sets delete-failed with child record message. On other errors sets delete-failed state.",
+          "records": [
+            "DCL-TR-TYPE",
+            "TTUP-OLD-TTYP-TYPE",
+            "SQLCODE",
+            "WS-DISP-SQLCODE",
+            "SQLERRM",
+            "TTUP-CHANGE-ACTION",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Screen Initialization and Setup",
+          "description": "Initializes output map CTRTUPAO with low-values. Populates screen header fields: titles from COTTL01Y, transaction ID, program name, current date (MM/DD/YY format), and current time (HH:MM:SS) from FUNCTION CURRENT-DATE.",
+          "records": [
+            "CTRTUPAO",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "WS-CURDATE-DATA",
+            "WS-CURDATE-MM-DD-YY",
+            "WS-CURTIME-HH-MM-SS"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Setup Screen Variables",
+          "description": "Populates screen data fields based on current program state. Shows initial blank values, original fetched values (TTUP-OLD-DETAILS), or updated/new values (TTUP-NEW-DETAILS) in TRTYPCDO and TRTYDSCO output fields.",
+          "records": [
+            "TRTYPCDO",
+            "TRTYDSCO",
+            "TTUP-OLD-TTYP-TYPE",
+            "TTUP-OLD-TTYP-TYPE-DESC",
+            "TTUP-NEW-TTYP-TYPE",
+            "TTUP-NEW-TTYP-TYPE-DESC",
+            "CTRTUPAO"
+          ]
+        },
+        {
+          "step": 19,
+          "process": "Setup Information and Error Messages",
+          "description": "Sets WS-INFO-MSG 88-level value based on program state (search prompt, create prompt, delete confirm, update success, failure, etc.). Center-justifies the info message text into WS-STRING-OUT and moves to INFOMSGO. Moves WS-RETURN-MSG to ERRMSGO.",
+          "records": [
+            "WS-INFO-MSG",
+            "WS-STRING-LEN",
+            "WS-STRING-MID",
+            "WS-STRING-OUT",
+            "INFOMSGO",
+            "ERRMSGO",
+            "WS-RETURN-MSG",
+            "CTRTUPAO"
+          ]
+        },
+        {
+          "step": 20,
+          "process": "Setup Screen Field Attributes",
+          "description": "Sets BMS field attributes for all screen fields. First protects all fields (DFHBMPRF). Then selectively unprotects based on state: makes TRTYPCDA editable for search key entry, or TRTYDSCA editable for description update. Sets color attributes (DFHRED for errors). Uses CSSETATY copybook for description field attribute logic.",
+          "records": [
+            "TRTYPCDA",
+            "TRTYDSCA",
+            "INFOMSGA",
+            "TRTYPCDC",
+            "TRTYPCDO",
+            "CTRTUPAI",
+            "DFHBMPRF",
+            "DFHBMFSE",
+            "DFHRED",
+            "DFHBMDAR",
+            "DFHBMASB"
+          ]
+        },
+        {
+          "step": 21,
+          "process": "Setup PF Key Attributes and Cursor Position",
+          "description": "Sets cursor position (length -1) to appropriate field based on state. Activates/deactivates PF key display attributes (FKEYSA, FKEY04A, FKEY05A, FKEY12A) based on which keys are valid in current context.",
+          "records": [
+            "TRTYPCDL",
+            "TRTYDSCL",
+            "FKEYSA",
+            "FKEY04A",
+            "FKEY05A",
+            "FKEY12A",
+            "CTRTUPAI"
+          ]
+        },
+        {
+          "step": 22,
+          "process": "Send Screen to Terminal",
+          "description": "Issues CICS SEND MAP command to display CTRTUPAO output map to the user terminal with CURSOR, ERASE, and FREEKB options. Captures response code.",
+          "records": [
+            "CTRTUPAO",
+            "CCARD-NEXT-MAP",
+            "CCARD-NEXT-MAPSET",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 23,
+          "process": "Common Return - Save State and Return to CICS",
+          "description": "Moves WS-RETURN-MSG to CCARD-ERROR-MSG. Packages CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA into WS-COMMAREA. Issues CICS RETURN with transaction ID 'CTTU' and the combined commarea to await next user interaction.",
+          "records": [
+            "WS-RETURN-MSG",
+            "CCARD-ERROR-MSG",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "WS-COMMAREA",
+            "LIT-THISTRANID"
+          ]
+        },
+        {
+          "step": 24,
+          "process": "Abend Handling",
+          "description": "On unexpected abend, populates ABEND-DATA with culprit program name and abend code. Sends abend data to terminal, cancels CICS abend handler, then issues CICS ABEND with the abend code.",
+          "records": [
+            "ABEND-MSG",
+            "ABEND-CULPRIT",
+            "ABEND-CODE",
+            "ABEND-REASON",
+            "ABEND-DATA",
+            "LIT-THISPGM"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN-driven initialization",
+          "description": "The entire commarea restoration logic depends on EIBCALEN being non-zero to indicate a returning transaction. A zero value forces full re-initialization, losing any prior state."
+        },
+        {
+          "dependency": "TTUP-CHANGE-ACTION state machine",
+          "description": "The program operates as a multi-step state machine driven by TTUP-CHANGE-ACTION. Each step (not-fetched, show-details, confirm-delete, changes-ok-not-confirmed, etc.) must be set correctly before the next interaction or routing logic will fail or produce incorrect behavior."
+        },
+        {
+          "dependency": "TTUP-OLD-DETAILS populated before update/delete",
+          "description": "The delete operation uses TTUP-OLD-TTYP-TYPE as the SQL WHERE key. The write processing uses TTUP-NEW-TTYP-TYPE. Both require that the prior read (9000-READ-TRANTYPE) successfully populated these fields before the DML operations are attempted."
+        },
+        {
+          "dependency": "FLG-TRANFILTER-ISVALID before database read",
+          "description": "The 9000-READ-TRANTYPE paragraph checks FLG-TRANFILTER-NOT-OK after calling 9100-GET-TRANSACTION-TYPE and exits early if set. The SQL read depends on TTUP-NEW-TTYP-TYPE being a valid, non-zero numeric value set by prior edit routines."
+        },
+        {
+          "dependency": "SQL UPDATE before INSERT fallback",
+          "description": "In 9600-WRITE-PROCESSING, an INSERT is only attempted when the UPDATE returns SQLCODE=+100 (no rows updated). The INSERT depends on the UPDATE having already been attempted and confirmed as a not-found condition, not a lock or other error."
+        },
+        {
+          "dependency": "CICS SYNCPOINT after successful DML",
+          "description": "Database changes (UPDATE, INSERT, DELETE) are only committed via CICS SYNCPOINT when SQLCODE=0. If SYNCPOINT is not reached due to an error path, the changes remain uncommitted and will be rolled back, making the SYNCPOINT call a critical dependency for data persistence."
+        },
+        {
+          "dependency": "Referential integrity on delete (SQLCODE -532)",
+          "description": "Deletion of a TRANSACTION_TYPE record will fail with SQLCODE=-532 if child records exist in related tables (e.g., TRANSACTION_CATEGORY via DCLTRCAT). The program explicitly handles this case and instructs the user to delete child records first."
+        },
+        {
+          "dependency": "CARDDEMO-COMMAREA layout and length contract",
+          "description": "The program splits DFHCOMMAREA into CARDDEMO-COMMAREA (first portion) and WS-THIS-PROGCOMMAREA (second portion) using fixed lengths. Both the calling program and this program must agree on the exact length of CARDDEMO-COMMAREA for the offset calculation to be correct."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM for navigation routing",
+          "description": "On PF03 exit, the target program and transaction ID are determined by CDEMO-FROM-PROGRAM and CDEMO-FROM-TRANID. If these are spaces or low-values, the program defaults to the admin program (COADM01C/CA00). Incorrect values in these fields will cause navigation to the wrong program."
+        },
+        {
+          "dependency": "WS-RETURN-MSG-OFF guard for error messages",
+          "description": "Multiple validation and error-handling sections check WS-RETURN-MSG-OFF before setting a new error message. This ensures only the first error message is preserved and not overwritten by subsequent checks in the same pass."
+        },
+        {
+          "dependency": "INPUT-OK/INPUT-ERROR flag for confirmation gate",
+          "description": "The transition to TTUP-CHANGES-OK-NOT-CONFIRMED state (which enables PF05 save) only occurs when INPUT-ERROR is not set. Any validation failure blocks the confirmation path, making the edit routines a prerequisite gate for the save operation."
+        },
+        {
+          "dependency": "DCL-TR-DESCRIPTION variable-length handling",
+          "description": "The description field uses a variable-length DB2 host variable (DCL-TR-DESCRIPTION with DCL-TR-DESCRIPTION-TEXT and DCL-TR-DESCRIPTION-LEN). The length must be correctly computed before INSERT/UPDATE and correctly applied when reading to avoid data truncation or padding errors."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Online Transaction Processing (OLTP) middleware",
+          "purpose": "Provides the runtime environment for the program. Used for: HANDLE ABEND registration, RECEIVE MAP to capture terminal input, SEND MAP to display output screens, RETURN with TRANSID/COMMAREA to maintain pseudo-conversational state, XCTL for program-to-program transfer, SYNCPOINT for transaction commit, and ABEND for controlled termination."
+        },
+        {
+          "system": "IBM DB2",
+          "type": "Relational Database Management System",
+          "purpose": "Stores and manages transaction type reference data. The program performs SELECT (read by TR_TYPE key), UPDATE (modify TR_DESCRIPTION), INSERT (add new transaction type), and DELETE (remove transaction type) operations against the CARDDEMO.TRANSACTION_TYPE table. Also references CARDDEMO.TRANSACTION_CATEGORY (via DCLTRCAT include) for referential integrity enforcement."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates transaction type code (numeric, non-zero, required) and description (alphanumeric, required) via dedicated edit paragraphs (1210-EDIT-TRANTYPE, 1230-EDIT-ALPHANUM-REQD, 1245-EDIT-NUM-REQD). Sets INPUT-ERROR flag and populates WS-RETURN-MSG with field-specific messages using STRING. Only the first error message is captured via WS-RETURN-MSG-OFF guard. Cursor is repositioned to the offending field. Screen attributes change to red for invalid fields. State flags (FLG-TRANFILTER-NOT-OK, FLG-TRANFILTER-BLANK, FLG-DESCRIPTION-NOT-OK) track individual field errors."
+      },
+      {
+        "category": "SQL Read Errors",
+        "description": "In 9100-GET-TRANSACTION-TYPE, SQLCODE is evaluated after SELECT. SQLCODE=0 sets FOUND-TRANTYPE-IN-TABLE. SQLCODE=+100 (not found) sets INPUT-ERROR and FLG-TRANFILTER-NOT-OK with WS-RECORD-NOT-FOUND message. Negative SQLCODE sets INPUT-ERROR and FLG-TRANFILTER-NOT-OK, and builds a detailed error message including table name, SQLCODE value, and SQLERRM text via STRING."
+      },
+      {
+        "category": "SQL Update Errors",
+        "description": "In 9600-WRITE-PROCESSING, SQLCODE is evaluated after UPDATE. SQLCODE=0 triggers CICS SYNCPOINT. SQLCODE=+100 (row not found) redirects to INSERT via 9700-INSERT-RECORD. SQLCODE=-911 (lock conflict) sets COULD-NOT-LOCK-REC-FOR-UPDATE and TTUP-CHANGES-OKAYED-LOCK-ERROR state. Negative SQLCODE sets TABLE-UPDATE-FAILED and TTUP-CHANGES-OKAYED-BUT-FAILED state with a detailed error message including SQLCODE and SQLERRM."
+      },
+      {
+        "category": "SQL Insert Errors",
+        "description": "In 9700-INSERT-RECORD, SQLCODE=0 triggers CICS SYNCPOINT. Any other SQLCODE sets TABLE-UPDATE-FAILED and builds an error message with table name, SQLCODE, and SQLERRM. Execution exits the paragraph immediately via GO TO on failure."
+      },
+      {
+        "category": "SQL Delete Errors",
+        "description": "In 9800-DELETE-PROCESSING, SQLCODE=0 sets TTUP-DELETE-DONE and issues SYNCPOINT. SQLCODE=-532 (referential integrity violation) sets RECORD-DELETE-FAILED with a message instructing the user to delete child records first, including SQLCODE and SQLERRM. Any other negative SQLCODE sets RECORD-DELETE-FAILED and TTUP-DELETE-FAILED with a generic delete failure message including SQLCODE and SQLERRM."
+      },
+      {
+        "category": "CICS Abend Handling",
+        "description": "A global CICS HANDLE ABEND pointing to ABEND-ROUTINE is established at program entry. The ABEND-ROUTINE sends abend details (culprit program, code, reason, message) to the terminal using NOHANDLE, cancels the abend handler, then issues CICS ABEND with the abend code. Unexpected state scenarios in 2000-DECIDE-ACTION also explicitly invoke ABEND-ROUTINE with code '0001' and message 'UNEXPECTED DATA SCENARIO'."
+      },
+      {
+        "category": "Invalid PF Key Errors",
+        "description": "In 0001-CHECK-PFKEYS, any key press not valid for the current program state sets PFK-INVALID and populates WS-RETURN-MSG with WS-INVALID-KEY-PRESSED message (guarded by WS-RETURN-MSG-OFF). The main EVALUATE in 0000-MAIN detects WS-INVALID-KEY-PRESSED and re-sends the map without further processing, preserving the current screen state."
+      },
+      {
+        "category": "No Input / No Changes Detected Errors",
+        "description": "If the transaction type field is blank, FLG-TRANFILTER-BLANK is set and NO-SEARCH-CRITERIA-RECEIVED message is displayed, resetting state to TTUP-DETAILS-NOT-FETCHED. If submitted data matches existing data, NO-CHANGES-DETECTED message is set and the update flow is bypassed, keeping the user on the edit screen with cursor on the description field."
+      },
+      {
+        "category": "Program State / Context Errors",
+        "description": "State is managed through TTUP-CHANGE-ACTION flags in the commarea. On initial entry or return from calling programs, the commarea is initialized to a clean state. Cancellation actions (PF12) restore prior state or navigate back appropriately. Messages like WS-UPDATE-WAS-CANCELLED and WS-DELETE-WAS-CANCELLED inform the user of cancelled operations. Error messages are propagated to CCARD-ERROR-MSG at COMMON-RETURN for display."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COTRTUP",
+        "map_name": "CTRTUPA",
+        "business_function": "Provides a CICS 3270 terminal interface for maintaining (viewing, adding, updating, and deleting) Transaction Type records in the CARDDEMO.TRANSACTION_TYPE database table. The screen allows an administrator to look up a transaction type by its 2-digit numeric code, view its description, modify the description, confirm or cancel changes, and delete existing records. It supports full CRUD operations with multi-step confirmation flows for destructive actions."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COTRTUP - Transaction Type Update</title><style>body{background:#000;margin:0;padding:20px;font-family:monospace;}  .terminal{background:#000;color:#fff;width:80ch;font-size:16px;line-height:1.4;position:relative;white-space:pre;border:1px solid #444;padding:4px;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .turquoise{color:#00cdcd;} .red{color:#ff5555;} .neutral{color:#aaaaaa;} .green{color:#00cd00;} .white{color:#ffffff;} .dark{color:#000;} .underline{text-decoration:underline;} .bright{font-weight:bold;} .input-field{background:#000;border-bottom:1px solid #aaa;display:inline-block;} .header-line{display:block;} </style></head><body><div class='terminal'><span class='blue'>Tran: </span><span class='blue'>CTTU</span>               <span class='yellow'>CardDemo                                </span>    <span class='blue'>Date: </span><span class='blue'>06/15/25</span>\n<span class='blue'>Prog: </span><span class='blue'>COTRTUPC</span>               <span class='yellow'>Transaction Type Maintenance             </span>    <span class='blue'>Time: </span><span class='blue'>10:30:45</span>\n\n\n\n\n                           <span class='neutral'>Maintain Transaction Type</span>\n\n\n\n\n\n   <span class='turquoise'>Transaction Type  :</span> <span class='white underline'>01</span>\n\n   <span class='turquoise'>Description       :</span> <span class='white underline'>Purchase                                          </span>\n\n\n\n\n\n\n                       <span class='neutral'>Selected transaction type shown above   </span>\n<span class='red bright'>                                                                              </span>\n<span class='yellow'>ENTER=Process F3=Exit</span> <span class='yellow dark'>F4=Delete</span> <span class='yellow dark'>F5=Save </span> <span class='yellow dark'>F6=Add</span>                    <span class='yellow dark'>F12=Cancel</span></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process current screen inputs - receive map data, validate fields, decide next action, and redisplay screen with results"
+        },
+        {
+          "key": "F3",
+          "action": "Exit the Transaction Type Update screen and transfer control back to the calling program (Admin menu COADM01C or list screen COTRTLIC), issuing a SYNCPOINT before XCTL"
+        },
+        {
+          "key": "F4",
+          "action": "Initiate delete flow: when record details are displayed, prompts user to confirm deletion; when confirmation is already pending (TTUP-CONFIRM-DELETE state), executes the actual DELETE from CARDDEMO.TRANSACTION_TYPE"
+        },
+        {
+          "key": "F5",
+          "action": "Save/Add: when a record was not found and user wants to add a new record, transitions to create-new-record state; when edits have been validated and confirmed (TTUP-CHANGES-OK-NOT-CONFIRMED state), executes the UPDATE (or INSERT if not found) against CARDDEMO.TRANSACTION_TYPE and issues SYNCPOINT"
+        },
+        {
+          "key": "F6",
+          "action": "Add (displayed in key bar but controlled by program logic as part of the new-record creation flow; key bar label shown as F6=Add)"
+        },
+        {
+          "key": "F12",
+          "action": "Cancel current operation: cancels a pending update confirmation (sets TTUP-CHANGES-BACKED-OUT), cancels a pending delete confirmation (sets WS-DELETE-WAS-CANCELLED), or returns to initial search state when viewing details or after completed/failed operations"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,502 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COPAUA0C.cbl",
+        "type": "cobol",
+        "transaction_id": "CP00"
+      },
+      "overview": "COPAUA0C operates within the CardDemo application's authorization module, serving as the real-time decision engine that evaluates incoming card payment requests in a CICS/IMS/MQ environment. It acts as a triggered batch-style processor that consumes authorization requests from an IBM MQ queue, applies business rules, and returns approval or decline decisions to a reply queue. The program solves the core problem of automated credit card transaction authorization by validating card and account data, checking available credit, and persisting authorization records to an IMS database for downstream settlement and reconciliation.",
+      "key_features": [
+        {
+          "feature": "MQ-Triggered Processing",
+          "description": "Launched via MQ trigger mechanism, opens a request queue and processes up to 500 authorization request messages per invocation in a loop."
+        },
+        {
+          "feature": "Card Cross-Reference Lookup",
+          "description": "Reads the CCXREF VSAM file to resolve an incoming card number to its associated account ID and customer ID."
+        },
+        {
+          "feature": "Account and Customer Validation",
+          "description": "Retrieves account master (ACCTDAT) and customer master (CUSTDAT) records via CICS file reads to validate the cardholder's standing."
+        },
+        {
+          "feature": "IMS Authorization Summary Read",
+          "description": "Queries an IMS database (PSB PSBPAUTB) for a pending authorization summary segment to obtain the most current credit limit and balance for the account."
+        },
+        {
+          "feature": "Credit Authorization Decision",
+          "description": "Computes available credit by subtracting the current balance from the credit limit and approves or declines the transaction based on whether the transaction amount exceeds that limit."
+        },
+        {
+          "feature": "Decline Reason Coding",
+          "description": "Assigns specific reason codes (e.g., 3100 for card/account not found, 4100 for insufficient funds, 5100 for card fraud) to declined transactions for downstream reporting."
+        },
+        {
+          "feature": "MQ Reply Response",
+          "description": "Formats and sends an authorization response message (card number, transaction ID, response code, reason code, approved amount) back to the requester's reply-to queue using MQPUT1."
+        },
+        {
+          "feature": "IMS Authorization Record Persistence",
+          "description": "Writes or updates an IMS authorization summary segment and inserts a child authorization detail segment to maintain a full audit trail of each authorization decision."
+        },
+        {
+          "feature": "Structured Error Logging",
+          "description": "Logs warnings and critical errors with timestamps, error codes, and context to the CSSL transient data queue; terminates processing immediately on critical errors."
+        },
+        {
+          "feature": "CICS Syncpoint Management",
+          "description": "Issues a CICS SYNCPOINT after each message is processed to commit work units, and re-schedules the IMS PSB per message to ensure data integrity across MQ, VSAM, and IMS resources."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "REQUEST_QUEUE (WS-REQUEST-QNAME)",
+        "type": "Read",
+        "description": "IBM MQ input queue - reads incoming card authorization request messages containing card number, transaction amount, merchant details, and other authorization request fields. Queue name is dynamically retrieved from MQ trigger data at startup."
+      },
+      {
+        "name": "REPLY_QUEUE (WS-REPLY-QNAME)",
+        "type": "Write",
+        "description": "IBM MQ reply queue - sends authorization response messages back to the requester containing card number, transaction ID, auth ID code, response code, response reason, and approved amount. Queue name is obtained from the incoming request message's ReplyToQ field."
+      },
+      {
+        "name": "CCXREF (CARDAIX/CCXREF)",
+        "type": "Read",
+        "description": "VSAM Card Cross-Reference file (CCXREF) - reads card cross-reference records using card number as key to retrieve associated customer ID and account ID for a given card number."
+      },
+      {
+        "name": "ACCTDAT",
+        "type": "Read",
+        "description": "VSAM Account master file - reads account records using account ID to retrieve credit limit, current balance, cash credit limit, and account status for authorization decision making."
+      },
+      {
+        "name": "CUSTDAT",
+        "type": "Read",
+        "description": "VSAM Customer master file - reads customer records using customer ID to retrieve customer demographic and profile information associated with the card being authorized."
+      },
+      {
+        "name": "IMS_PAUTSUM0 (PSBPAUTB)",
+        "type": "Read/Write",
+        "description": "IMS database Pending Authorization Summary segment (root segment) - reads existing authorization summary to get current credit balance and limits; inserts new summary record if none exists or replaces existing one after updating approved/declined counts and amounts."
+      },
+      {
+        "name": "IMS_PAUTDTL1 (PSBPAUTB)",
+        "type": "Write",
+        "description": "IMS database Pending Authorization Details segment (child segment under PAUTSUM0) - inserts a new authorization detail record for each processed transaction containing full transaction details, authorization result, match status, and fraud indicators."
+      },
+      {
+        "name": "CSSL (TD Queue)",
+        "type": "Write",
+        "description": "CICS Transient Data Queue used for error logging - writes error log records containing date, time, application, program, error location, severity level, subsystem type, error codes, message, and event key whenever errors occur during processing."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization via CICS Trigger",
+          "description": "Program is triggered by CICS. Retrieves MQ trigger data (MQTM) to identify the request queue name and trigger metadata. Sets wait interval to 5000ms.",
+          "records": [
+            "MQTM-QNAME",
+            "MQTM-TRIGGERDATA",
+            "WS-REQUEST-QNAME",
+            "WS-TRIGGER-DATA",
+            "WS-WAIT-INTERVAL"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Open MQ Request Queue",
+          "description": "Opens the IBM MQ request queue in shared input mode using MQOPEN. Stores the queue handle for subsequent GET operations. Logs critical error M001 on failure.",
+          "records": [
+            "WS-REQUEST-QNAME",
+            "W01-HCONN-REQUEST",
+            "W01-HOBJ-REQUEST",
+            "WS-OPTIONS",
+            "WS-COMPCODE",
+            "WS-REASON"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Read Authorization Request from MQ",
+          "description": "Reads a single authorization request message from the MQ queue using MQGET with WAIT option. Captures the correlation ID and reply-to queue name from the message descriptor for later response routing. Sets NO-MORE-MSG-AVAILABLE flag if queue is empty.",
+          "records": [
+            "W01-GET-BUFFER",
+            "W01-DATALEN",
+            "W01-BUFFLEN",
+            "MQMD-CORRELID",
+            "MQMD-REPLYTOQ",
+            "WS-SAVE-CORRELID",
+            "WS-REPLY-QNAME",
+            "MQM-MD-REQUEST",
+            "MQM-GET-MESSAGE-OPTIONS"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Extract and Parse Request Message",
+          "description": "Parses the comma-delimited MQ message buffer into individual authorization request fields including card number, transaction amount, merchant details, and transaction metadata. Converts transaction amount from alphanumeric to numeric using NUMVAL.",
+          "records": [
+            "PA-RQ-AUTH-DATE",
+            "PA-RQ-AUTH-TIME",
+            "PA-RQ-CARD-NUM",
+            "PA-RQ-AUTH-TYPE",
+            "PA-RQ-CARD-EXPIRY-DATE",
+            "PA-RQ-MESSAGE-TYPE",
+            "PA-RQ-MESSAGE-SOURCE",
+            "PA-RQ-PROCESSING-CODE",
+            "PA-RQ-TRANSACTION-AMT",
+            "PA-RQ-MERCHANT-CATAGORY-CODE",
+            "PA-RQ-ACQR-COUNTRY-CODE",
+            "PA-RQ-POS-ENTRY-MODE",
+            "PA-RQ-MERCHANT-ID",
+            "PA-RQ-MERCHANT-NAME",
+            "PA-RQ-MERCHANT-CITY",
+            "PA-RQ-MERCHANT-STATE",
+            "PA-RQ-MERCHANT-ZIP",
+            "PA-RQ-TRANSACTION-ID",
+            "WS-TRANSACTION-AMT-AN",
+            "WS-TRANSACTION-AMT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Schedule IMS PSB",
+          "description": "Schedules the IMS Program Specification Block (PSBPAUTB) using DLI SCHD command. If PSB is already scheduled (TC status), terminates and reschedules. Sets IMS-PSB-SCHD flag on success. Logs critical error I001 on failure.",
+          "records": [
+            "PSB-NAME",
+            "IMS-RETURN-CODE",
+            "WS-IMS-PSB-SCHD-FLG",
+            "DIBSTAT",
+            "PAUT-PCB-NUM"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read Card Cross-Reference Record",
+          "description": "Reads the CCXREF VSAM file using the card number from the request to retrieve the associated account ID and customer ID. Sets CARD-FOUND-XREF or CARD-NFOUND-XREF flag. Logs warning A001 if card not found, critical error C001 on file error.",
+          "records": [
+            "PA-RQ-CARD-NUM",
+            "XREF-CARD-NUM",
+            "CARD-XREF-RECORD",
+            "XREF-ACCT-ID",
+            "XREF-CUST-ID",
+            "WS-XREF-READ-FLG",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Read Account Master Record",
+          "description": "If card was found in XREF, reads the ACCTDAT VSAM file using the account ID derived from the cross-reference. Retrieves credit limit and current balance for authorization decision. Logs warning A002 if account not found, critical error C002 on file error.",
+          "records": [
+            "XREF-ACCT-ID",
+            "WS-CARD-RID-ACCT-ID",
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CURR-BAL",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "WS-ACCT-MASTER-READ-FLG",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Read Customer Master Record",
+          "description": "Reads the CUSTDAT VSAM file using the customer ID from the cross-reference to retrieve customer profile data. Sets FOUND-CUST-IN-MSTR or NFOUND-CUST-IN-MSTR flag. Logs warning A003 if customer not found, critical error C003 on file error.",
+          "records": [
+            "XREF-CUST-ID",
+            "WS-CARD-RID-CUST-ID",
+            "WS-CARD-RID-CUST-ID-X",
+            "CUSTOMER-RECORD",
+            "WS-CUST-MASTER-READ-FLG",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Read IMS Pending Authorization Summary Segment",
+          "description": "Performs an IMS DLI GU (Get Unique) call to retrieve the pending authorization summary root segment (PAUTSUM0) for the account. Contains aggregated credit limit and balance data. Sets FOUND-PAUT-SMRY-SEG or NFOUND-PAUT-SMRY-SEG flag. Logs critical error I002 on unexpected IMS status.",
+          "records": [
+            "PA-ACCT-ID",
+            "PENDING-AUTH-SUMMARY",
+            "PA-CREDIT-LIMIT",
+            "PA-CREDIT-BALANCE",
+            "WS-PAUT-SMRY-SEG-FLG",
+            "IMS-RETURN-CODE",
+            "DIBSTAT",
+            "PAUT-PCB-NUM"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Read Profile Data (Stub)",
+          "description": "Placeholder paragraph 5600-READ-PROFILE-DATA contains only CONTINUE, indicating future profile-based authorization rules are not yet implemented.",
+          "records": []
+        },
+        {
+          "step": 11,
+          "process": "Make Authorization Decision",
+          "description": "Evaluates available credit against transaction amount. Prefers IMS summary data (PA-CREDIT-LIMIT minus PA-CREDIT-BALANCE) over account master data (ACCT-CREDIT-LIMIT minus ACCT-CURR-BAL). Sets APPROVE-AUTH or DECLINE-AUTH flag. Assigns response code '00' for approval or '05' for decline. Assigns decline reason codes: 3100 (card/account/customer not found), 4100 (insufficient funds), 4200 (card not active), 4300 (account closed), 5100 (card fraud), 5200 (merchant fraud), 9000 (other). Formats comma-delimited response string into W02-PUT-BUFFER.",
+          "records": [
+            "WS-AVAILABLE-AMT",
+            "WS-TRANSACTION-AMT",
+            "PA-CREDIT-LIMIT",
+            "PA-CREDIT-BALANCE",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CURR-BAL",
+            "PA-RL-CARD-NUM",
+            "PA-RL-TRANSACTION-ID",
+            "PA-RL-AUTH-ID-CODE",
+            "PA-RL-AUTH-RESP-CODE",
+            "PA-RL-AUTH-RESP-REASON",
+            "PA-RL-APPROVED-AMT",
+            "WS-APPROVED-AMT",
+            "WS-APPROVED-AMT-DIS",
+            "W02-PUT-BUFFER",
+            "WS-RESP-LENGTH",
+            "WS-DECLINE-FLG",
+            "WS-DECLINE-REASON-FLG",
+            "WS-AUTH-RESP-FLG"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Send Authorization Response via MQ",
+          "description": "Puts the authorization response message onto the reply-to queue using MQPUT1. Sets message type to MQMT-REPLY, correlates using saved correlation ID, sets expiry to 50 (tenths of seconds), and marks message as non-persistent. Logs critical error M004 on failure.",
+          "records": [
+            "WS-REPLY-QNAME",
+            "WS-SAVE-CORRELID",
+            "W02-PUT-BUFFER",
+            "W02-BUFFLEN",
+            "MQM-OD-REPLY",
+            "MQM-MD-REPLY",
+            "MQM-PUT-MESSAGE-OPTIONS",
+            "W02-HCONN-REPLY",
+            "WS-COMPCODE",
+            "WS-REASON"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Update IMS Pending Authorization Summary",
+          "description": "If card was found in XREF, updates or inserts the IMS PAUTSUM0 root segment. If summary segment did not previously exist, initializes and inserts a new one (DLI ISRT). If it existed, replaces it (DLI REPL). Updates approved/declined counts and amounts, and updates credit balance for approved transactions. Logs critical error I003 on IMS failure.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PA-ACCT-ID",
+            "PA-CUST-ID",
+            "PA-CREDIT-LIMIT",
+            "PA-CASH-LIMIT",
+            "PA-APPROVED-AUTH-CNT",
+            "PA-APPROVED-AUTH-AMT",
+            "PA-CREDIT-BALANCE",
+            "PA-CASH-BALANCE",
+            "PA-DECLINED-AUTH-CNT",
+            "PA-DECLINED-AUTH-AMT",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "WS-APPROVED-AMT",
+            "IMS-RETURN-CODE",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Insert IMS Pending Authorization Detail Segment",
+          "description": "Inserts a new child detail segment (PAUTDTL1) under the PAUTSUM0 root segment in IMS. Populates all transaction fields from the request and response including card number, merchant data, amounts, auth codes, and response reason. Generates a descending sort key using CICS ASKTIME/FORMATTIME to compute PA-AUTH-DATE-9C and PA-AUTH-TIME-9C. Sets match status to pending or declined. Logs critical error I004 on IMS failure.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PA-AUTH-DATE-9C",
+            "PA-AUTH-TIME-9C",
+            "PA-AUTH-ORIG-DATE",
+            "PA-AUTH-ORIG-TIME",
+            "PA-CARD-NUM",
+            "PA-AUTH-TYPE",
+            "PA-CARD-EXPIRY-DATE",
+            "PA-MESSAGE-TYPE",
+            "PA-MESSAGE-SOURCE",
+            "PA-PROCESSING-CODE",
+            "PA-TRANSACTION-AMT",
+            "PA-MERCHANT-CATAGORY-CODE",
+            "PA-ACQR-COUNTRY-CODE",
+            "PA-POS-ENTRY-MODE",
+            "PA-MERCHANT-ID",
+            "PA-MERCHANT-NAME",
+            "PA-MERCHANT-CITY",
+            "PA-MERCHANT-STATE",
+            "PA-MERCHANT-ZIP",
+            "PA-TRANSACTION-ID",
+            "PA-AUTH-ID-CODE",
+            "PA-AUTH-RESP-CODE",
+            "PA-AUTH-RESP-REASON",
+            "PA-APPROVED-AMT",
+            "PA-AUTH-FRAUD",
+            "PA-FRAUD-RPT-DATE",
+            "PA-ACCT-ID",
+            "WS-ABS-TIME",
+            "WS-YYDDD",
+            "WS-CUR-TIME-N6",
+            "WS-CUR-TIME-MS",
+            "WS-TIME-WITH-MS"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "CICS Syncpoint",
+          "description": "Issues a CICS SYNCPOINT after each message is fully processed to commit all resource updates (MQ gets, IMS writes). Resets IMS-PSB-NOT-SCHD flag to force PSB rescheduling on next iteration. Increments WS-MSG-PROCESSED counter.",
+          "records": [
+            "WS-MSG-PROCESSED",
+            "WS-IMS-PSB-SCHD-FLG"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Loop Control and Batch Limit Check",
+          "description": "After each message, checks if WS-MSG-PROCESSED exceeds WS-REQSTS-PROCESS-LIMIT (500). If limit reached, sets WS-LOOP-END to terminate processing loop. Otherwise, reads next MQ message and continues loop.",
+          "records": [
+            "WS-MSG-PROCESSED",
+            "WS-REQSTS-PROCESS-LIMIT",
+            "WS-MSG-LOOP-FLG",
+            "WS-MSG-AVAILABLE-FLG"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Termination and Cleanup",
+          "description": "Terminates IMS PSB using DLI TERM if it was scheduled. Closes the MQ request queue using MQCLOSE. Logs warning M005 if queue close fails. Returns control to CICS.",
+          "records": [
+            "WS-IMS-PSB-SCHD-FLG",
+            "WS-REQUEST-MQ-FLG",
+            "W01-HCONN-REQUEST",
+            "W01-HOBJ-REQUEST",
+            "WS-COMPCODE",
+            "WS-REASON"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Error Logging",
+          "description": "Centralized error handler called throughout the program. Captures CICS timestamp, formats date/time, populates error log record with program name, transaction ID, date, time, error codes, and message. Writes to CICS transient data queue CSSL. If error is critical, invokes 9990-END-ROUTINE to terminate immediately.",
+          "records": [
+            "ERROR-LOG-RECORD",
+            "ERR-APPLICATION",
+            "ERR-PROGRAM",
+            "ERR-DATE",
+            "ERR-TIME",
+            "ERR-LOCATION",
+            "ERR-CODE-1",
+            "ERR-CODE-2",
+            "ERR-MESSAGE",
+            "ERR-EVENT-KEY",
+            "WS-ABS-TIME",
+            "WS-CUR-DATE-X6",
+            "WS-CUR-TIME-X6",
+            "WS-CICS-TRANID",
+            "WS-PGM-AUTH"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "MQ Trigger before Queue Open",
+          "description": "The program must successfully retrieve the MQ trigger message (CICS RETRIEVE into MQTM) during initialization to obtain WS-REQUEST-QNAME before MQOPEN can be called. Without the trigger data, the queue name is unknown."
+        },
+        {
+          "dependency": "XREF Read before Account and Customer Reads",
+          "description": "The CCXREF file must be successfully read to obtain XREF-ACCT-ID and XREF-CUST-ID before the account (ACCTDAT) and customer (CUSTDAT) files can be accessed. All downstream data lookups are gated on CARD-FOUND-XREF flag."
+        },
+        {
+          "dependency": "XREF Read before IMS Summary Read",
+          "description": "The account ID (XREF-ACCT-ID) obtained from the CCXREF read is required as the key (PA-ACCT-ID) for the IMS DLI GU call to retrieve the PAUTSUM0 summary segment. The IMS read is only performed if CARD-FOUND-XREF is true."
+        },
+        {
+          "dependency": "IMS PSB Scheduling before any DLI calls",
+          "description": "PSB PSBPAUTB must be successfully scheduled via DLI SCHD before any IMS DLI operations (GU, REPL, ISRT) can be performed. The IMS-PSB-SCHD flag gates all IMS database access. PSB is rescheduled each iteration after CICS SYNCPOINT resets the flag."
+        },
+        {
+          "dependency": "Authorization Decision before Response and DB Write",
+          "description": "The 6000-MAKE-DECISION paragraph must complete and populate PA-RL-AUTH-RESP-CODE, PA-RL-APPROVED-AMT, and WS-AUTH-RESP-FLG before the MQ response (7100-SEND-RESPONSE) is sent and before IMS summary/detail writes (8000-WRITE-AUTH-TO-DB) are performed."
+        },
+        {
+          "dependency": "IMS Summary Read before Summary Update Logic",
+          "description": "The FOUND-PAUT-SMRY-SEG / NFOUND-PAUT-SMRY-SEG flag set during 5500-READ-AUTH-SUMMRY determines whether 8400-UPDATE-SUMMARY performs a DLI REPL (update existing) or DLI ISRT (insert new) operation. Incorrect flag state would cause IMS duplicate or not-found errors."
+        },
+        {
+          "dependency": "IMS Summary Insert before Detail Insert",
+          "description": "In 8500-INSERT-AUTH, the DLI ISRT for the child detail segment (PAUTDTL1) uses a WHERE clause referencing the parent PAUTSUM0 segment. The parent segment must exist in IMS before the child can be inserted. 8400-UPDATE-SUMMARY ensures the parent exists prior to 8500-INSERT-AUTH."
+        },
+        {
+          "dependency": "Account Master Data for Credit Limit Fallback",
+          "description": "If the IMS summary segment is not found (NFOUND-PAUT-SMRY-SEG), the authorization decision falls back to ACCT-CREDIT-LIMIT and ACCT-CURR-BAL from the account master record. If neither IMS summary nor account master is found, the transaction is automatically declined."
+        },
+        {
+          "dependency": "MQ Correlation ID preservation for Response Routing",
+          "description": "The MQMD-CORRELID saved from the incoming request message (WS-SAVE-CORRELID) and the MQMD-REPLYTOQ (WS-REPLY-QNAME) must be preserved across all processing steps and used when constructing the MQ reply message to ensure the response is routed back to the correct requester."
+        },
+        {
+          "dependency": "CICS SYNCPOINT resets IMS PSB state",
+          "description": "After each CICS SYNCPOINT, the IMS PSB is implicitly terminated as part of the sync boundary. The program explicitly sets IMS-PSB-NOT-SCHD after each SYNCPOINT, requiring 1200-SCHEDULE-PSB to be called again at the start of each message processing iteration."
+        },
+        {
+          "dependency": "Batch processing limit of 500 messages",
+          "description": "WS-REQSTS-PROCESS-LIMIT is hardcoded to 500. Once WS-MSG-PROCESSED exceeds this value, the loop terminates regardless of remaining messages in the queue. This prevents unbounded execution within a single CICS task invocation."
+        },
+        {
+          "dependency": "Critical error causes immediate program termination",
+          "description": "Any call to 9500-LOG-ERROR with ERR-CRITICAL set will invoke 9990-END-ROUTINE, which calls 9000-TERMINATE (closing MQ and terminating IMS PSB) and then issues CICS RETURN. This means subsequent messages in the queue will not be processed in the current invocation."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM MQ (WebSphere MQ)",
+          "type": "Message-oriented middleware",
+          "purpose": "Receives incoming card authorization request messages from an external request queue (queue name obtained from CICS trigger data). Sends authorization response messages to a dynamic reply-to queue specified in the request message descriptor. Uses MQOPEN, MQGET, MQPUT1, and MQCLOSE API calls."
+        },
+        {
+          "system": "CICS (Customer Information Control System)",
+          "type": "Transaction processing monitor",
+          "purpose": "Provides the runtime environment for the program. Used for: triggering the program via MQ trigger mechanism (CICS RETRIEVE), reading VSAM files (EXEC CICS READ for CCXREF, ACCTDAT, CUSTDAT), obtaining timestamps (EXEC CICS ASKTIME, EXEC CICS FORMATTIME), issuing syncpoints (EXEC CICS SYNCPOINT), writing error logs to transient data queue CSSL (EXEC CICS WRITEQ TD), and returning control (EXEC CICS RETURN)."
+        },
+        {
+          "system": "IMS (Information Management System)",
+          "type": "Hierarchical database management system",
+          "purpose": "Stores and manages pending authorization data in a hierarchical structure. PSB PSBPAUTB is scheduled via DLI SCHD. Used for: reading the pending authorization summary root segment PAUTSUM0 (DLI GU), updating the summary segment (DLI REPL), inserting new summary segments (DLI ISRT), inserting child authorization detail segments PAUTDTL1 (DLI ISRT with parent qualification), and terminating the PSB (DLI TERM)."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "MQ Queue Operation Errors",
+        "description": "MQ operations (MQOPEN, MQGET, MQPUT1, MQCLOSE) are checked via WS-COMPCODE and WS-REASON fields. On failure, error location codes (M001, M003, M004, M005) are set, ERR-CRITICAL or ERR-WARNING severity is assigned, error type is flagged as ERR-MQ, and both comp/reason codes are captured in ERR-CODE-1/ERR-CODE-2. Critical errors trigger 9500-LOG-ERROR which terminates the program. A special case exists for MQRC-NO-MSG-AVAILABLE which sets NO-MORE-MSG-AVAILABLE flag to gracefully end message processing loop rather than treating it as an error."
+      },
+      {
+        "category": "CICS File Read Errors",
+        "description": "CICS READ operations for XREF (C001/A001), ACCT (C002/A002), and CUST (C003/A003) files use RESP/RESP2 codes evaluated via EVALUATE WS-RESP-CD. DFHRESP(NOTFND) is treated as a warning (ERR-WARNING, ERR-APP) and sets corresponding not-found flags (CARD-NFOUND-XREF, NFOUND-ACCT-IN-MSTR, NFOUND-CUST-IN-MSTR) allowing processing to continue with a declined authorization. All other non-normal responses are treated as critical errors (ERR-CRITICAL, ERR-CICS) with both response codes logged, triggering program termination via 9500-LOG-ERROR."
+      },
+      {
+        "category": "IMS Database Errors",
+        "description": "IMS operations (SCHD, GU, REPL, ISRT) use DIBSTAT moved to IMS-RETURN-CODE with 88-level condition names for status interpretation. PSB scheduling (I001) handles PSB-SCHEDULED-MORE-THAN-ONCE by issuing TERM and re-scheduling before failing. SEGMENT-NOT-FOUND on GU (5500) is treated as a non-critical condition setting NFOUND-PAUT-SMRY-SEG flag. All other non-OK statuses for SCHD (I001), GU (I002), REPL/ISRT summary (I003), and ISRT detail (I004) are flagged as ERR-CRITICAL with ERR-IMS type, logging IMS return code and triggering termination."
+      },
+      {
+        "category": "Authorization Business Logic Errors",
+        "description": "Business rule violations are handled through a flag-based decline mechanism using WS-DECLINE-FLG and WS-DECLINE-REASON-FLG. Conditions such as card not found in XREF, account not found, insufficient funds, inactive card, closed account, card fraud, and merchant fraud each set specific 88-level flags. In 6000-MAKE-DECISION, these flags drive response codes (05 for decline, 00 for approve) and reason codes (3100 for not found, 4100 for insufficient funds, 4200 card inactive, 4300 account closed, 5100 card fraud, 5200 merchant fraud, 9000 unknown). These are non-terminating and result in a declined authorization response being sent."
+      },
+      {
+        "category": "Centralized Error Logging",
+        "description": "All errors funnel through 9500-LOG-ERROR which captures a timestamp via CICS ASKTIME/FORMATTIME, populates a structured ERROR-LOG-RECORD (from CCPAUERY copybook) with application ID, program name, date, time, location code, error type, error codes, message, and event key, then writes to CICS transient data queue CSSL. After logging, if ERR-CRITICAL is set, 9990-END-ROUTINE is called which performs 9000-TERMINATE (closes MQ queues, terminates IMS PSB) before issuing CICS RETURN, ensuring clean resource release on critical failures."
+      },
+      {
+        "category": "Resource Cleanup and Termination",
+        "description": "9000-TERMINATE ensures orderly shutdown by conditionally terminating the IMS PSB only if IMS-PSB-SCHD flag is set, preventing double-termination. MQ queue closure in 9100-CLOSE-REQUEST-QUEUE is guarded by WS-REQUEST-MQ-OPEN flag check. A processing limit (WS-REQSTS-PROCESS-LIMIT = 500) prevents infinite loops by setting WS-LOOP-END after processing 500 messages. CICS SYNCPOINT is issued after each message to commit work, and IMS-PSB-NOT-SCHD is reset between iterations to ensure PSB is freshly scheduled per transaction cycle."
+      }
+    ]
+  }
+}

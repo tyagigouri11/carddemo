@@ -1,0 +1,231 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "PAUDBLOD.CBL",
+        "type": "cobol"
+      },
+      "overview": "This program operates within a financial services authorization processing domain, specifically handling pending authorization records in an IMS (Information Management System) database. It serves as a database loader utility in the workflow pipeline for managing customer authorization data, likely used during data migration, initial load, or recovery scenarios. The program reads two sequential input files containing pending authorization summary (root) and detail (child) segment records, then inserts them into an IMS hierarchical database, maintaining the parent-child relationship between summary and detail authorization records. It solves the problem of bulk-loading or reloading authorization data into the IMS database while preserving referential integrity between root and child segments.",
+      "key_features": [
+        {
+          "feature": "Root Segment Loading",
+          "description": "Reads pending authorization summary records from INFILE1 and inserts them as root segments into the IMS database using qualified SSA calls"
+        },
+        {
+          "feature": "Child Segment Loading",
+          "description": "Reads pending authorization detail records from INFILE2 and inserts them as child segments under their corresponding parent root segments"
+        },
+        {
+          "feature": "Parent-Child Integrity",
+          "description": "Performs a Get Unique (GU) call to locate the parent root segment before inserting each child detail record, ensuring hierarchical database integrity"
+        },
+        {
+          "feature": "Duplicate Handling",
+          "description": "Detects and reports duplicate segments (IMS status 'II') for both root and child inserts without aborting, allowing partial reloads"
+        },
+        {
+          "feature": "Error Handling and Abend",
+          "description": "Monitors IMS PCB status codes and file status codes after each operation, triggering a controlled abend with return code 16 on unexpected errors"
+        },
+        {
+          "feature": "Sequential File Processing",
+          "description": "Processes both input files sequentially from start to finish, with end-of-file detection controlling the main processing loops"
+        },
+        {
+          "feature": "File Open and Close Management",
+          "description": "Safely opens both input files during initialization and closes them after processing, with status checking at each step"
+        },
+        {
+          "feature": "Operational Logging",
+          "description": "Displays progress messages for each insert operation, including success, duplicate, and failure conditions, to support operational monitoring and troubleshooting"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "INFILE1",
+        "type": "Read",
+        "description": "Sequential input file containing root segment records (PENDING-AUTH-SUMMARY / CIPAUSMY layout) - read sequentially and inserted into IMS database as root segments (PAUTSUM0)"
+      },
+      {
+        "name": "INFILE2",
+        "type": "Read",
+        "description": "Sequential input file containing child segment records (CIPAUDTY layout) with a root segment key (ROOT-SEG-KEY) and child data (CHILD-SEG-REC) - read sequentially and inserted into IMS database as child segments (PAUTDTL1) under their parent root segment"
+      },
+      {
+        "name": "PAUTBPCB (IMS DB - PAUTSUM0/PAUTDTL1)",
+        "type": "Write",
+        "description": "IMS database accessed via PCB PAUTBPCB - root segments (PAUTSUM0 / PENDING-AUTH-SUMMARY) and child segments (PAUTDTL1 / PENDING-AUTH-DETAILS) are inserted using CBLTDLI ISRT calls; GU calls are also made to locate root segments before inserting child segments"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Initialization",
+          "description": "Accepts current date and Julian date from system, opens INFILE1 (root segment flat file) and INFILE2 (child segment flat file) for sequential input. Abends if either file fails to open.",
+          "records": [
+            "CURRENT-DATE",
+            "CURRENT-YYDDD",
+            "WS-INFIL1-STATUS",
+            "WS-INFIL2-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Root Segment File",
+          "description": "Sequentially reads records from INFILE1 into INFIL1-REC. Each record is moved to PENDING-AUTH-SUMMARY (root IMS segment layout). Continues until end-of-file is detected (status '10'). Triggers root segment insert for each valid record.",
+          "records": [
+            "INFIL1-REC",
+            "PENDING-AUTH-SUMMARY",
+            "WS-INFIL1-STATUS",
+            "END-ROOT-SEG-FILE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Insert Root Segment into IMS",
+          "description": "Issues an IMS ISRT (insert) call via CBLTDLI using FUNC-ISRT, PAUTBPCB, PENDING-AUTH-SUMMARY, and ROOT-UNQUAL-SSA targeting segment PAUTSUM0. Logs success, duplicate (status 'II'), or abends on other failures.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "ROOT-UNQUAL-SSA",
+            "PAUT-PCB-STATUS",
+            "PAUT-SEG-NAME"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Child Segment File",
+          "description": "Sequentially reads records from INFILE2 into INFIL2-REC. Extracts ROOT-SEG-KEY (packed decimal account ID) and CHILD-SEG-REC (child segment data). Validates ROOT-SEG-KEY is numeric, moves key to qualified SSA and child data to PENDING-AUTH-DETAILS. Continues until end-of-file (status '10').",
+          "records": [
+            "INFIL2-REC",
+            "ROOT-SEG-KEY",
+            "CHILD-SEG-REC",
+            "QUAL-SSA-KEY-VALUE",
+            "PENDING-AUTH-DETAILS",
+            "WS-INFIL2-STATUS",
+            "END-CHILD-SEG-FILE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Get Unique Root Segment from IMS",
+          "description": "Issues an IMS GU (Get Unique) call via CBLTDLI using FUNC-GU, PAUTBPCB, PENDING-AUTH-SUMMARY, and ROOT-QUAL-SSA (qualified SSA with ACCNTID key on segment PAUTSUM0) to establish parentage for the child insert. Abends if call fails with status other than spaces or 'II'.",
+          "records": [
+            "ROOT-QUAL-SSA",
+            "QUAL-SSA-KEY-VALUE",
+            "QUAL-SSA-SEG-NAME",
+            "QUAL-SSA-KEY-FIELD",
+            "PENDING-AUTH-SUMMARY",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Insert Child Segment into IMS",
+          "description": "Issues an IMS ISRT call via CBLTDLI using FUNC-ISRT, PAUTBPCB, PENDING-AUTH-DETAILS, and CHILD-UNQUAL-SSA targeting segment PAUTDTL1 as a child under the previously retrieved root. Logs success, duplicate (status 'II'), or abends on other failures.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "CHILD-UNQUAL-SSA",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Close Files",
+          "description": "Closes INFILE1 and INFILE2. Logs errors if file status is not spaces or '00' after close, but does not abend.",
+          "records": [
+            "WS-INFIL1-STATUS",
+            "WS-INFIL2-STATUS"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Abend Handling",
+          "description": "On any critical error (file open failure, IMS insert/GU failure), sets RETURN-CODE to 16, displays abend message, and issues GOBACK to terminate the program abnormally.",
+          "records": [
+            "RETURN-CODE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Root segment must be inserted before child segment",
+          "description": "The program processes all root segments from INFILE1 completely before processing any child segments from INFILE2. Child segment inserts depend on the corresponding root segment already existing in the IMS database (PAUTSUM0) to establish valid parentage for PAUTDTL1."
+        },
+        {
+          "dependency": "IMS GU call required before child ISRT",
+          "description": "A successful GU call using the qualified SSA (ROOT-QUAL-SSA with ACCNTID key) must complete before the child ISRT call is issued. This establishes IMS parentage context so the child segment PAUTDTL1 is inserted under the correct root PAUTSUM0 occurrence."
+        },
+        {
+          "dependency": "ROOT-SEG-KEY numeric validation for child processing",
+          "description": "The ROOT-SEG-KEY field from INFILE2 must pass an IS NUMERIC check before the child segment processing proceeds. Non-numeric keys cause the record to be silently skipped, preventing invalid SSA key values from being passed to IMS."
+        },
+        {
+          "dependency": "INFILE1 sequential read order determines IMS load order",
+          "description": "Root segments are loaded into IMS in the exact sequential order they appear in INFILE1. Duplicate root segments (IMS status 'II') are tolerated and logged but do not cause abend, allowing re-runnable loads."
+        },
+        {
+          "dependency": "INFILE2 record structure dependency on ROOT-SEG-KEY linkage",
+          "description": "Each INFILE2 record embeds ROOT-SEG-KEY (S9(11) COMP-3) as the account identifier linking the child segment to its parent. The correctness of child-to-parent association entirely depends on this key matching an existing root segment in the IMS database."
+        },
+        {
+          "dependency": "PCB mask PAUTBPCB required for all IMS calls",
+          "description": "All IMS DL/I calls (ISRT for root, GU for root retrieval, ISRT for child) use PAUTBPCB as the Program Communication Block. The PCB status field PAUT-PCB-STATUS is checked after every call to determine success or failure. The PCB is passed via ENTRY DLITCBL and PROCEDURE DIVISION USING."
+        },
+        {
+          "dependency": "File open success required before any processing",
+          "description": "Both INFILE1 and INFILE2 must open successfully (status spaces or '00') during initialization. Failure of either triggers an immediate abend via 9999-ABEND before any IMS operations begin."
+        },
+        {
+          "dependency": "Duplicate segment tolerance state",
+          "description": "IMS status 'II' (duplicate segment) is explicitly handled as a non-fatal condition for both root and child inserts, allowing the program to be re-run against a partially loaded database without abending on already-existing segments."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM IMS (Information Management System)",
+          "type": "Hierarchical Database",
+          "purpose": "Loads pending authorization data into IMS database. Root segments (PAUTSUM0 - Pending Authorization Summary) are inserted from INFILE1, and child segments (PAUTDTL1 - Pending Authorization Details) are inserted from INFILE2 under their respective parent root segments. DL/I calls (ISRT, GU) are made via CBLTDLI interface using PSB IMSUNLOD and PCB defined in PAUTBPCB."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "After opening INFILE1 and INFILE2, the program checks WS-INFIL1-STATUS and WS-INFIL2-STATUS respectively. If either status is not SPACES or '00', an error message is displayed with the file status code and PERFORM 9999-ABEND is invoked to terminate the program with return code 16."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "During sequential reads of INFILE1 (root segment file) and INFILE2 (child segment file), file status codes are checked. A status of '10' sets the end-of-file flag (END-ROOT-SEG-FILE or END-CHILD-SEG-FILE to 'Y') to terminate the read loop gracefully. Any other non-zero, non-space status results in a DISPLAY of an error message but does NOT trigger an abend, meaning the program continues processing without explicit termination for read errors."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "After closing INFILE1 and INFILE2, the program checks the respective file status fields. If the status is not SPACES or '00', an error message is displayed with the status code. However, unlike open errors, close errors do NOT invoke 9999-ABEND, so the program continues to GOBACK without forced termination."
+      },
+      {
+        "category": "IMS Root Segment Insert Errors (ISRT)",
+        "description": "After the CBLTDLI ISRT call for the root segment, PAUT-PCB-STATUS is checked. A SPACES status indicates success. A status of 'II' (duplicate segment) is treated as a non-fatal condition with an informational display. Any other non-space, non-'II' status triggers a DISPLAY of the failure status and invokes 9999-ABEND to terminate the program."
+      },
+      {
+        "category": "IMS Root Segment Get-Unique Errors (GU)",
+        "description": "Before inserting a child segment, a GU call is made to locate the parent root segment. PAUT-PCB-STATUS is checked; SPACES indicates success and processing continues to child insert. Any status other than SPACES or 'II' results in a DISPLAY of the failure status and the key feedback area (PAUT-KEYFB), followed by 9999-ABEND to terminate the program."
+      },
+      {
+        "category": "IMS Child Segment Insert Errors (ISRT)",
+        "description": "After the CBLTDLI ISRT call for the child segment, PAUT-PCB-STATUS is checked. SPACES status indicates success. A status of 'II' (duplicate) is treated as informational and non-fatal. Any other non-space, non-'II' status triggers a DISPLAY of the failure status and PAUT-KEYFB key feedback area, followed by 9999-ABEND to terminate the program."
+      },
+      {
+        "category": "Input Data Validation",
+        "description": "When reading INFILE2 (child segment records), the ROOT-SEG-KEY field is validated with an IS NUMERIC check before processing. If the key is not numeric, the record is silently skipped with no error message or abend, representing a silent discard of invalid records."
+      },
+      {
+        "category": "Program Abend Handler (9999-ABEND)",
+        "description": "A centralized abend routine displays 'IMS LOAD ABENDING ...' and sets RETURN-CODE to 16 before executing GOBACK. This provides a uniform fatal error termination mechanism used across file open failures and IMS call failures, signaling an abnormal completion to the calling environment via the return code."
+      }
+    ]
+  }
+}

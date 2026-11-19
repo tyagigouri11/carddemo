@@ -1,0 +1,98 @@
+{
+    "created_on": "2026-11-05",
+    "name": "FTPJCL.JCL",
+    "file_path": "carddemo-v2-main/app/jcl/FTPJCL.JCL",
+    "type": "jcl",
+    "description": "This JCL job transfers a mainframe dataset to a remote server using FTP (File Transfer Protocol). It connects to a remote host at IP address 172.31.21.124 using provided credentials, navigates to a specific remote directory, and uploads a mainframe sequential file as a text file in ASCII format.Key Functionalities:\nEstablishes an FTP connection to remote server at IP address 172.31.21.124 using credentials (user: carddemousr) to perform file transfer operations.\nSets the transfer mode to ASCII to ensure proper text file encoding during the file upload process.\nNavigates to the remote directory \"/ftpfolder\" on the target server after verifying the current working directory and listing its contents.\nUploads the mainframe dataset 'AWS.M2.CARDEMO.FTP.TEST' to the remote server as a file named \"welcome.txt\" in the /ftpfolder directory.\nTerminates the FTP session gracefully after the file transfer is complete.",
+    "rules": [
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The FTP job FTPJCLS is initiated and ready to execute file transfer operations",
+                "When": "The FTP program attempts to connect to the remote server at IP address 172.31.21.124",
+                "Then": "A network connection is successfully established with the remote server at 172.31.21.124, enabling the FTP session to proceed; if the server is unreachable, all subsequent file transfer operations are abandoned and no file is transferred"
+            },
+            "Rule_Name": "STEP1 - FTP - Remote Server Connection",
+            "Rule_Description": "Establishes a network connection to the designated remote server as the first step of the Card Demo file transfer process.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "A network connection has been successfully established with the remote server at 172.31.21.124",
+                "When": "The FTP session submits username 'carddemousr' and password 'ftpdemo1' to the remote server for authentication",
+                "Then": "The user 'carddemousr' is authenticated and granted access to perform file operations on the remote server; if authentication fails, the session is rejected and no file transfer or directory operations are executed"
+            },
+            "Rule_Name": "STEP1 - FTP - User Authentication for Remote Server Access",
+            "Rule_Description": "Authenticates the FTP session using designated credentials to gain authorized access to the remote server before any file operations are performed.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The user 'carddemousr' is authenticated and an active FTP session exists on the remote server at 172.31.21.124",
+                "When": "The transfer mode is set to ASCII for the active FTP session",
+                "Then": "All subsequent file transfers within this session are performed in ASCII text mode, ensuring the mainframe file's character encoding is automatically converted to a format compatible with the remote server"
+            },
+            "Rule_Name": "STEP1 - FTP - ASCII Transfer Mode Configuration",
+            "Rule_Description": "Configures the file transfer mode to ASCII (text) to ensure the Card Demo file is correctly encoded when delivered to the non-mainframe remote server.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "An authenticated FTP session is active with ASCII transfer mode configured on the remote server",
+                "When": "The current working directory is requested from the remote server using the pwd command",
+                "Then": "The remote server returns and displays the current working directory path, confirming the session's active location on the remote server prior to directory navigation"
+            },
+            "Rule_Name": "STEP1 - FTP - Remote Server Current Directory Verification",
+            "Rule_Description": "Verifies and displays the current working directory on the remote server to confirm the session's starting location before navigating to the target folder.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "An authenticated FTP session is active, ASCII transfer mode is set, and the current working directory has been verified on the remote server",
+                "When": "A directory listing is requested from the current location on the remote server using the dir command",
+                "Then": "The remote server returns and displays all files and folders available in the current directory, allowing confirmation that the target folder structure including /ftpfolder is present before proceeding"
+            },
+            "Rule_Name": "STEP1 - FTP - Remote Directory Content Listing",
+            "Rule_Description": "Lists the contents of the current directory on the remote server to verify the availability of the target folder before navigating to it.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "An authenticated FTP session is active, ASCII transfer mode is configured, and the remote directory contents have been reviewed",
+                "When": "The FTP session navigates to the /ftpfolder directory on the remote server",
+                "Then": "The active working directory on the remote server is changed to /ftpfolder, making it the designated destination for the Card Demo Test File upload; if /ftpfolder does not exist, the upload will not be delivered to the correct location"
+            },
+            "Rule_Name": "STEP1 - FTP - Target Delivery Folder Navigation",
+            "Rule_Description": "Navigates to the designated /ftpfolder directory on the remote server to set the correct destination before uploading the Card Demo Test File.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The FTP session is active, authenticated, ASCII transfer mode is set, and the working directory on the remote server is /ftpfolder",
+                "When": "The mainframe dataset 'AWS.M2.CARDEMO.FTP.TEST' is uploaded to the remote server using the PUT command",
+                "Then": "The Card Demo Test File is transferred from the mainframe to the /ftpfolder directory on the remote server and saved with the name 'welcome.txt'; the file content remains unchanged but is delivered in ASCII text format under the new name"
+            },
+            "Rule_Name": "STEP1 - FTP - Card Demo Test File Upload to Remote Server",
+            "Rule_Description": "Transfers the Card Demo Test File from the mainframe to the /ftpfolder directory on the remote server, renaming it to welcome.txt upon delivery.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-FTPJCL-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo Test File 'AWS.M2.CARDEMO.FTP.TEST' has been uploaded to /ftpfolder on the remote server as 'welcome.txt'",
+                "When": "The QUIT command is issued to the active FTP session",
+                "Then": "The FTP session is gracefully closed, the connection to the remote server at 172.31.21.124 is terminated, and the file transfer job FTPJCLS is completed"
+            },
+            "Rule_Name": "STEP1 - FTP - FTP Session Termination",
+            "Rule_Description": "Gracefully closes the FTP session and terminates the connection to the remote server after the Card Demo Test File transfer is complete.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCard Demo FTP Job]):::start\n\n    B[STEP1 - FTP Utility\nInitiate Secure Connection to\nRemote Server 172.31.21.124\nUsing Authorized Credentials]:::process\n\n    C{Remote Server\nConnection\nSuccessful?}:::decision\n\n    D[Set File Transfer Mode\nto ASCII Text Format\nVerify Remote Directory\nStructure on Server]:::process\n\n    E[Navigate to Target Folder\n/ftpfolder on Remote Server\nPrepare for File Upload]:::process\n\n    F[Upload Card Demo Test File\nAWS.M2.CARDEMO.FTP.TEST\nto Remote Server as\nwelcome.txt]:::process\n\n    G{File Upload\nCompleted\nSuccessfully?}:::decision\n\n    H[Terminate FTP Session\nGracefully - QUIT]:::process\n\n    I([FILE TRANSFER\nCOMPLETED SUCCESSFULLY\nwelcome.txt Available at\n172.31.21.124 /ftpfolder/]):::success\n\n    J([FTP CONNECTION FAILED\nRemote Server Unreachable\nor Invalid Credentials\nJob Abended]):::error\n\n    K([FILE UPLOAD FAILED\nInsufficient Permissions\nor Target Folder Missing\nJob Abended]):::error\n\n    A --> B\n    B --> C\n    C -->|Yes - Connection Established| D\n    C -->|No - Connection Refused| J\n    D --> E\n    E --> F\n    F --> G\n    G -->|Yes - RC = 0| H\n    G -->|No - RC > 0| K\n    H --> I\n\n    classDef start fill:#ff6666,color:#000000,font-weight:bold\n    classDef process fill:#6699ff,color:#000000,font-weight:bold\n    classDef decision fill:#ffcc00,color:#000000,font-weight:bold\n    classDef datasource fill:#66ff66,color:#000000,font-weight:bold\n    classDef final fill:#ae74de,color:#000000,font-weight:bold\n    classDef success fill:#22c55e,color:#000000,font-weight:bold\n    classDef error fill:#ef4444,color:#000000,font-weight:bold"
+}

@@ -1,0 +1,166 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CREADB21.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job (CREADB2) is designed to create and initialize the CARDDEMO database within the DB2 subsystem (DAZ1), which appears to be a credit card transaction management application. The job handles the full database setup lifecycle, including freeing any existing plans and packages, creating the database structure using the DSNTIAD utility, and loading reference data tables for transaction types and transaction category codes. Overall, it serves as a database provisioning script that establishes the foundational data structures needed to support credit card transaction processing operations.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "(DB2CR),'SNJARAO'",
+          "description": "The JOB statement marks the beginning of a job and provides the job name CREADB2. The accounting information is DB2CR and the programmer name is SNJARAO."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Assigns the job to input job class A, which determines the initiator that will process the job and controls job scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "A",
+          "description": "Specifies that the job log and system messages output will be directed to output class A, controlling where the JES job log is routed after job completion."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Sets the maximum CPU time limit for the entire job to 1440 minutes (24 hours), preventing the job from running indefinitely and terminating it if this limit is exceeded."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user who submitted the job (resolved from the symbolic &SYSUID) will receive a TSO notification message when the job completes, informing them of the job's completion status."
+        },
+        {
+          "name": "TYPRUN",
+          "value": "SCAN",
+          "description": "Instructs JES to only scan and validate the JCL syntax without actually executing the job. This is used for JCL validation purposes, ensuring all statements are syntactically correct before actual execution."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "FREEPLN",
+        "purpose": "Frees existing DB2 plans and packages associated with the CARDDEMO and COTRTLIC applications in the DAZ1 subsystem. This step is intended to clean up prior bindings before recreating the database; it may end with RC=8 if the plans/packages do not exist.",
+        "programs": "IKJEFT01 (DSN)*",
+        "inputs": "SYSTSIN (DSN subcommands: FREE PLAN(CARDDEMO), FREE PLAN(COTRTLIC), FREE PACKAGE(COTRTLIC.*))",
+        "outputs": "SYSPRINT, SYSTSPRT, SYSUDUMP"
+      },
+      {
+        "step": "CRCRDDB",
+        "purpose": "Creates the CARDDEMO database in the DAZ1 DB2 subsystem by running the DSNTIAD dynamic SQL utility against a set of DDL statements. The SQL statements used for database creation are sourced from the member DB2CREAT in the CNTL library.",
+        "programs": "IKJEFT01 (DSNTIAD)*",
+        "inputs": "SYSTSIN (DSN RUN PROGRAM(DSNTIAD) PARMS('RC0')), SYSIN: AWS.M2.CARDDEMO.CNTL(DB2CREAT)",
+        "outputs": "SYSTSPRT, SYSPRINT, SYSUDUMP"
+      },
+      {
+        "step": "LDTTYPE",
+        "purpose": "Acts as a conditional gate step using the null program IEFBR14. It is conditioned on COND=(0,NE), meaning it will only execute if a prior step returned a non-zero condition code, effectively serving as a placeholder or bypass mechanism.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "N/A"
+      },
+      {
+        "step": "RUNTEP2",
+        "purpose": "Loads the Transaction Type reference table into the CARDDEMO DB2 database by running the DSNTEP4 SQL execution utility against INSERT statements stored in the DB2LTTYP member. The utility is run with left-hand-side alignment and mixed case support.",
+        "programs": "IKJEFT01 (DSNTEP4)*",
+        "inputs": "SYSTSIN (DSN RUN PROGRAM(DSNTEP4) PLAN(DSNTEP4) PARMS('/ALIGN(LHS) MIXED')), SYSIN: AWS.M2.CARDDEMO.CNTL(DB2LTTYP)",
+        "outputs": "SYSTSPRT, SYSPRINT, SYSUDUMP"
+      },
+      {
+        "step": "LDTCCAT",
+        "purpose": "Loads the Transaction Type Category reference table into the CARDDEMO DB2 database by running the DSNTEP4 SQL execution utility against INSERT statements stored in the DB2LTCAT member. The step is conditioned on COND=(0,NE) to skip execution if a prior step failed.",
+        "programs": "IKJEFT01 (DSNTEP4)*",
+        "inputs": "SYSTSIN (DSN RUN PROGRAM(DSNTEP4) PLAN(DSNTEP4) PARMS('/ALIGN(LHS) MIXED')), SYSIN: AWS.M2.CARDDEMO.CNTL(DB2LTCAT)",
+        "outputs": "SYSTSPRT, SYSPRINT, SYSUDUMP"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "FREEPLN",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.SDSNEXIT, OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "STEPLIB DD loads DB2 exit and load libraries for IKJEFT01 execution"
+      },
+      {
+        "step": "FREEPLN",
+        "type": "DB2",
+        "objects": "PLAN(CARDDEMO), PLAN(COTRTLIC), PACKAGE(COTRTLIC.*)",
+        "operations": "FREE",
+        "description": "Frees existing DB2 plans CARDDEMO and COTRTLIC, and all packages under COTRTLIC collection in DAZ1 subsystem"
+      },
+      {
+        "step": "CRCRDDB",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.RUNLIB.LOAD, OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "STEPLIB DD loads DB2 run library and load library for IKJEFT01 execution"
+      },
+      {
+        "step": "CRCRDDB",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CNTL(DB2CREAT)",
+        "operations": "READ",
+        "description": "SYSIN DD reads SQL DDL statements from member DB2CREAT used as input to DSNTIAD for database creation"
+      },
+      {
+        "step": "CRCRDDB",
+        "type": "DB2",
+        "objects": "DAZ1 subsystem, CARDDEMO database",
+        "operations": "CREATE",
+        "description": "Runs DSNTIAD utility with RC0 parameter against DAZ1 subsystem to execute SQL DDL from DB2CREAT member, creating the CARDDEMO database and its objects using STOGROUP AWST1STG"
+      },
+      {
+        "step": "LDTTYPE",
+        "type": "Dataset",
+        "objects": "None",
+        "operations": "NONE",
+        "description": "Executes IEFBR14 null program with COND=(0,NE) which prevents execution if prior step returned RC=0; no dataset or DB2 operations performed"
+      },
+      {
+        "step": "RUNTEP2",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.RUNLIB.LOAD, OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "STEPLIB DD loads DB2 run library and load library for IKJEFT01 execution"
+      },
+      {
+        "step": "RUNTEP2",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CNTL(DB2LTTYP)",
+        "operations": "READ",
+        "description": "SYSIN DD reads SQL INSERT statements from member DB2LTTYP used as input to DSNTEP4 for loading transaction type table"
+      },
+      {
+        "step": "RUNTEP2",
+        "type": "DB2",
+        "objects": "DAZ1 subsystem, transaction type table (loaded via DB2LTTYP)",
+        "operations": "INSERT",
+        "description": "Runs DSNTEP4 utility with plan DSNTEP4 and ALIGN(LHS) MIXED parameters against DAZ1 subsystem to execute SQL from DB2LTTYP member, loading rows into the transaction type table"
+      },
+      {
+        "step": "LDTCCAT",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.RUNLIB.LOAD, OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "STEPLIB DD loads DB2 run library and load library for IKJEFT01 execution"
+      },
+      {
+        "step": "LDTCCAT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CNTL(DB2LTCAT)",
+        "operations": "READ",
+        "description": "SYSIN DD reads SQL INSERT statements from member DB2LTCAT used as input to DSNTEP4 for loading transaction type category table"
+      },
+      {
+        "step": "LDTCCAT",
+        "type": "DB2",
+        "objects": "DAZ1 subsystem, transaction type category table (loaded via DB2LTCAT)",
+        "operations": "INSERT",
+        "description": "Runs DSNTEP4 utility with plan DSNTEP4 and ALIGN(LHS) MIXED parameters against DAZ1 subsystem to execute SQL from DB2LTCAT member, loading rows into the transaction type category table"
+      }
+    ]
+  }
+}

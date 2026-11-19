@@ -1,0 +1,168 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CARDFILE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **CARDFILE**, manages the setup and initialization of VSAM data structures for a credit card data management system (CardDemo). It deletes any existing card data VSAM files, recreates them with defined specifications, populates them with data from a flat file source, and establishes an alternate index to enable lookups by account ID. The job also handles CICS file management by closing the relevant files before processing and reopening them upon completion to ensure data integrity within the online transaction environment.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "CARDFILE",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It is the first positional parameter on the JOB statement."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'Delete define card data'",
+          "description": "A free-form accounting or description field associated with the job. It is used for job identification, billing, or documentation purposes and appears in job logs."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A determines the scheduling priority and resource allocation rules applied to the job by the job entry subsystem (JES)."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (system messages). MSGCLASS=0 directs the job's system message output (JES job log) to the output class '0', which determines how and where the job log is routed or printed."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "CLCIFIL",
+        "purpose": "Closes the CARDDAT and CARDAIX files in the CICS region (CICSAWSA) using CEMT SET FILE CLOSE commands issued via SDSF, preparing them for deletion and redefinition.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline CEMT commands: CEMT SET FIL(CARDDAT) CLO, CEMT SET FIL(CARDAIX) CLO)",
+        "outputs": "ISFOUT (SYSOUT=*), CMDOUT (SYSOUT=*)"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing VSAM KSDS cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) and its alternate index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) if they already exist, suppressing non-fatal return codes up to 8 to allow the job to continue even if the objects do not exist.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline commands: DELETE AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS CLUSTER, DELETE AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX ALTERNATEINDEX)",
+        "outputs": "SYSPRINT (SYSOUT=*); deleted objects: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS (CLUSTER), AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX (ALTERNATEINDEX)"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM KSDS cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) with a 16-byte key at offset 0, fixed record size of 150 bytes, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders, share options (2,3), and ERASE attribute.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline DEFINE CLUSTER command)",
+        "outputs": "SYSPRINT (SYSOUT=*); created objects: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS (CLUSTER), AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.DATA (DATA component), AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.INDEX (INDEX component)"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies card data records from the sequential flat file (AWS.M2.CARDDEMO.CARDDATA.PS) into the newly defined VSAM KSDS cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "CARDDATA: AWS.M2.CARDDEMO.CARDDATA.PS (DISP=SHR); SYSIN (inline REPRO command)",
+        "outputs": "SYSPRINT (SYSOUT=*); CARDVSAM: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS (populated with records)"
+      },
+      {
+        "step": "STEP40",
+        "purpose": "Defines an alternate index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) on the VSAM KSDS base cluster, using an 11-byte key at offset 16 (account ID), with NONUNIQUEKEY and UPGRADE attributes, allocated on volume AWSHJ1 with 5 primary and 1 secondary cylinders.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline DEFINE ALTERNATEINDEX command)",
+        "outputs": "SYSPRINT (SYSOUT=*); created objects: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX (ALTERNATEINDEX), AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.DATA (DATA component), AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.INDEX (INDEX component)"
+      },
+      {
+        "step": "STEP50",
+        "purpose": "Defines a path (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH) that relates the alternate index (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) to the base KSDS cluster, enabling access to the base cluster via the alternate index.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline DEFINE PATH command)",
+        "outputs": "SYSPRINT (SYSOUT=*); created object: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH (PATH)"
+      },
+      {
+        "step": "STEP60",
+        "purpose": "Builds the alternate index cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX) by extracting key values from the base KSDS cluster (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS), populating the alternate index with the account ID keys.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (inline BLDINDEX command); INDATASET: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+        "outputs": "SYSPRINT (SYSOUT=*); OUTDATASET: AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX (built alternate index)"
+      },
+      {
+        "step": "OPCIFIL",
+        "purpose": "Opens the CARDDAT and CARDAIX files in the CICS region (CICSAWSA) using CEMT SET FILE OPEN commands issued via SDSF, making the newly defined and populated VSAM files available for CICS transactions.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline CEMT commands: CEMT SET FIL(CARDDAT) OPE, CEMT SET FIL(CARDAIX) OPE)",
+        "outputs": "ISFOUT (SYSOUT=*), CMDOUT (SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CARDDAT, CARDAIX",
+        "operations": "CLOSE",
+        "description": "Issues CEMT SET FILE CLOSE commands via SDSF to close CARDDAT and CARDAIX files in CICS region CICSAWSA before dataset operations begin"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS if it exists; sets MAXCC to 0 if return code is 8 or less to suppress not-found errors"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM Alternate Index AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX if it exists; sets MAXCC to 0 if return code is 8 or less to suppress not-found errors"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS with 1 primary and 5 secondary cylinders on volume AWSHJ1, key length 16 at offset 0, fixed record size 150 bytes, share options (2,3), ERASE and INDEXED attributes, along with its DATA and INDEX components"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) AWS.M2.CARDDEMO.CARDDATA.PS as input for the REPRO operation"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the VSAM KSDS cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS as output of the REPRO operation, copying data from the flat file"
+      },
+      {
+        "step": "STEP40",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.DATA, AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines a new Alternate Index AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX related to base cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, with key length 11 at offset 16, NONUNIQUEKEY, UPGRADE, record size 150 bytes, on volume AWSHJ1, 5 primary and 1 secondary cylinders, along with its DATA and INDEX components"
+      },
+      {
+        "step": "STEP50",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH",
+        "operations": "DEFINE",
+        "description": "Defines a PATH named AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX.PATH with PATHENTRY pointing to the Alternate Index AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX, relating the alternate index to the base cluster"
+      },
+      {
+        "step": "STEP60",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS, AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX",
+        "operations": "READ, WRITE",
+        "description": "Builds the Alternate Index cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.AIX by reading records from the base KSDS cluster AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS and populating the alternate index entries"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "CARDDAT, CARDAIX",
+        "operations": "OPEN",
+        "description": "Issues CEMT SET FILE OPEN commands via SDSF to reopen CARDDAT and CARDAIX files in CICS region CICSAWSA after all dataset definition and population steps have completed"
+      }
+    ]
+  }
+}

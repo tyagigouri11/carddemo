@@ -1,0 +1,1817 @@
+{
+    "name": "COBTUPDT.cbl",
+    "program_name": "COBTUPDT.cbl",
+    "generated_at": "2026-11-05T08:13:45Z",
+    "overview": {
+        "total_key_functionalities": 12,
+        "total_rules": 70,
+        "main_flow_diagram": "flowchart TD\n    START([Start Program]):::start\n    OPEN[1: Open Input File]:::process\n    OPEN_OK{File Opened\nSuccessfully?}:::decision\n    READ_FIRST[2: Read Input Records]:::process\n    EOF{End of\nFile?}:::decision\n    DETERMINE[3: Determine Record Action Type]:::decision\n    INSERT[4: Insert Transaction Type]:::process\n    UPDATE[5: Update Transaction Type]:::process\n    DELETE[6: Delete Transaction Type]:::process\n    SKIP[7: Skip Commented Lines]:::process\n    VALIDATE[8: Validate Record Type]:::process\n    ERROR_OPEN[Display File Open Error]:::error\n    ERROR_HANDLER[9: Handle Processing Errors\nDisplay Error Message\nSet Error Return Code = 4]:::error\n    INSERT_OK{Insert\nSuccessful?}:::decision\n    UPDATE_OK{Update\nSuccessful?}:::decision\n    DELETE_OK{Delete\nSuccessful?}:::decision\n    READ_NEXT[2: Read Next Input Record]:::process\n    CLOSE[10: Close Input File and Stop]:::final\n\n    INPFILE[(INPFILE\nSequential Input File\nTR-RECORD)]:::datasource\n    TRTABLE[(CARDDEMO.TRANSACTION_TYPE\nDB2 Table)]:::datasource\n\n    START --> OPEN\n    OPEN -.->|Open File| INPFILE\n    OPEN --> OPEN_OK\n    OPEN_OK -->|No| ERROR_OPEN\n    OPEN_OK -->|Yes| READ_FIRST\n    INPFILE -.->|Read Record| READ_FIRST\n    READ_FIRST --> EOF\n    EOF -->|Yes| CLOSE\n    EOF -->|No| DETERMINE\n    DETERMINE -->|A - Add Record| INSERT\n    DETERMINE -->|U - Update Record| UPDATE\n    DETERMINE -->|D - Delete Record| DELETE\n    DETERMINE -->|* - Comment Line| SKIP\n    DETERMINE -->|Invalid Type| VALIDATE\n    VALIDATE --> ERROR_HANDLER\n\n    INSERT -.->|Insert Row| TRTABLE\n    INSERT --> INSERT_OK\n    INSERT_OK -->|Success| READ_NEXT\n    INSERT_OK -->|Failure| ERROR_HANDLER\n\n    UPDATE -.->|Update Row| TRTABLE\n    UPDATE --> UPDATE_OK\n    UPDATE_OK -->|Success| READ_NEXT\n    UPDATE_OK -->|No Record Found / Failure| ERROR_HANDLER\n\n    DELETE -.->|Delete Row| TRTABLE\n    DELETE --> DELETE_OK\n    DELETE_OK -->|Success| READ_NEXT\n    DELETE_OK -->|No Record Found / Failure| ERROR_HANDLER\n\n    SKIP --> READ_NEXT\n    ERROR_HANDLER --> READ_NEXT\n    INPFILE -.->|Read Next Record| READ_NEXT\n    READ_NEXT --> EOF\n    CLOSE -.->|Close File| INPFILE\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-COBTUPDT-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Open Transaction Type Input File",
+                "rule_description": "The program must successfully open the sequential input file containing transaction type maintenance records before any processing can begin.",
+                "sub_graph_node_text": "1: Open Input File",
+                "acceptance_criteria": {
+                    "Given": "The batch program is initiated to process transaction type maintenance records from the sequential input file TR-RECORD",
+                    "When": "The program attempts to open the input file TR-RECORD",
+                    "Then": "If the file opens successfully, the program displays 'OPEN FILE OK' and proceeds to read records; if the file does not open successfully, the program displays 'OPEN FILE NOT OK'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "Read First Input Record Before Processing Loop",
+                "rule_description": "Before entering the main processing loop, the program performs an initial priming read to retrieve the first record from the input file, establishing whether there are any records to process.",
+                "sub_graph_node_text": "2: Read Input Records",
+                "acceptance_criteria": {
+                    "Given": "The input file TR-RECORD has been successfully opened",
+                    "When": "The program performs the first read of the input file TR-RECORD into the working storage input record WS-INPUT-REC",
+                    "Then": "If a record is successfully read, the record content is displayed with label 'PROCESSING' and the program proceeds to evaluate the record type; if no record exists (end of file), the end-of-file indicator LASTREC is set to 'Y' and the program skips directly to closing the file"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00003",
+                "rule_type": "Process Rules",
+                "rule_name": "Detect End of Input File",
+                "rule_description": "The program must detect when all records in the input file have been processed and transition to the file closing step.",
+                "sub_graph_node_text": "End of File?",
+                "acceptance_criteria": {
+                    "Given": "The program is in the main processing loop reading records from the input file TR-RECORD",
+                    "When": "A read operation on the input file reaches the end of the file",
+                    "Then": "The end-of-file indicator LASTREC is set to 'Y', the processing loop terminates, and the program proceeds to close the input file and stop"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00004",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Record Action Type",
+                "rule_description": "Each input record contains a Record Type indicator that determines which database maintenance operation \u2014 Add, Update, Delete, Skip, or Error \u2014 should be performed on the TRANSACTION_TYPE table.",
+                "sub_graph_node_text": "3: Determine Record Action Type",
+                "acceptance_criteria": {
+                    "Given": "A record has been successfully read from the input file TR-RECORD into WS-INPUT-REC",
+                    "When": "The program evaluates the INPUT-REC-TYPE field of the current record",
+                    "Then": "If INPUT-REC-TYPE is 'A', the program routes to the Add (Insert) process; if 'U', routes to the Update process; if 'D', routes to the Delete process; if '*', routes to the Skip (comment line) process; if any other value, routes to the invalid record type error handler"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00005",
+                "rule_type": "Action Rules",
+                "rule_name": "Insert New Transaction Type Record",
+                "rule_description": "When a record is marked for addition, a new Transaction Type entry is inserted into the CARDDEMO.TRANSACTION_TYPE database table using the transaction type code and description from the input record.",
+                "sub_graph_node_text": "4: Insert Transaction Type",
+                "acceptance_criteria": {
+                    "Given": "The current input record has INPUT-REC-TYPE equal to 'A', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) and INPUT-REC-DESC containing the Transaction Description (TR_DESCRIPTION)",
+                    "When": "The program executes an INSERT operation into the CARDDEMO.TRANSACTION_TYPE table with values TR_TYPE = INPUT-REC-NUMBER and TR_DESCRIPTION = INPUT-REC-DESC",
+                    "Then": "If the insert is successful, the program displays 'RECORD INSERTED SUCCESSFULLY' and proceeds to read the next input record; if the insert fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, the error is logged, Return Code is set to 4, and the program continues to the next record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00006",
+                "rule_type": "Action Rules",
+                "rule_name": "Update Existing Transaction Type Description",
+                "rule_description": "When a record is marked for update, the description of an existing Transaction Type in the CARDDEMO.TRANSACTION_TYPE table is updated using the transaction type code as the key identifier.",
+                "sub_graph_node_text": "5: Update Transaction Type",
+                "acceptance_criteria": {
+                    "Given": "The current input record has INPUT-REC-TYPE equal to 'U', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) to identify the record and INPUT-REC-DESC containing the new Transaction Description (TR_DESCRIPTION)",
+                    "When": "The program executes an UPDATE operation on the CARDDEMO.TRANSACTION_TYPE table setting TR_DESCRIPTION = INPUT-REC-DESC where TR_TYPE = INPUT-REC-NUMBER",
+                    "Then": "If the update is successful, the program displays 'RECORD UPDATED SUCCESSFULLY' and proceeds to read the next input record; if no matching record is found, an error message 'No records found.' is generated, Return Code is set to 4, and the program continues to the next record; if the update fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, Return Code is set to 4, and the program continues to the next record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00007",
+                "rule_type": "Action Rules",
+                "rule_name": "Delete Existing Transaction Type Record",
+                "rule_description": "When a record is marked for deletion, the matching Transaction Type entry is removed from the CARDDEMO.TRANSACTION_TYPE table using the transaction type code as the key identifier.",
+                "sub_graph_node_text": "6: Delete Transaction Type",
+                "acceptance_criteria": {
+                    "Given": "The current input record has INPUT-REC-TYPE equal to 'D', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) that identifies the record to be deleted",
+                    "When": "The program executes a DELETE operation on the CARDDEMO.TRANSACTION_TYPE table where TR_TYPE = INPUT-REC-NUMBER",
+                    "Then": "If the deletion is successful, the program displays 'RECORD DELETED SUCCESSFULLY' and proceeds to read the next input record; if no matching record is found, an error message 'No records found.' is generated, Return Code is set to 4, and the program continues to the next record; if the deletion fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, Return Code is set to 4, and the program continues to the next record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00008",
+                "rule_type": "Validation Rules",
+                "rule_name": "Skip Commented Input Records",
+                "rule_description": "Input records prefixed with an asterisk (*) are treated as comment lines and are intentionally ignored \u2014 no database operation is performed for these records.",
+                "sub_graph_node_text": "7: Skip Commented Lines",
+                "acceptance_criteria": {
+                    "Given": "The current input record has INPUT-REC-TYPE equal to '*'",
+                    "When": "The program evaluates the record type and identifies it as a comment line",
+                    "Then": "The program displays 'IGNORING COMMENTED LINE', performs no database operation, and proceeds directly to read the next input record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00009",
+                "rule_type": "Validation Rules",
+                "rule_name": "Validate Record Type \u2014 Reject Invalid Action Codes",
+                "rule_description": "Any input record whose Record Type indicator is not one of the recognized values (A, U, D, or *) is considered invalid and must be flagged as an error.",
+                "sub_graph_node_text": "8: Validate Record Type",
+                "acceptance_criteria": {
+                    "Given": "The current input record has an INPUT-REC-TYPE value that is not 'A', 'U', 'D', or '*'",
+                    "When": "The program evaluates the INPUT-REC-TYPE field and finds no matching valid action code",
+                    "Then": "The program constructs an error message 'ERROR: TYPE NOT VALID', routes to the error handler which displays the error message and sets Return Code to 4, and then continues processing the next input record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00010",
+                "rule_type": "Policy Rules",
+                "rule_name": "Handle Processing Errors \u2014 Log and Continue",
+                "rule_description": "When any processing error occurs \u2014 including invalid record types, database insert/update/delete failures, or records not found \u2014 the program logs the error and sets a warning return code, but continues processing remaining records without terminating.",
+                "sub_graph_node_text": "9: Handle Processing Errors\nDisplay Error Message\nSet Error Return Code = 4",
+                "acceptance_criteria": {
+                    "Given": "A processing error has occurred due to one of the following conditions: (1) an invalid record type was encountered, (2) a database insert operation failed, (3) a database update operation failed or found no matching record, or (4) a database delete operation failed or found no matching record",
+                    "When": "The error handler routine is invoked with a pre-constructed error message stored in WS-RETURN-MSG",
+                    "Then": "The program displays the error message contained in WS-RETURN-MSG, sets the program Return Code to 4 to signal that errors occurred during the run, and returns control to continue reading and processing the next input record \u2014 the program does NOT terminate"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00011",
+                "rule_type": "Process Rules",
+                "rule_name": "Read Next Input Record in Processing Loop",
+                "rule_description": "After each record is processed (whether successfully or with an error), the program reads the next sequential record from the input file to continue the processing loop.",
+                "sub_graph_node_text": "2: Read Next Input Record",
+                "acceptance_criteria": {
+                    "Given": "The current input record has been fully processed \u2014 either a database operation was completed successfully, an error was handled, or a comment line was skipped",
+                    "When": "The program performs a sequential read of the next record from the input file TR-RECORD into WS-INPUT-REC",
+                    "Then": "If a next record exists, its content is displayed with label 'PROCESSING' and the program loops back to evaluate the record type; if no more records exist (end of file), the end-of-file indicator LASTREC is set to 'Y' and the processing loop terminates"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBTUPDT-cbl-00012",
+                "rule_type": "Process Rules",
+                "rule_name": "Close Input File and End Program",
+                "rule_description": "Once all records in the input file have been processed, the program closes the input file and terminates execution.",
+                "sub_graph_node_text": "10: Close Input File and Stop",
+                "acceptance_criteria": {
+                    "Given": "The end-of-file condition has been reached on the input file TR-RECORD, meaning all input records have been processed",
+                    "When": "The program executes the close and stop routine",
+                    "Then": "The input file TR-RECORD is closed and the program terminates"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "open-input-file",
+            "title": "Open Input File",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Start: Open Input File])\n    OPEN[Open Sequential Input File\\nContaining Transaction Type Records]\n    STATUS{File Opened\\nSuccessfully?}\n    SUCCESS[Display:\\nFile Opened Successfully]\n    FAIL[Display:\\nFile Open Failed]\n    PROCEED([Proceed to\\nRead Input Records])\n\n    START --> OPEN\n    OPEN --> STATUS\n    STATUS -->|Yes| SUCCESS\n    STATUS -->|No| FAIL\n    SUCCESS --> PROCEED\n    FAIL --> PROCEED",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00013",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Open Transaction Type Input File for Processing",
+                    "rule_description": "The program must open the sequential input file (TR-RECORD) that contains transaction type maintenance records before any record processing can begin. This is the mandatory first step in the batch process.",
+                    "sub_graph_node_text": "Open Sequential Input File\nContaining Transaction Type Records",
+                    "acceptance_criteria": {
+                        "Given": "The batch process for Transaction Type table maintenance is initiated",
+                        "When": "The program attempts to open the sequential input file TR-RECORD containing transaction type records",
+                        "Then": "The input file TR-RECORD is opened in READ-ONLY (INPUT) mode and made available for sequential record reading"
+                    },
+                    "key_functionality_id": "open-input-file"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00014",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Confirm Successful Opening of Transaction Type Input File",
+                    "rule_description": "After attempting to open the input file, the program evaluates the file status to determine whether the file was opened successfully. A file status of '00' indicates a successful open.",
+                    "sub_graph_node_text": "File Opened\nSuccessfully?",
+                    "acceptance_criteria": {
+                        "Given": "The program has attempted to open the sequential input file TR-RECORD",
+                        "When": "The file open status is evaluated and the status code equals '00'",
+                        "Then": "The file is confirmed as successfully opened and the program displays the message 'OPEN FILE OK' to confirm readiness for processing"
+                    },
+                    "key_functionality_id": "open-input-file"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00015",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle Failure to Open Transaction Type Input File",
+                    "rule_description": "If the input file cannot be opened (file status is not '00'), the program logs a failure notification. Critically, the program does not terminate \u2014 it continues to the next step regardless of the file open failure.",
+                    "sub_graph_node_text": "Display:\nFile Open Failed",
+                    "acceptance_criteria": {
+                        "Given": "The program has attempted to open the sequential input file TR-RECORD",
+                        "When": "The file open status is evaluated and the status code is NOT equal to '00'",
+                        "Then": "The program displays the message 'OPEN FILE NOT OK' to signal the failure, and then continues processing without terminating"
+                    },
+                    "key_functionality_id": "open-input-file"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00016",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Proceed to Record Processing Regardless of File Open Outcome",
+                    "rule_description": "After the file open attempt \u2014 whether successful or not \u2014 the program unconditionally proceeds to the record reading phase. There is no business rule that halts the process based on the file open result alone.",
+                    "sub_graph_node_text": "Proceed to\nRead Input Records",
+                    "acceptance_criteria": {
+                        "Given": "The program has attempted to open the sequential input file TR-RECORD and has displayed either a success or failure message",
+                        "When": "The file open evaluation block (IF/ELSE/END-IF) completes execution",
+                        "Then": "The program unconditionally proceeds to the next step of reading and processing input records, regardless of whether the file was opened successfully or not"
+                    },
+                    "key_functionality_id": "open-input-file"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Open Input File"
+        },
+        {
+            "id": "read-input-records",
+            "title": "Read Input Records",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Start Reading Input Records])\n    READ_FIRST[Read First Record\\nfrom Input File]\n    EOF_CHECK{End of\\nFile Reached?}\n    DISPLAY[Display Record\\nBeing Processed]\n    PROCESS[Process Current Record\\nDetermine Action Type]\n    READ_NEXT[Read Next Record\\nfrom Input File]\n    EOF_MARK[Mark End of File\\nFlag = Y]\n    END_LOOP([All Records Read\\nProceed to Close File])\n\n    START --> READ_FIRST\n    READ_FIRST --> EOF_CHECK\n    EOF_CHECK -->|Yes| EOF_MARK\n    EOF_CHECK -->|No| DISPLAY\n    DISPLAY --> PROCESS\n    PROCESS --> READ_NEXT\n    READ_NEXT --> EOF_CHECK\n    EOF_MARK --> END_LOOP",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00017",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Priming Read of First Input Record",
+                    "rule_description": "Before entering the main processing loop, the program must read the very first record from the input file to initialize the processing cycle. This ensures the loop has a record ready to evaluate before checking for end-of-file.",
+                    "sub_graph_node_text": "Read First Record from Input File",
+                    "acceptance_criteria": {
+                        "Given": "The input file TR-RECORD has been successfully opened and is ready for reading",
+                        "When": "The batch process begins its record processing cycle",
+                        "Then": "The first record from the input file is read into the working storage input record area (WS-INPUT-REC), making it available for end-of-file evaluation and subsequent processing"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00018",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Detection During Sequential Read",
+                    "rule_description": "After each read attempt from the input file, the program must determine whether the end of the file has been reached. This check controls whether the processing loop continues or terminates.",
+                    "sub_graph_node_text": "End of File Reached?",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the input file TR-RECORD",
+                        "When": "The read operation encounters the end of the file (no more records available)",
+                        "Then": "An end-of-file flag (LASTREC) is set to 'Y', signaling that all records have been read and the processing loop should terminate"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00019",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Mark End-of-File Flag to Stop Processing Loop",
+                    "rule_description": "When the input file has no more records to provide, the end-of-file condition must be formally recorded by setting a flag. This flag is the mechanism that stops the sequential processing loop from continuing.",
+                    "sub_graph_node_text": "Mark End of File Flag = Y",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been attempted on the input file TR-RECORD",
+                        "When": "The read operation reaches the physical end of the input file with no further records available",
+                        "Then": "The end-of-file indicator (LASTREC) is set to the value 'Y', which will cause the processing loop to exit on its next evaluation"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00020",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Record Being Processed for Audit Visibility",
+                    "rule_description": "Each time a valid (non-end-of-file) record is successfully read from the input file, its full content must be displayed to provide a processing audit trail. This only occurs when an actual data record has been retrieved.",
+                    "sub_graph_node_text": "Display Record Being Processed",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the input file and the end-of-file flag (LASTREC) is NOT equal to 'Y'",
+                        "When": "A valid input record has been successfully read into the working storage input record area (WS-INPUT-REC)",
+                        "Then": "The message 'PROCESSING' followed by the full content of the input record (WS-INPUT-REC) is displayed, confirming the record is about to be processed"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00021",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Invoke Record Action Processing Based on Record Type",
+                    "rule_description": "After a valid record is read and displayed, the program must invoke the record treatment routine to determine and execute the appropriate database action (Add, Update, Delete, Skip, or Error) based on the record type indicator in the input record.",
+                    "sub_graph_node_text": "Process Current Record Determine Action Type",
+                    "acceptance_criteria": {
+                        "Given": "A valid input record has been read from the input file and the end-of-file flag (LASTREC) is NOT 'Y'",
+                        "When": "The current input record is ready for processing",
+                        "Then": "The record treatment routine (1003-TREAT-RECORD) is invoked to evaluate the record type indicator (INPUT-REC-TYPE) and execute the corresponding database operation (Insert, Update, Delete, Skip, or Error handling)"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00022",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Read of Next Input Record Within Processing Loop",
+                    "rule_description": "After each record has been processed, the program must immediately read the next record from the input file to continue the sequential processing cycle. This read feeds the end-of-file check for the next loop iteration.",
+                    "sub_graph_node_text": "Read Next Record from Input File",
+                    "acceptance_criteria": {
+                        "Given": "The current input record has been fully processed by the record treatment routine",
+                        "When": "The processing loop requires the next record to continue sequential file processing",
+                        "Then": "The next sequential record is read from the input file TR-RECORD into the working storage input record area (WS-INPUT-REC); if no more records exist, the end-of-file flag (LASTREC) is set to 'Y'"
+                    },
+                    "key_functionality_id": "read-input-records"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00023",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Terminate Processing Loop When All Records Are Read",
+                    "rule_description": "Once the end-of-file flag has been set, the processing loop must exit and the program must proceed to close the input file. No further record reads or processing actions are attempted after all records have been consumed.",
+                    "sub_graph_node_text": "All Records Read Proceed to Close File",
+                    "acceptance_criteria": {
+                        "Given": "The end-of-file flag (LASTREC) has been set to 'Y' indicating no more records remain in the input file",
+                        "When": "The processing loop evaluates the end-of-file condition and finds LASTREC = 'Y'",
+                        "Then": "The processing loop terminates and the file closure routine (2001-CLOSE-STOP) is invoked to close the input file TR-RECORD, completing the batch run"
+                    },
+                    "key_functionality_id": "read-input-records"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Read Input Records"
+        },
+        {
+            "id": "determine-record-action-type",
+            "title": "Determine Record Action Type",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Determine Record Action Type])\n    EVAL{Evaluate\\nRecord Type\\nIndicator}\n\n    A_CHECK{Record Type\\n= A ?}\n    U_CHECK{Record Type\\n= U ?}\n    D_CHECK{Record Type\\n= D ?}\n    COMMENT_CHECK{Record Type\\n= * ?}\n\n    ADD[Route to:\\nAdd New Transaction Type]\n    UPDATE[Route to:\\nUpdate Existing Transaction Type]\n    DELETE[Route to:\\nDelete Existing Transaction Type]\n    SKIP[Route to:\\nSkip Commented Line]\n    INVALID[Flag as Invalid\\nRecord Type Error]\n\n    START --> EVAL\n    EVAL --> A_CHECK\n    A_CHECK -->|Yes| ADD\n    A_CHECK -->|No| U_CHECK\n    U_CHECK -->|Yes| UPDATE\n    U_CHECK -->|No| D_CHECK\n    D_CHECK -->|Yes| DELETE\n    D_CHECK -->|No| COMMENT_CHECK\n    COMMENT_CHECK -->|Yes| SKIP\n    COMMENT_CHECK -->|No - Unknown Type| INVALID\n\n    ADD --> END_ADD([Proceed to Insert Transaction Type])\n    UPDATE --> END_UPDATE([Proceed to Update Transaction Type])\n    DELETE --> END_DELETE([Proceed to Delete Transaction Type])\n    SKIP --> END_SKIP([Proceed to Read Next Record])\n    INVALID --> END_INVALID([Proceed to Handle Processing Error])",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00024",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route Add Record Action to Insert Transaction Type",
+                    "rule_description": "When a record from the input file has a Record Type Indicator of 'A', the system must route processing to the Add New Transaction Type operation to insert a new record into the Transaction Type table.",
+                    "sub_graph_node_text": "Route to: Add New Transaction Type",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'A'",
+                        "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                        "Then": "The system routes processing to the Add New Transaction Type procedure to insert the transaction type record into the TRANSACTION_TYPE table"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00025",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route Update Record Action to Update Transaction Type",
+                    "rule_description": "When a record from the input file has a Record Type Indicator of 'U', the system must route processing to the Update Existing Transaction Type operation to modify an existing record in the Transaction Type table.",
+                    "sub_graph_node_text": "Route to: Update Existing Transaction Type",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'U'",
+                        "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                        "Then": "The system routes processing to the Update Existing Transaction Type procedure to update the transaction type description in the TRANSACTION_TYPE table"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00026",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route Delete Record Action to Delete Transaction Type",
+                    "rule_description": "When a record from the input file has a Record Type Indicator of 'D', the system must route processing to the Delete Existing Transaction Type operation to remove a record from the Transaction Type table.",
+                    "sub_graph_node_text": "Route to: Delete Existing Transaction Type",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'D'",
+                        "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                        "Then": "The system routes processing to the Delete Existing Transaction Type procedure to remove the transaction type record from the TRANSACTION_TYPE table"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00027",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Skip Commented Input Records",
+                    "rule_description": "When a record from the input file has a Record Type Indicator of '*', the record is treated as a comment line and must be ignored. No database operation is performed and processing continues with the next record.",
+                    "sub_graph_node_text": "Route to: Skip Commented Line",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value '*'",
+                        "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                        "Then": "The system displays 'IGNORING COMMENTED LINE', performs no database operation, and proceeds to read the next input record"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00028",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Flag Unknown Record Type as Invalid",
+                    "rule_description": "When a record from the input file contains a Record Type Indicator that is not one of the recognised values ('A', 'U', 'D', or '*'), the record is considered invalid. An error message must be generated and the error handling procedure must be invoked, setting a processing error condition.",
+                    "sub_graph_node_text": "Flag as Invalid Record Type Error",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains a value other than 'A', 'U', 'D', or '*'",
+                        "When": "The system evaluates the Record Type Indicator and finds no matching valid operation type",
+                        "Then": "The system constructs an error message 'ERROR: TYPE NOT VALID', routes processing to the error handling procedure, sets the program Return Code to 4 to signal an error condition, and continues processing the next input record without performing any database operation"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00029",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Determine Database Operation Based on Record Type Indicator",
+                    "rule_description": "For every input record read from the Transaction Type maintenance file, the system must evaluate the Record Type Indicator to determine which database operation to perform. The valid Record Type Indicators are 'A' (Add), 'U' (Update), 'D' (Delete), and '*' (Comment/Skip). Any other value is treated as an invalid record type.",
+                    "sub_graph_node_text": "Evaluate Record Type Indicator",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been successfully read from the Transaction Type maintenance input file and is available for processing",
+                        "When": "The system evaluates the Record Type Indicator field of the input record",
+                        "Then": "The system must route the record to exactly one of the following outcomes based on the Record Type Indicator value: 'A' routes to Add New Transaction Type; 'U' routes to Update Existing Transaction Type; 'D' routes to Delete Existing Transaction Type; '*' routes to Skip Commented Line; any other value routes to Flag as Invalid Record Type Error"
+                    },
+                    "key_functionality_id": "determine-record-action-type"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Determine Record Action Type"
+        },
+        {
+            "id": "insert-transaction-type",
+            "title": "Insert Transaction Type",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Start: Insert Transaction Type])\n    DISPLAY[Display: Adding Record]\n    INSERT[Add New Transaction Type Record\\nto TRANSACTION_TYPE Table\\nusing Transaction Number and Description\\nfrom Input Record]\n    SUCCESS{Insert\\nSuccessful?}\n    DISPLAY_OK[Display: Record Inserted Successfully]\n    ERROR[Prepare Error Message\\nwith Table Name and Error Details]\n    SET_ERROR[Set Error Return Code = 4\\nDisplay Error Message]\n    END_OK([Return to Record Processing])\n    END_ERR([Return to Record Processing])\n\n    START --> DISPLAY\n    DISPLAY --> INSERT\n    INSERT -.->|Transaction Number +\\nDescription| TRTABLE[(CARDDEMO.TRANSACTION_TYPE\\nDB2 Table)]\n    INSERT --> SUCCESS\n    SUCCESS -->|Yes| DISPLAY_OK\n    SUCCESS -->|No| ERROR\n    DISPLAY_OK --> END_OK\n    ERROR --> SET_ERROR\n    SET_ERROR --> END_ERR",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00030",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Trigger Insert Operation for Add Record Type",
+                    "rule_description": "When an input record is identified with record type 'A', the system initiates the Add New Transaction Type process and signals that an insert operation is about to be performed.",
+                    "sub_graph_node_text": "Display: Adding Record",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type input file",
+                        "When": "The Record Type indicator on the input record is 'A' (Add)",
+                        "Then": "The system initiates the Insert Transaction Type process and displays the message 'ADDING RECORD' to confirm the operation has been triggered"
+                    },
+                    "key_functionality_id": "insert-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00031",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Add New Transaction Type Record to Database",
+                    "rule_description": "The system inserts a new Transaction Type record into the TRANSACTION_TYPE table using the Transaction Number as the type code and the Description from the input record as the transaction description.",
+                    "sub_graph_node_text": "Add New Transaction Type Record to TRANSACTION_TYPE Table using Transaction Number and Description from Input Record",
+                    "acceptance_criteria": {
+                        "Given": "The insert operation has been triggered for an input record with Record Type 'A', containing a Transaction Number (TR_TYPE) and a Transaction Description (TR_DESCRIPTION)",
+                        "When": "The system attempts to add the new Transaction Type record to the CARDDEMO.TRANSACTION_TYPE table using the Transaction Number as the Transaction Type Code and the Transaction Description as the description value",
+                        "Then": "A new row is created in the TRANSACTION_TYPE table with TR_TYPE populated from the input Transaction Number and TR_DESCRIPTION populated from the input Transaction Description"
+                    },
+                    "key_functionality_id": "insert-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00032",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Confirm Successful Insertion of Transaction Type",
+                    "rule_description": "When a new Transaction Type record is successfully added to the database, the system confirms the successful insertion with a success message.",
+                    "sub_graph_node_text": "Display: Record Inserted Successfully",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to insert a new Transaction Type record into the CARDDEMO.TRANSACTION_TYPE table",
+                        "When": "The insert operation completes successfully with no database errors",
+                        "Then": "The system displays the message 'RECORD INSERTED SUCCESSFULLY' to confirm the new Transaction Type record has been added"
+                    },
+                    "key_functionality_id": "insert-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00033",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Prepare Error Message on Failed Transaction Type Insertion",
+                    "rule_description": "When the insertion of a new Transaction Type record fails due to a database error, the system prepares a descriptive error message identifying the affected table and the specific error details.",
+                    "sub_graph_node_text": "Prepare Error Message with Table Name and Error Details",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to insert a new Transaction Type record into the CARDDEMO.TRANSACTION_TYPE table",
+                        "When": "The insert operation fails with a database error (indicated by a negative database return code)",
+                        "Then": "The system constructs an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the specific database error code value, and stores it as the current error message for reporting"
+                    },
+                    "key_functionality_id": "insert-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00034",
+                    "rule_type": "Policy Rules",
+                    "rule_name": "Set Error Return Code and Display Error on Failed Insertion",
+                    "rule_description": "When a Transaction Type insertion fails, the system logs the error message and sets the program return code to 4 to signal that an error occurred, while allowing the program to continue processing remaining records.",
+                    "sub_graph_node_text": "Set Error Return Code = 4\nDisplay Error Message",
+                    "acceptance_criteria": {
+                        "Given": "The insert operation for a new Transaction Type record has failed and an error message has been prepared identifying the TRANSACTION_TYPE table and the error details",
+                        "When": "The error handling process is invoked",
+                        "Then": "The system displays the prepared error message and sets the program Return Code to 4 to indicate an error condition, after which processing returns to handle the next input record without terminating the program"
+                    },
+                    "key_functionality_id": "insert-transaction-type"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Insert Transaction Type"
+        },
+        {
+            "id": "update-transaction-type",
+            "title": "Update Transaction Type",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Start: Update Transaction Type])\n    UPDATE_DB[/_Input: Transaction Number & New Description\\nfrom Input Record_/]\n    EXEC_UPDATE[_Update TRANSACTION_TYPE Table\\nSet TR_DESCRIPTION = Input Description\\nWhere TR_TYPE = Input Transaction Number_]\n    TRTABLE[(CARDDEMO.TRANSACTION_TYPE\\nDB2 Table)]\n    UPDATE_RESULT{Update\\nResult?}\n    SUCCESS[Display: Record Updated Successfully]\n    NOT_FOUND[Set Error Message:\\nNo Records Found for\\nGiven Transaction Number]\n    DB_ERROR[Set Error Message:\\nError Accessing\\nTRANSACTION_TYPE Table]\n    ERROR_HANDLER[Handle Processing Error\\nDisplay Error Message\\nSet Error Return Code = 4]\n    END_SUCCESS([Return: Update Successful])\n    END_ERROR([Return: Update Failed])\n\n    START --> UPDATE_DB\n    UPDATE_DB --> EXEC_UPDATE\n    EXEC_UPDATE -.->|Update Row by Transaction Number| TRTABLE\n    TRTABLE -.->|Update Result| EXEC_UPDATE\n    EXEC_UPDATE --> UPDATE_RESULT\n    UPDATE_RESULT -->|Record Updated Successfully| SUCCESS\n    UPDATE_RESULT -->|Transaction Number Not Found| NOT_FOUND\n    UPDATE_RESULT -->|Database Error Occurred| DB_ERROR\n    SUCCESS --> END_SUCCESS\n    NOT_FOUND --> ERROR_HANDLER\n    DB_ERROR --> ERROR_HANDLER\n    ERROR_HANDLER --> END_ERROR",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00035",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Execute Update of Transaction Type Description",
+                    "rule_description": "When an update operation is triggered for a transaction type record, the system must update the description of the matching transaction type in the TRANSACTION_TYPE table using the transaction number as the lookup key and the new description from the input record.",
+                    "sub_graph_node_text": "Update TRANSACTION_TYPE Table\nSet TR_DESCRIPTION = Input Description\nWhere TR_TYPE = Input Transaction Number",
+                    "acceptance_criteria": {
+                        "Given": "A valid input record of type 'U' has been read, containing a Transaction Number (TR_TYPE) and a New Description (TR_DESCRIPTION) sourced from the input file",
+                        "When": "The system executes an update against the CARDDEMO.TRANSACTION_TYPE table, setting TR_DESCRIPTION equal to the input description for the row where TR_TYPE matches the input transaction number",
+                        "Then": "The TRANSACTION_TYPE table row identified by the given Transaction Number is updated with the new description value from the input record"
+                    },
+                    "key_functionality_id": "update-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00036",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Confirm Successful Update of Transaction Type",
+                    "rule_description": "When the TRANSACTION_TYPE table is successfully updated, the system must confirm the successful operation by displaying a success message.",
+                    "sub_graph_node_text": "Display: Record Updated Successfully",
+                    "acceptance_criteria": {
+                        "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "The update completes successfully with no errors and the record is found and modified",
+                        "Then": "The system displays the message 'RECORD UPDATED SUCCESSFULLY' to confirm the transaction type description has been updated"
+                    },
+                    "key_functionality_id": "update-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00037",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle Transaction Number Not Found During Update",
+                    "rule_description": "When an update is attempted for a Transaction Number that does not exist in the TRANSACTION_TYPE table, the system must treat this as an error condition, generate an appropriate error message, and invoke the error handling process.",
+                    "sub_graph_node_text": "Set Error Message:\nNo Records Found for\nGiven Transaction Number",
+                    "acceptance_criteria": {
+                        "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "No matching record is found in the TRANSACTION_TYPE table for the provided Transaction Number",
+                        "Then": "The system sets the error message to 'No records found.' and invokes the error handler which displays the error message and sets the processing error return code to 4"
+                    },
+                    "key_functionality_id": "update-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00038",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle Database Error During Transaction Type Update",
+                    "rule_description": "When a database error occurs while attempting to update the TRANSACTION_TYPE table, the system must capture the error details including the table name and the database error code, generate an error message, and invoke the error handling process.",
+                    "sub_graph_node_text": "Set Error Message:\nError Accessing\nTRANSACTION_TYPE Table",
+                    "acceptance_criteria": {
+                        "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "A database error occurs during the update operation, indicated by a negative database error code",
+                        "Then": "The system constructs an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the specific database error code value, and invokes the error handler which displays the error message and sets the processing error return code to 4"
+                    },
+                    "key_functionality_id": "update-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00039",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Invoke Error Handler for Update Failures",
+                    "rule_description": "When any error condition is encountered during the update of a transaction type \u2014 whether the record is not found or a database error occurs \u2014 the system must invoke a centralized error handling routine that logs the error and marks the overall process as having encountered an error, while allowing subsequent records to continue processing.",
+                    "sub_graph_node_text": "Handle Processing Error\nDisplay Error Message\nSet Error Return Code = 4",
+                    "acceptance_criteria": {
+                        "Given": "An error condition has been identified during the update of a transaction type record, and an error message has been set describing the nature of the failure",
+                        "When": "The error handling routine is invoked following either a 'no record found' or a 'database error' outcome from the update operation",
+                        "Then": "The system displays the error message describing the failure, sets the processing return code to 4 to signal that an error has occurred, and returns control so that processing of subsequent input records can continue"
+                    },
+                    "key_functionality_id": "update-transaction-type"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number",
+                    "title": "Update TRANSACTION_TYPE Table\nSet TR_DESCRIPTION = Input Description\nWhere TR_TYPE = Input Transaction Number",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    START([Start: Update Transaction Type])\n    UPDATE_SQL[_Update CARDDEMO.TRANSACTION_TYPE\\nSet TR_DESCRIPTION = Input Description\\nWhere TR_TYPE = Input Transaction Number_]\n    TRTABLE[(CARDDEMO.TRANSACTION_TYPE\\nDB2 Table)]\n    EVAL{Was Update\\nSuccessful?}\n    SUCCESS[Display: Record Updated\\nSuccessfully]\n    NO_RECORD[_Error: No Matching\\nTransaction Type Found\\nfor Given Transaction Number_]\n    DB_ERROR[_Error: Failed to Update\\nTransaction Type Table_]\n    ERROR_HANDLER[Handle Error:\\nDisplay Error Message\\nSet Error Return Code = 4]\n    END_SUCCESS([Return to\\nNext Record Processing])\n    END_ERROR([Return to\\nNext Record Processing])\n\n    START --> UPDATE_SQL\n    UPDATE_SQL -.->|Update Row| TRTABLE\n    UPDATE_SQL --> EVAL\n    EVAL -->|Success| SUCCESS\n    EVAL -->|No Matching Record Found| NO_RECORD\n    EVAL -->|Database Error| DB_ERROR\n    SUCCESS --> END_SUCCESS\n    NO_RECORD --> ERROR_HANDLER\n    DB_ERROR --> ERROR_HANDLER\n    ERROR_HANDLER --> END_ERROR",
+                    "rules": [
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00061",
+                            "rule_type": "Process Rules",
+                            "rule_name": "Update Transaction Type Description in Database",
+                            "rule_description": "When a record with type 'U' is read from the input file, the system must update the Transaction Description for the matching Transaction Type Code in the TRANSACTION_TYPE table. Only the description is modified; the Transaction Type Code serves as the unique identifier and is not changed.",
+                            "sub_graph_node_text": "Update CARDDEMO.TRANSACTION_TYPE\nSet TR_DESCRIPTION = Input Description\nWhere TR_TYPE = Input Transaction Number",
+                            "acceptance_criteria": {
+                                "Given": "An input record with Record Type 'U' has been read from the input file, containing a valid Transaction Type Code (INPUT-REC-NUMBER) and a new Transaction Description (INPUT-REC-DESC)",
+                                "When": "The system executes an update operation against the CARDDEMO.TRANSACTION_TYPE table",
+                                "Then": "The Transaction Description (TR_DESCRIPTION) for the row where Transaction Type Code (TR_TYPE) matches the input Transaction Type Code must be updated to the new description provided in the input record; no other fields or rows are modified"
+                            },
+                            "key_functionality_id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00062",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Confirm Successful Update of Transaction Type",
+                            "rule_description": "When the update operation on the TRANSACTION_TYPE table completes successfully, the system must confirm the successful update by displaying a success message before returning to process the next record.",
+                            "sub_graph_node_text": "Display: Record Updated Successfully",
+                            "acceptance_criteria": {
+                                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Type Code",
+                                "When": "The update operation completes successfully with no errors and at least one row is updated",
+                                "Then": "The system must display the message 'RECORD UPDATED SUCCESSFULLY' and return control to process the next input record"
+                            },
+                            "key_functionality_id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00063",
+                            "rule_type": "Validation Rules",
+                            "rule_name": "Handle No Matching Transaction Type Found During Update",
+                            "rule_description": "When an update is attempted for a Transaction Type Code that does not exist in the TRANSACTION_TYPE table, the system must treat this as a business error. Attempting to update a non-existent transaction type is not a silent skip \u2014 it must be flagged as an error condition.",
+                            "sub_graph_node_text": "Error: No Matching Transaction Type Found\nfor Given Transaction Number",
+                            "acceptance_criteria": {
+                                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table using the input Transaction Type Code as the search key",
+                                "When": "No matching row is found in the TRANSACTION_TYPE table for the given Transaction Type Code",
+                                "Then": "The system must generate the error message 'No records found.' and invoke the error handling process"
+                            },
+                            "key_functionality_id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00064",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Handle Database Failure During Transaction Type Update",
+                            "rule_description": "When the update operation against the TRANSACTION_TYPE table encounters a database failure, the system must capture the failure details and invoke the error handling process to log the error and flag the run as having encountered errors.",
+                            "sub_graph_node_text": "Error: Failed to Update Transaction Type Table",
+                            "acceptance_criteria": {
+                                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Type Code",
+                                "When": "The database returns a failure response indicating the update could not be completed due to a database error",
+                                "Then": "The system must generate an error message identifying the TRANSACTION_TYPE table as the source of the failure and invoke the error handling process"
+                            },
+                            "key_functionality_id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00065",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Log Error and Set Error Return Code for Update Failures",
+                            "rule_description": "When any error condition occurs during the update of a Transaction Type record \u2014 whether the record was not found or a database failure occurred \u2014 the system must display the error message and set the program return code to 4 to signal that errors were encountered. Processing then continues with the next input record rather than terminating the program.",
+                            "sub_graph_node_text": "Handle Error:\nDisplay Error Message\nSet Error Return Code = 4",
+                            "acceptance_criteria": {
+                                "Given": "An error condition has been detected during the update of a Transaction Type record, and an error message has been populated (either 'No records found.' or a database failure message referencing the TRANSACTION_TYPE table)",
+                                "When": "The error handling process is invoked",
+                                "Then": "The system must display the error message stored in the error message field, set the program-level Return Code to 4 to indicate an error condition, and return control so that processing continues with the next input record without terminating the program"
+                            },
+                            "key_functionality_id": "update-transaction-type-table\nset-tr-description-=-input-description\nwhere-tr-type-=-input-transaction-number"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "Update Transaction Type"
+        },
+        {
+            "id": "delete-transaction-type",
+            "title": "Delete Transaction Type",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    START([Delete Transaction Type])\n    DEL[Attempt to Remove Transaction Type Record\\nfrom TRANSACTION_TYPE Table\\nMatching by Transaction Number]\n    TRTABLE[(CARDDEMO.TRANSACTION_TYPE\\nDB2 Table)]\n    DEL_OK{Was Record\\nRemoved\\nSuccessfully?}\n    SUCCESS[Display: Record Deleted Successfully\\nContinue Processing]\n    NOT_FOUND[Capture Error Message:\\nNo Records Found for\\nGiven Transaction Number]\n    DB_ERROR[Capture Error Message:\\nTransaction Type Table\\nAccess Error]\n    ERROR_HANDLER[9: Handle Processing Errors\\nDisplay Error Message\\nSet Error Return Code = 4]\n\n    START --> DEL\n    DEL -.->|Delete Row by Transaction Number| TRTABLE\n    DEL --> DEL_OK\n    DEL_OK -->|Yes - Record Removed| SUCCESS\n    DEL_OK -->|No - Transaction Number\\nNot Found| NOT_FOUND\n    DEL_OK -->|No - Database\\nError Occurred| DB_ERROR\n    NOT_FOUND --> ERROR_HANDLER\n    DB_ERROR --> ERROR_HANDLER\n    SUCCESS --> DONE([Return to\\nMain Processing])\n    ERROR_HANDLER --> DONE",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00040",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Attempt to Remove Transaction Type Record from Database",
+                    "rule_description": "When a Delete operation is requested, the system attempts to permanently remove the matching Transaction Type record from the TRANSACTION_TYPE table using the Transaction Number as the unique identifier.",
+                    "sub_graph_node_text": "Attempt to Remove Transaction Type Record from TRANSACTION_TYPE Table Matching by Transaction Number",
+                    "acceptance_criteria": {
+                        "Given": "A valid input record with Record Type 'D' has been read from the input file, containing a Transaction Number (INPUT-REC-NUMBER) that serves as the key to identify the Transaction Type record to be removed",
+                        "When": "The system executes a delete operation against the CARDDEMO.TRANSACTION_TYPE table targeting the row where TR_TYPE matches the Transaction Number provided in the input record",
+                        "Then": "The matching Transaction Type record is permanently removed from the CARDDEMO.TRANSACTION_TYPE table"
+                    },
+                    "key_functionality_id": "delete-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00041",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Confirm Successful Deletion of Transaction Type Record",
+                    "rule_description": "When a Transaction Type record is successfully deleted from the database, the system confirms the successful deletion and continues processing the remaining input records.",
+                    "sub_graph_node_text": "Display: Record Deleted Successfully - Continue Processing",
+                    "acceptance_criteria": {
+                        "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "The database confirms the record was successfully removed (no errors and record was found and deleted)",
+                        "Then": "The system displays the message 'RECORD DELETED SUCCESSFULLY' and continues processing the next input record without setting any error condition"
+                    },
+                    "key_functionality_id": "delete-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00042",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle Transaction Number Not Found During Deletion",
+                    "rule_description": "When a delete operation is attempted but no matching Transaction Type record exists in the database for the given Transaction Number, the system treats this as an error condition and captures an appropriate error message.",
+                    "sub_graph_node_text": "Capture Error Message: No Records Found for Given Transaction Number",
+                    "acceptance_criteria": {
+                        "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "The database reports that no matching record was found for the provided Transaction Number (record not found condition)",
+                        "Then": "The system captures the error message 'No records found.' into the error message field and invokes the error handling process, which displays the error message and sets the program Return Code to 4, then continues processing the next input record"
+                    },
+                    "key_functionality_id": "delete-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle Database Access Error During Deletion",
+                    "rule_description": "When a delete operation fails due to a database access error, the system captures a descriptive error message including the database error code and invokes the error handling process.",
+                    "sub_graph_node_text": "Capture Error Message: Transaction Type Table Access Error",
+                    "acceptance_criteria": {
+                        "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                        "When": "The database returns an error condition (a negative error code) indicating the TRANSACTION_TYPE table could not be accessed successfully",
+                        "Then": "The system captures an error message composed of the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, then invokes the error handling process which displays the error message and sets the program Return Code to 4, then continues processing the next input record"
+                    },
+                    "key_functionality_id": "delete-transaction-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00044",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Invoke Error Handler for Failed Deletion",
+                    "rule_description": "When any error condition occurs during the deletion of a Transaction Type record (either record not found or database access failure), the system invokes the central error handling routine to log the error and flag the program as having encountered an error.",
+                    "sub_graph_node_text": "9: Handle Processing Errors - Display Error Message - Set Error Return Code = 4",
+                    "acceptance_criteria": {
+                        "Given": "An error condition has been detected during the deletion of a Transaction Type record, and an error message has been captured describing either 'No records found.' or 'Error accessing: TRANSACTION_TYPE table. SQLCODE: [error code]'",
+                        "When": "The error handling routine is invoked",
+                        "Then": "The system displays the captured error message to the output log and sets the program-level Return Code to 4 to signal that an error occurred, after which processing continues with the next input record without terminating the program"
+                    },
+                    "key_functionality_id": "delete-transaction-type"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number",
+                    "title": "Attempt to Remove Transaction Type Record\nfrom TRANSACTION_TYPE Table\nMatching by Transaction Number",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    START([Start: Delete Transaction Type])\n    ATTEMPT[Attempt to Remove Transaction Type Record\\nfrom TRANSACTION_TYPE Table\\nMatching by Transaction Number]\n    TRTABLE[(CARDDEMO.TRANSACTION_TYPE\\nDB2 Table)]\n    RESULT{Was Record\\nRemoved?}\n    SUCCESS[Display: Record Deleted\\nSuccessfully]\n    NOT_FOUND[Set Error Message:\\nNo Records Found\\nfor Given Transaction Number]\n    DB_ERROR[Set Error Message:\\nError Accessing\\nTRANSACTION_TYPE Table]\n    ERROR_HANDLER[Handle Processing Error:\\nDisplay Error Message\\nSet Error Return Code = 4]\n    END_SUCCESS([Return to Main Processing])\n    END_ERROR([Return to Main Processing\\nWith Error Code 4])\n\n    START --> ATTEMPT\n    ATTEMPT -.->|Delete Row by\\nTransaction Number| TRTABLE\n    ATTEMPT --> RESULT\n    RESULT -->|Record Successfully Removed| SUCCESS\n    RESULT -->|No Matching Record Found| NOT_FOUND\n    RESULT -->|Database Error Occurred| DB_ERROR\n    SUCCESS --> END_SUCCESS\n    NOT_FOUND --> ERROR_HANDLER\n    DB_ERROR --> ERROR_HANDLER\n    ERROR_HANDLER --> END_ERROR",
+                    "rules": [
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00066",
+                            "rule_type": "Process Rules",
+                            "rule_name": "Delete Transaction Type Record from Database",
+                            "rule_description": "When a delete operation is requested, the system attempts to remove the matching Transaction Type record from the TRANSACTION_TYPE table using the Transaction Number as the unique identifier.",
+                            "sub_graph_node_text": "Attempt to Remove Transaction Type Record from TRANSACTION_TYPE Table Matching by Transaction Number",
+                            "acceptance_criteria": {
+                                "Given": "A valid input record with Record Type 'D' has been read, containing a Transaction Number (TR_TYPE) that identifies the Transaction Type record to be removed from the CARDDEMO.TRANSACTION_TYPE table",
+                                "When": "The system attempts to remove the Transaction Type record from the CARDDEMO.TRANSACTION_TYPE table where the Transaction Type Code matches the Transaction Number provided in the input record",
+                                "Then": "The matching Transaction Type record is removed from the CARDDEMO.TRANSACTION_TYPE table using the Transaction Number as the lookup key"
+                            },
+                            "key_functionality_id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00067",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Confirm Successful Deletion of Transaction Type",
+                            "rule_description": "When a Transaction Type record is successfully removed from the database, the system confirms the successful deletion by displaying a success message.",
+                            "sub_graph_node_text": "Display: Record Deleted Successfully",
+                            "acceptance_criteria": {
+                                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                                "When": "The record is successfully removed from the TRANSACTION_TYPE table with no errors",
+                                "Then": "The system displays the message 'RECORD DELETED SUCCESSFULLY' and returns control to main processing without any error condition"
+                            },
+                            "key_functionality_id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00068",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Handle Transaction Type Not Found During Deletion",
+                            "rule_description": "When a delete operation is attempted but no matching Transaction Type record exists in the database for the given Transaction Number, the system treats this as an error condition and sets an appropriate error message.",
+                            "sub_graph_node_text": "Set Error Message: No Records Found for Given Transaction Number",
+                            "acceptance_criteria": {
+                                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                                "When": "No matching record is found in the TRANSACTION_TYPE table for the provided Transaction Number",
+                                "Then": "The system sets the error message to 'No records found.' and proceeds to the error handler to display the error message and set the Error Return Code to 4"
+                            },
+                            "key_functionality_id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00069",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Handle Database Error During Transaction Type Deletion",
+                            "rule_description": "When a delete operation fails due to a database error, the system captures the error details including the TRANSACTION_TYPE table name and the database error code, and sets an appropriate error message for reporting.",
+                            "sub_graph_node_text": "Set Error Message: Error Accessing TRANSACTION_TYPE Table",
+                            "acceptance_criteria": {
+                                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                                "When": "The delete operation fails due to a database error (any error condition other than record not found)",
+                                "Then": "The system sets the error message to 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the database error code value, and proceeds to the error handler to display the error message and set the Error Return Code to 4"
+                            },
+                            "key_functionality_id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number"
+                        },
+                        {
+                            "rule_id": "R-COBTUPDT-cbl-00070",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Process Deletion Error and Set Error Return Code",
+                            "rule_description": "When any error occurs during the deletion of a Transaction Type record \u2014 whether the record was not found or a database error occurred \u2014 the system logs the error and sets a standard error return code of 4, then continues processing remaining records without terminating the program.",
+                            "sub_graph_node_text": "Handle Processing Error: Display Error Message Set Error Return Code = 4",
+                            "acceptance_criteria": {
+                                "Given": "An error condition has been identified during the deletion of a Transaction Type record, and an error message has been set describing either 'No records found.' or 'Error accessing: TRANSACTION_TYPE table. SQLCODE: [error code]'",
+                                "When": "The error handler is invoked after a failed delete operation",
+                                "Then": "The system displays the error message stored in the error message field, sets the program Error Return Code to 4 to signal that an error occurred, and returns control to main processing so that the remaining input records continue to be processed"
+                            },
+                            "key_functionality_id": "attempt-to-remove-transaction-type-record\nfrom-transaction-type-table\nmatching-by-transaction-number"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "Delete Transaction Type"
+        },
+        {
+            "id": "skip-commented-lines",
+            "title": "Skip Commented Lines",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Process Input Record])\n    B{Is Record Type\\nIndicator = '*'?}\n    C[Identify Record as\\nCommented Line]\n    D[Bypass Record -\\nNo Database Action Taken]\n    E([Return to Read\\nNext Input Record])\n    F[Process Other\\nRecord Types]\n\n    A --> B\n    B -->|Yes - Asterisk Found| C\n    B -->|No| F\n    C --> D\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00045",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify and Skip Commented Input Records",
+                    "rule_description": "When processing input records from the Transaction Type maintenance file, any record marked with an asterisk (*) in the Record Type field must be recognized as a comment line and excluded from all database processing.",
+                    "sub_graph_node_text": "Is Record Type Indicator = '*'?",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance file and is ready for processing",
+                        "When": "The Record Type Indicator field of the input record contains an asterisk character ('*')",
+                        "Then": "The record is identified as a commented line, no database action (Insert, Update, or Delete) is performed against the TRANSACTION_TYPE table, and the program returns to read the next input record without logging any error or success message"
+                    },
+                    "key_functionality_id": "skip-commented-lines"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00046",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Bypass Database Action for Commented Records",
+                    "rule_description": "Commented records marked with an asterisk (*) must be completely bypassed in the Transaction Type maintenance process, ensuring no unintended modifications are made to the TRANSACTION_TYPE table for such records.",
+                    "sub_graph_node_text": "Bypass Record - No Database Action Taken",
+                    "acceptance_criteria": {
+                        "Given": "An input record from the Transaction Type maintenance file has been identified as a commented line because its Record Type Indicator is '*'",
+                        "When": "The program evaluates the Record Type Indicator and finds it equals '*'",
+                        "Then": "The program displays the message 'IGNORING COMMENTED LINE', performs no Insert, Update, or Delete operation on the CARDDEMO.TRANSACTION_TYPE table, does not set any error condition or Return Code, and immediately proceeds to read the next input record from the file"
+                    },
+                    "key_functionality_id": "skip-commented-lines"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Skip Commented Lines"
+        },
+        {
+            "id": "validate-record-type",
+            "title": "Validate Record Type",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Receive Record Type\\nfor Validation])\n    B{Is Record Type\\nA, U, D, or '*'?}\n    C[Record Type is Valid\\nProceed with Action]\n    D[Flag Record as Invalid:\\nBuild Error Message\\n'ERROR: TYPE NOT VALID']\n    E[Display Error Message\\nto Operator]\n    F[Set Error Return Code = 4\\nFlag Program as Errored]\n    G([Return to Process\\nNext Record])\n\n    A --> B\n    B -->|Yes - Valid Type| C\n    B -->|No - Unrecognized Type| D\n    D --> E\n    E --> F\n    F --> G\n    C --> G",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00047",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Validate Transaction Record Type Against Allowed Values",
+                    "rule_description": "Each input record must carry a Record Type indicator that belongs to the set of recognized operation codes: A (Add), U (Update), D (Delete), or * (Comment/Skip). Any value outside this set is considered invalid and must be flagged as an error before any database action is attempted.",
+                    "sub_graph_node_text": "Is Record Type A, U, D, or '*'?",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance file and its Record Type field (INPUT-REC-TYPE) is available for evaluation",
+                        "When": "The Record Type value is assessed against the list of permitted values: 'A' (Add), 'U' (Update), 'D' (Delete), and '*' (Comment/Skip)",
+                        "Then": "If the Record Type matches one of the four permitted values ('A', 'U', 'D', or '*'), the record is considered valid and the corresponding business action is initiated; if the Record Type does not match any of the four permitted values, the record is flagged as invalid and error processing is triggered"
+                    },
+                    "key_functionality_id": "validate-record-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00048",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Build Error Message for Unrecognized Record Type",
+                    "rule_description": "When an input record contains a Record Type that is not one of the four recognized values (A, U, D, *), the program must construct a specific error message to communicate the nature of the failure before logging and flagging the error.",
+                    "sub_graph_node_text": "Flag Record as Invalid: Build Error Message 'ERROR: TYPE NOT VALID'",
+                    "acceptance_criteria": {
+                        "Given": "An input record has been read from the Transaction Type maintenance file and its Record Type field (INPUT-REC-TYPE) has been evaluated and found to not match any of the valid values: 'A', 'U', 'D', or '*'",
+                        "When": "The Record Type is determined to be unrecognized (WHEN OTHER condition is met in the record type evaluation)",
+                        "Then": "The error message 'ERROR: TYPE NOT VALID' is constructed and stored in the program's return message field (WS-RETURN-MSG), ready to be displayed to the operator and used for error reporting"
+                    },
+                    "key_functionality_id": "validate-record-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00049",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Invalid Record Type Error Message to Operator",
+                    "rule_description": "Once an invalid Record Type error message has been built, it must be immediately displayed to the operator so that the data quality issue is visible and can be investigated or corrected.",
+                    "sub_graph_node_text": "Display Error Message to Operator",
+                    "acceptance_criteria": {
+                        "Given": "An input record with an unrecognized Record Type has been detected and the error message 'ERROR: TYPE NOT VALID' has been stored in the return message field (WS-RETURN-MSG)",
+                        "When": "The error handling routine (9999-ABEND) is invoked following the detection of the invalid Record Type",
+                        "Then": "The contents of the return message field (WS-RETURN-MSG), containing 'ERROR: TYPE NOT VALID', are displayed to the operator as a visible notification of the invalid record condition"
+                    },
+                    "key_functionality_id": "validate-record-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00050",
+                    "rule_type": "Policy Rules",
+                    "rule_name": "Set Program Error Return Code Upon Invalid Record Type Detection",
+                    "rule_description": "When an invalid Record Type is encountered, the program must set its completion status to indicate that one or more errors occurred during processing. A Return Code of 4 signals a warning-level error to downstream processes or job schedulers, while allowing the program to continue processing remaining records.",
+                    "sub_graph_node_text": "Set Error Return Code = 4\nFlag Program as Errored",
+                    "acceptance_criteria": {
+                        "Given": "An input record with an unrecognized Record Type has been detected, the error message 'ERROR: TYPE NOT VALID' has been built and displayed, and the error handling routine (9999-ABEND) is executing",
+                        "When": "The error handling routine completes its display of the error message",
+                        "Then": "The program's Return Code is set to 4 to flag that an error condition was encountered during the run; the program does NOT terminate but instead returns control so that processing of subsequent records in the input file can continue"
+                    },
+                    "key_functionality_id": "validate-record-type"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00051",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue Processing Remaining Records After Invalid Record Type Error",
+                    "rule_description": "Detection of an invalid Record Type on one input record must not halt the entire batch run. The program must continue reading and processing all remaining records in the input file, ensuring maximum throughput even when individual records contain errors.",
+                    "sub_graph_node_text": "Return to Process Next Record",
+                    "acceptance_criteria": {
+                        "Given": "An input record with an unrecognized Record Type has been processed, the error message has been displayed, and the Return Code has been set to 4",
+                        "When": "The error handling routine (9999-ABEND) exits and control is returned to the main record processing loop (1001-READ-NEXT-RECORDS)",
+                        "Then": "The program does not stop or terminate; it proceeds to read the next record from the Transaction Type maintenance input file and continues the processing loop until all records in the file have been evaluated"
+                    },
+                    "key_functionality_id": "validate-record-type"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Validate Record Type"
+        },
+        {
+            "id": "handle-processing-errors",
+            "title": "Handle Processing Errors",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    TRIGGER([Error Condition Detected])\n\n    INVALID[Invalid Record Type Encountered]\n    INS_FAIL[Insert Operation Failed]\n    UPD_NOTFOUND[Update - No Matching Record Found]\n    UPD_FAIL[Update Operation Failed]\n    DEL_NOTFOUND[Delete - No Matching Record Found]\n    DEL_FAIL[Delete Operation Failed]\n\n    MSG_INVALID[Prepare Message:\\n'ERROR: TYPE NOT VALID']\n    MSG_INS[Prepare Message:\\n'Error accessing TRANSACTION_TYPE table'\\nwith Error Code]\n    MSG_UPD_NF[Prepare Message:\\n'No records found']\n    MSG_UPD_FAIL[Prepare Message:\\n'Error accessing TRANSACTION_TYPE table'\\nwith Error Code]\n    MSG_DEL_NF[Prepare Message:\\n'No records found']\n    MSG_DEL_FAIL[Prepare Message:\\n'Error accessing TRANSACTION_TYPE table'\\nwith Error Code]\n\n    DISPLAY[Display Error Message to Output]\n    SETRC[Set Program Return Code = 4]\n    CONTINUE[Continue Processing\\nNext Record]\n\n    TRIGGER --> INVALID\n    TRIGGER --> INS_FAIL\n    TRIGGER --> UPD_NOTFOUND\n    TRIGGER --> UPD_FAIL\n    TRIGGER --> DEL_NOTFOUND\n    TRIGGER --> DEL_FAIL\n\n    INVALID --> MSG_INVALID\n    INS_FAIL --> MSG_INS\n    UPD_NOTFOUND --> MSG_UPD_NF\n    UPD_FAIL --> MSG_UPD_FAIL\n    DEL_NOTFOUND --> MSG_DEL_NF\n    DEL_FAIL --> MSG_DEL_FAIL\n\n    MSG_INVALID --> DISPLAY\n    MSG_INS --> DISPLAY\n    MSG_UPD_NF --> DISPLAY\n    MSG_UPD_FAIL --> DISPLAY\n    MSG_DEL_NF --> DISPLAY\n    MSG_DEL_FAIL --> DISPLAY\n\n    DISPLAY --> SETRC\n    SETRC --> CONTINUE",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00052",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message for Invalid Transaction Record Type",
+                    "rule_description": "When an input record contains a Record Type that is not one of the recognized values (A, U, D, or *), the program must prepare a specific error message indicating the record type is not valid.",
+                    "sub_graph_node_text": "Invalid Record Type Encountered",
+                    "acceptance_criteria": {
+                        "Given": "An input record is being processed and its Record Type field does not match any of the valid values: 'A' (Add), 'U' (Update), 'D' (Delete), or '*' (Comment/Skip)",
+                        "When": "The program evaluates the Record Type and finds it does not match any recognized operation code",
+                        "Then": "The program prepares the error message 'ERROR: TYPE NOT VALID' and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00053",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message for Failed Transaction Type Insert Operation",
+                    "rule_description": "When an attempt to add a new Transaction Type record to the database fails due to a database error, the program must prepare a descriptive error message that identifies the affected table and the specific error code returned.",
+                    "sub_graph_node_text": "Insert Operation Failed",
+                    "acceptance_criteria": {
+                        "Given": "An input record with Record Type 'A' (Add) has been submitted to insert a new Transaction Type into the TRANSACTION_TYPE table",
+                        "When": "The database insert operation returns a negative error code indicating a failure",
+                        "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00054",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message When Transaction Type to Update is Not Found",
+                    "rule_description": "When an attempt to update a Transaction Type record fails because no matching Transaction Type Code exists in the database, the program must prepare an error message indicating that no records were found.",
+                    "sub_graph_node_text": "Update - No Matching Record Found",
+                    "acceptance_criteria": {
+                        "Given": "An input record with Record Type 'U' (Update) has been submitted to update the description of an existing Transaction Type identified by its Transaction Type Code",
+                        "When": "The database update operation returns a 'no data found' condition, meaning no row in the TRANSACTION_TYPE table matches the provided Transaction Type Code",
+                        "Then": "The program prepares the error message 'No records found.' and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00055",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message for Failed Transaction Type Update Operation",
+                    "rule_description": "When an attempt to update a Transaction Type record fails due to a database error (other than record not found), the program must prepare a descriptive error message that identifies the affected table and the specific error code returned.",
+                    "sub_graph_node_text": "Update Operation Failed",
+                    "acceptance_criteria": {
+                        "Given": "An input record with Record Type 'U' (Update) has been submitted to update the description of an existing Transaction Type in the TRANSACTION_TYPE table",
+                        "When": "The database update operation returns a negative error code indicating a failure",
+                        "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00056",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message When Transaction Type to Delete is Not Found",
+                    "rule_description": "When an attempt to delete a Transaction Type record fails because no matching Transaction Type Code exists in the database, the program must prepare an error message indicating that no records were found.",
+                    "sub_graph_node_text": "Delete - No Matching Record Found",
+                    "acceptance_criteria": {
+                        "Given": "An input record with Record Type 'D' (Delete) has been submitted to remove an existing Transaction Type identified by its Transaction Type Code",
+                        "When": "The database delete operation returns a 'no data found' condition, meaning no row in the TRANSACTION_TYPE table matches the provided Transaction Type Code",
+                        "Then": "The program prepares the error message 'No records found.' and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00057",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Prepare Error Message for Failed Transaction Type Delete Operation",
+                    "rule_description": "When an attempt to delete a Transaction Type record fails due to a database error (other than record not found), the program must prepare a descriptive error message that identifies the affected table and the specific error code returned.",
+                    "sub_graph_node_text": "Delete Operation Failed",
+                    "acceptance_criteria": {
+                        "Given": "An input record with Record Type 'D' (Delete) has been submitted to remove an existing Transaction Type from the TRANSACTION_TYPE table",
+                        "When": "The database delete operation returns a negative error code indicating a failure",
+                        "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00058",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Error Message and Set Program Error Return Code",
+                    "rule_description": "After any error condition is detected and an error message is prepared, the program must display the error message to the output and set the program return code to 4 to signal that one or more errors occurred during the batch run.",
+                    "sub_graph_node_text": "Display Error Message to Output",
+                    "acceptance_criteria": {
+                        "Given": "An error condition has been detected during processing of an input record (invalid record type, failed insert, failed update, update record not found, failed delete, or delete record not found) and an error message has been prepared",
+                        "When": "The error handling routine is invoked",
+                        "Then": "The program displays the prepared error message to the output console AND sets the Program Return Code to 4 to indicate that the batch job completed with errors"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                },
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00059",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue Processing Remaining Records After an Error",
+                    "rule_description": "Errors encountered during the processing of an individual input record must not stop the batch job. After logging the error and setting the return code, the program must continue processing the next record in the input file, ensuring all records are attempted.",
+                    "sub_graph_node_text": "Continue Processing Next Record",
+                    "acceptance_criteria": {
+                        "Given": "An error has been detected and handled for a specific input record \u2014 the error message has been displayed and the Program Return Code has been set to 4",
+                        "When": "The error handling routine completes",
+                        "Then": "The program does not terminate and instead resumes processing by moving on to the next record in the input file, ensuring all remaining records are processed regardless of prior errors"
+                    },
+                    "key_functionality_id": "handle-processing-errors"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Handle Processing Errors"
+        },
+        {
+            "id": "close-input-file-and-stop",
+            "title": "Close Input File and Stop",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([All Records Processed\\nEnd of File Reached])\n    B[Close Input File\\nTR-RECORD]\n    C([Program Ends])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-COBTUPDT-cbl-00060",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Input File Upon Completion of All Record Processing",
+                    "rule_description": "Once all records in the input file have been processed and the end of file is reached, the input transaction file must be properly closed before the program terminates.",
+                    "sub_graph_node_text": "Close Input File\nTR-RECORD",
+                    "acceptance_criteria": {
+                        "Given": "All records in the input transaction file (TR-RECORD) have been read and processed, and the end of file condition has been reached (LASTREC = 'Y')",
+                        "When": "The program completes its record processing loop and invokes the close and stop routine",
+                        "Then": "The input transaction file (TR-RECORD) is closed and the program ends"
+                    },
+                    "key_functionality_id": "close-input-file-and-stop"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Close Input File and Stop"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The batch program is initiated to process transaction type maintenance records from the sequential input file TR-RECORD",
+                "When": "The program attempts to open the input file TR-RECORD",
+                "Then": "If the file opens successfully, the program displays 'OPEN FILE OK' and proceeds to read records; if the file does not open successfully, the program displays 'OPEN FILE NOT OK'"
+            },
+            "Rule_Name": "Open Transaction Type Input File",
+            "Rule_Description": "The program must successfully open the sequential input file containing transaction type maintenance records before any processing can begin."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The input file TR-RECORD has been successfully opened",
+                "When": "The program performs the first read of the input file TR-RECORD into the working storage input record WS-INPUT-REC",
+                "Then": "If a record is successfully read, the record content is displayed with label 'PROCESSING' and the program proceeds to evaluate the record type; if no record exists (end of file), the end-of-file indicator LASTREC is set to 'Y' and the program skips directly to closing the file"
+            },
+            "Rule_Name": "Read First Input Record Before Processing Loop",
+            "Rule_Description": "Before entering the main processing loop, the program performs an initial priming read to retrieve the first record from the input file, establishing whether there are any records to process."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00003",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is in the main processing loop reading records from the input file TR-RECORD",
+                "When": "A read operation on the input file reaches the end of the file",
+                "Then": "The end-of-file indicator LASTREC is set to 'Y', the processing loop terminates, and the program proceeds to close the input file and stop"
+            },
+            "Rule_Name": "Detect End of Input File",
+            "Rule_Description": "The program must detect when all records in the input file have been processed and transition to the file closing step."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00004",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A record has been successfully read from the input file TR-RECORD into WS-INPUT-REC",
+                "When": "The program evaluates the INPUT-REC-TYPE field of the current record",
+                "Then": "If INPUT-REC-TYPE is 'A', the program routes to the Add (Insert) process; if 'U', routes to the Update process; if 'D', routes to the Delete process; if '*', routes to the Skip (comment line) process; if any other value, routes to the invalid record type error handler"
+            },
+            "Rule_Name": "Determine Record Action Type",
+            "Rule_Description": "Each input record contains a Record Type indicator that determines which database maintenance operation \u2014 Add, Update, Delete, Skip, or Error \u2014 should be performed on the TRANSACTION_TYPE table."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00005",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has INPUT-REC-TYPE equal to 'A', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) and INPUT-REC-DESC containing the Transaction Description (TR_DESCRIPTION)",
+                "When": "The program executes an INSERT operation into the CARDDEMO.TRANSACTION_TYPE table with values TR_TYPE = INPUT-REC-NUMBER and TR_DESCRIPTION = INPUT-REC-DESC",
+                "Then": "If the insert is successful, the program displays 'RECORD INSERTED SUCCESSFULLY' and proceeds to read the next input record; if the insert fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, the error is logged, Return Code is set to 4, and the program continues to the next record"
+            },
+            "Rule_Name": "Insert New Transaction Type Record",
+            "Rule_Description": "When a record is marked for addition, a new Transaction Type entry is inserted into the CARDDEMO.TRANSACTION_TYPE database table using the transaction type code and description from the input record."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00006",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has INPUT-REC-TYPE equal to 'U', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) to identify the record and INPUT-REC-DESC containing the new Transaction Description (TR_DESCRIPTION)",
+                "When": "The program executes an UPDATE operation on the CARDDEMO.TRANSACTION_TYPE table setting TR_DESCRIPTION = INPUT-REC-DESC where TR_TYPE = INPUT-REC-NUMBER",
+                "Then": "If the update is successful, the program displays 'RECORD UPDATED SUCCESSFULLY' and proceeds to read the next input record; if no matching record is found, an error message 'No records found.' is generated, Return Code is set to 4, and the program continues to the next record; if the update fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, Return Code is set to 4, and the program continues to the next record"
+            },
+            "Rule_Name": "Update Existing Transaction Type Description",
+            "Rule_Description": "When a record is marked for update, the description of an existing Transaction Type in the CARDDEMO.TRANSACTION_TYPE table is updated using the transaction type code as the key identifier."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00007",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has INPUT-REC-TYPE equal to 'D', with INPUT-REC-NUMBER containing the Transaction Type Code (TR_TYPE) that identifies the record to be deleted",
+                "When": "The program executes a DELETE operation on the CARDDEMO.TRANSACTION_TYPE table where TR_TYPE = INPUT-REC-NUMBER",
+                "Then": "If the deletion is successful, the program displays 'RECORD DELETED SUCCESSFULLY' and proceeds to read the next input record; if no matching record is found, an error message 'No records found.' is generated, Return Code is set to 4, and the program continues to the next record; if the deletion fails due to a database error, an error message is constructed containing 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the SQL error code, Return Code is set to 4, and the program continues to the next record"
+            },
+            "Rule_Name": "Delete Existing Transaction Type Record",
+            "Rule_Description": "When a record is marked for deletion, the matching Transaction Type entry is removed from the CARDDEMO.TRANSACTION_TYPE table using the transaction type code as the key identifier."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00008",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has INPUT-REC-TYPE equal to '*'",
+                "When": "The program evaluates the record type and identifies it as a comment line",
+                "Then": "The program displays 'IGNORING COMMENTED LINE', performs no database operation, and proceeds directly to read the next input record"
+            },
+            "Rule_Name": "Skip Commented Input Records",
+            "Rule_Description": "Input records prefixed with an asterisk (*) are treated as comment lines and are intentionally ignored \u2014 no database operation is performed for these records."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00009",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has an INPUT-REC-TYPE value that is not 'A', 'U', 'D', or '*'",
+                "When": "The program evaluates the INPUT-REC-TYPE field and finds no matching valid action code",
+                "Then": "The program constructs an error message 'ERROR: TYPE NOT VALID', routes to the error handler which displays the error message and sets Return Code to 4, and then continues processing the next input record"
+            },
+            "Rule_Name": "Validate Record Type \u2014 Reject Invalid Action Codes",
+            "Rule_Description": "Any input record whose Record Type indicator is not one of the recognized values (A, U, D, or *) is considered invalid and must be flagged as an error."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00010",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "A processing error has occurred due to one of the following conditions: (1) an invalid record type was encountered, (2) a database insert operation failed, (3) a database update operation failed or found no matching record, or (4) a database delete operation failed or found no matching record",
+                "When": "The error handler routine is invoked with a pre-constructed error message stored in WS-RETURN-MSG",
+                "Then": "The program displays the error message contained in WS-RETURN-MSG, sets the program Return Code to 4 to signal that errors occurred during the run, and returns control to continue reading and processing the next input record \u2014 the program does NOT terminate"
+            },
+            "Rule_Name": "Handle Processing Errors \u2014 Log and Continue",
+            "Rule_Description": "When any processing error occurs \u2014 including invalid record types, database insert/update/delete failures, or records not found \u2014 the program logs the error and sets a warning return code, but continues processing remaining records without terminating."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00011",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has been fully processed \u2014 either a database operation was completed successfully, an error was handled, or a comment line was skipped",
+                "When": "The program performs a sequential read of the next record from the input file TR-RECORD into WS-INPUT-REC",
+                "Then": "If a next record exists, its content is displayed with label 'PROCESSING' and the program loops back to evaluate the record type; if no more records exist (end of file), the end-of-file indicator LASTREC is set to 'Y' and the processing loop terminates"
+            },
+            "Rule_Name": "Read Next Input Record in Processing Loop",
+            "Rule_Description": "After each record is processed (whether successfully or with an error), the program reads the next sequential record from the input file to continue the processing loop."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00012",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The end-of-file condition has been reached on the input file TR-RECORD, meaning all input records have been processed",
+                "When": "The program executes the close and stop routine",
+                "Then": "The input file TR-RECORD is closed and the program terminates"
+            },
+            "Rule_Name": "Close Input File and End Program",
+            "Rule_Description": "Once all records in the input file have been processed, the program closes the input file and terminates execution."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00013",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The batch process for Transaction Type table maintenance is initiated",
+                "When": "The program attempts to open the sequential input file TR-RECORD containing transaction type records",
+                "Then": "The input file TR-RECORD is opened in READ-ONLY (INPUT) mode and made available for sequential record reading"
+            },
+            "Rule_Name": "Open Transaction Type Input File for Processing",
+            "Rule_Description": "The program must open the sequential input file (TR-RECORD) that contains transaction type maintenance records before any record processing can begin. This is the mandatory first step in the batch process."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00014",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to open the sequential input file TR-RECORD",
+                "When": "The file open status is evaluated and the status code equals '00'",
+                "Then": "The file is confirmed as successfully opened and the program displays the message 'OPEN FILE OK' to confirm readiness for processing"
+            },
+            "Rule_Name": "Confirm Successful Opening of Transaction Type Input File",
+            "Rule_Description": "After attempting to open the input file, the program evaluates the file status to determine whether the file was opened successfully. A file status of '00' indicates a successful open."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00015",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to open the sequential input file TR-RECORD",
+                "When": "The file open status is evaluated and the status code is NOT equal to '00'",
+                "Then": "The program displays the message 'OPEN FILE NOT OK' to signal the failure, and then continues processing without terminating"
+            },
+            "Rule_Name": "Handle Failure to Open Transaction Type Input File",
+            "Rule_Description": "If the input file cannot be opened (file status is not '00'), the program logs a failure notification. Critically, the program does not terminate \u2014 it continues to the next step regardless of the file open failure."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00016",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to open the sequential input file TR-RECORD and has displayed either a success or failure message",
+                "When": "The file open evaluation block (IF/ELSE/END-IF) completes execution",
+                "Then": "The program unconditionally proceeds to the next step of reading and processing input records, regardless of whether the file was opened successfully or not"
+            },
+            "Rule_Name": "Proceed to Record Processing Regardless of File Open Outcome",
+            "Rule_Description": "After the file open attempt \u2014 whether successful or not \u2014 the program unconditionally proceeds to the record reading phase. There is no business rule that halts the process based on the file open result alone."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00017",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The input file TR-RECORD has been successfully opened and is ready for reading",
+                "When": "The batch process begins its record processing cycle",
+                "Then": "The first record from the input file is read into the working storage input record area (WS-INPUT-REC), making it available for end-of-file evaluation and subsequent processing"
+            },
+            "Rule_Name": "Priming Read of First Input Record",
+            "Rule_Description": "Before entering the main processing loop, the program must read the very first record from the input file to initialize the processing cycle. This ensures the loop has a record ready to evaluate before checking for end-of-file."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00018",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the input file TR-RECORD",
+                "When": "The read operation encounters the end of the file (no more records available)",
+                "Then": "An end-of-file flag (LASTREC) is set to 'Y', signaling that all records have been read and the processing loop should terminate"
+            },
+            "Rule_Name": "End-of-File Detection During Sequential Read",
+            "Rule_Description": "After each read attempt from the input file, the program must determine whether the end of the file has been reached. This check controls whether the processing loop continues or terminates."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00019",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been attempted on the input file TR-RECORD",
+                "When": "The read operation reaches the physical end of the input file with no further records available",
+                "Then": "The end-of-file indicator (LASTREC) is set to the value 'Y', which will cause the processing loop to exit on its next evaluation"
+            },
+            "Rule_Name": "Mark End-of-File Flag to Stop Processing Loop",
+            "Rule_Description": "When the input file has no more records to provide, the end-of-file condition must be formally recorded by setting a flag. This flag is the mechanism that stops the sequential processing loop from continuing."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00020",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the input file and the end-of-file flag (LASTREC) is NOT equal to 'Y'",
+                "When": "A valid input record has been successfully read into the working storage input record area (WS-INPUT-REC)",
+                "Then": "The message 'PROCESSING' followed by the full content of the input record (WS-INPUT-REC) is displayed, confirming the record is about to be processed"
+            },
+            "Rule_Name": "Display Record Being Processed for Audit Visibility",
+            "Rule_Description": "Each time a valid (non-end-of-file) record is successfully read from the input file, its full content must be displayed to provide a processing audit trail. This only occurs when an actual data record has been retrieved."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00021",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid input record has been read from the input file and the end-of-file flag (LASTREC) is NOT 'Y'",
+                "When": "The current input record is ready for processing",
+                "Then": "The record treatment routine (1003-TREAT-RECORD) is invoked to evaluate the record type indicator (INPUT-REC-TYPE) and execute the corresponding database operation (Insert, Update, Delete, Skip, or Error handling)"
+            },
+            "Rule_Name": "Invoke Record Action Processing Based on Record Type",
+            "Rule_Description": "After a valid record is read and displayed, the program must invoke the record treatment routine to determine and execute the appropriate database action (Add, Update, Delete, Skip, or Error) based on the record type indicator in the input record."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00022",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The current input record has been fully processed by the record treatment routine",
+                "When": "The processing loop requires the next record to continue sequential file processing",
+                "Then": "The next sequential record is read from the input file TR-RECORD into the working storage input record area (WS-INPUT-REC); if no more records exist, the end-of-file flag (LASTREC) is set to 'Y'"
+            },
+            "Rule_Name": "Sequential Read of Next Input Record Within Processing Loop",
+            "Rule_Description": "After each record has been processed, the program must immediately read the next record from the input file to continue the sequential processing cycle. This read feeds the end-of-file check for the next loop iteration."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00023",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The end-of-file flag (LASTREC) has been set to 'Y' indicating no more records remain in the input file",
+                "When": "The processing loop evaluates the end-of-file condition and finds LASTREC = 'Y'",
+                "Then": "The processing loop terminates and the file closure routine (2001-CLOSE-STOP) is invoked to close the input file TR-RECORD, completing the batch run"
+            },
+            "Rule_Name": "Terminate Processing Loop When All Records Are Read",
+            "Rule_Description": "Once the end-of-file flag has been set, the processing loop must exit and the program must proceed to close the input file. No further record reads or processing actions are attempted after all records have been consumed."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00024",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'A'",
+                "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                "Then": "The system routes processing to the Add New Transaction Type procedure to insert the transaction type record into the TRANSACTION_TYPE table"
+            },
+            "Rule_Name": "Route Add Record Action to Insert Transaction Type",
+            "Rule_Description": "When a record from the input file has a Record Type Indicator of 'A', the system must route processing to the Add New Transaction Type operation to insert a new record into the Transaction Type table."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00025",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'U'",
+                "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                "Then": "The system routes processing to the Update Existing Transaction Type procedure to update the transaction type description in the TRANSACTION_TYPE table"
+            },
+            "Rule_Name": "Route Update Record Action to Update Transaction Type",
+            "Rule_Description": "When a record from the input file has a Record Type Indicator of 'U', the system must route processing to the Update Existing Transaction Type operation to modify an existing record in the Transaction Type table."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00026",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value 'D'",
+                "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                "Then": "The system routes processing to the Delete Existing Transaction Type procedure to remove the transaction type record from the TRANSACTION_TYPE table"
+            },
+            "Rule_Name": "Route Delete Record Action to Delete Transaction Type",
+            "Rule_Description": "When a record from the input file has a Record Type Indicator of 'D', the system must route processing to the Delete Existing Transaction Type operation to remove a record from the Transaction Type table."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00027",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains the value '*'",
+                "When": "The system evaluates the Record Type Indicator to determine the appropriate database operation",
+                "Then": "The system displays 'IGNORING COMMENTED LINE', performs no database operation, and proceeds to read the next input record"
+            },
+            "Rule_Name": "Skip Commented Input Records",
+            "Rule_Description": "When a record from the input file has a Record Type Indicator of '*', the record is treated as a comment line and must be ignored. No database operation is performed and processing continues with the next record."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00028",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance input file and the Record Type Indicator field contains a value other than 'A', 'U', 'D', or '*'",
+                "When": "The system evaluates the Record Type Indicator and finds no matching valid operation type",
+                "Then": "The system constructs an error message 'ERROR: TYPE NOT VALID', routes processing to the error handling procedure, sets the program Return Code to 4 to signal an error condition, and continues processing the next input record without performing any database operation"
+            },
+            "Rule_Name": "Flag Unknown Record Type as Invalid",
+            "Rule_Description": "When a record from the input file contains a Record Type Indicator that is not one of the recognised values ('A', 'U', 'D', or '*'), the record is considered invalid. An error message must be generated and the error handling procedure must be invoked, setting a processing error condition."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00029",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been successfully read from the Transaction Type maintenance input file and is available for processing",
+                "When": "The system evaluates the Record Type Indicator field of the input record",
+                "Then": "The system must route the record to exactly one of the following outcomes based on the Record Type Indicator value: 'A' routes to Add New Transaction Type; 'U' routes to Update Existing Transaction Type; 'D' routes to Delete Existing Transaction Type; '*' routes to Skip Commented Line; any other value routes to Flag as Invalid Record Type Error"
+            },
+            "Rule_Name": "Determine Database Operation Based on Record Type Indicator",
+            "Rule_Description": "For every input record read from the Transaction Type maintenance file, the system must evaluate the Record Type Indicator to determine which database operation to perform. The valid Record Type Indicators are 'A' (Add), 'U' (Update), 'D' (Delete), and '*' (Comment/Skip). Any other value is treated as an invalid record type."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00030",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type input file",
+                "When": "The Record Type indicator on the input record is 'A' (Add)",
+                "Then": "The system initiates the Insert Transaction Type process and displays the message 'ADDING RECORD' to confirm the operation has been triggered"
+            },
+            "Rule_Name": "Trigger Insert Operation for Add Record Type",
+            "Rule_Description": "When an input record is identified with record type 'A', the system initiates the Add New Transaction Type process and signals that an insert operation is about to be performed."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00031",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The insert operation has been triggered for an input record with Record Type 'A', containing a Transaction Number (TR_TYPE) and a Transaction Description (TR_DESCRIPTION)",
+                "When": "The system attempts to add the new Transaction Type record to the CARDDEMO.TRANSACTION_TYPE table using the Transaction Number as the Transaction Type Code and the Transaction Description as the description value",
+                "Then": "A new row is created in the TRANSACTION_TYPE table with TR_TYPE populated from the input Transaction Number and TR_DESCRIPTION populated from the input Transaction Description"
+            },
+            "Rule_Name": "Add New Transaction Type Record to Database",
+            "Rule_Description": "The system inserts a new Transaction Type record into the TRANSACTION_TYPE table using the Transaction Number as the type code and the Description from the input record as the transaction description."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00032",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to insert a new Transaction Type record into the CARDDEMO.TRANSACTION_TYPE table",
+                "When": "The insert operation completes successfully with no database errors",
+                "Then": "The system displays the message 'RECORD INSERTED SUCCESSFULLY' to confirm the new Transaction Type record has been added"
+            },
+            "Rule_Name": "Confirm Successful Insertion of Transaction Type",
+            "Rule_Description": "When a new Transaction Type record is successfully added to the database, the system confirms the successful insertion with a success message."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00033",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to insert a new Transaction Type record into the CARDDEMO.TRANSACTION_TYPE table",
+                "When": "The insert operation fails with a database error (indicated by a negative database return code)",
+                "Then": "The system constructs an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the specific database error code value, and stores it as the current error message for reporting"
+            },
+            "Rule_Name": "Prepare Error Message on Failed Transaction Type Insertion",
+            "Rule_Description": "When the insertion of a new Transaction Type record fails due to a database error, the system prepares a descriptive error message identifying the affected table and the specific error details."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00034",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "The insert operation for a new Transaction Type record has failed and an error message has been prepared identifying the TRANSACTION_TYPE table and the error details",
+                "When": "The error handling process is invoked",
+                "Then": "The system displays the prepared error message and sets the program Return Code to 4 to indicate an error condition, after which processing returns to handle the next input record without terminating the program"
+            },
+            "Rule_Name": "Set Error Return Code and Display Error on Failed Insertion",
+            "Rule_Description": "When a Transaction Type insertion fails, the system logs the error message and sets the program return code to 4 to signal that an error occurred, while allowing the program to continue processing remaining records."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00035",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid input record of type 'U' has been read, containing a Transaction Number (TR_TYPE) and a New Description (TR_DESCRIPTION) sourced from the input file",
+                "When": "The system executes an update against the CARDDEMO.TRANSACTION_TYPE table, setting TR_DESCRIPTION equal to the input description for the row where TR_TYPE matches the input transaction number",
+                "Then": "The TRANSACTION_TYPE table row identified by the given Transaction Number is updated with the new description value from the input record"
+            },
+            "Rule_Name": "Execute Update of Transaction Type Description",
+            "Rule_Description": "When an update operation is triggered for a transaction type record, the system must update the description of the matching transaction type in the TRANSACTION_TYPE table using the transaction number as the lookup key and the new description from the input record."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00036",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "The update completes successfully with no errors and the record is found and modified",
+                "Then": "The system displays the message 'RECORD UPDATED SUCCESSFULLY' to confirm the transaction type description has been updated"
+            },
+            "Rule_Name": "Confirm Successful Update of Transaction Type",
+            "Rule_Description": "When the TRANSACTION_TYPE table is successfully updated, the system must confirm the successful operation by displaying a success message."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00037",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "No matching record is found in the TRANSACTION_TYPE table for the provided Transaction Number",
+                "Then": "The system sets the error message to 'No records found.' and invokes the error handler which displays the error message and sets the processing error return code to 4"
+            },
+            "Rule_Name": "Handle Transaction Number Not Found During Update",
+            "Rule_Description": "When an update is attempted for a Transaction Number that does not exist in the TRANSACTION_TYPE table, the system must treat this as an error condition, generate an appropriate error message, and invoke the error handling process."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00038",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "A database error occurs during the update operation, indicated by a negative database error code",
+                "Then": "The system constructs an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' followed by the specific database error code value, and invokes the error handler which displays the error message and sets the processing error return code to 4"
+            },
+            "Rule_Name": "Handle Database Error During Transaction Type Update",
+            "Rule_Description": "When a database error occurs while attempting to update the TRANSACTION_TYPE table, the system must capture the error details including the table name and the database error code, generate an error message, and invoke the error handling process."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00039",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error condition has been identified during the update of a transaction type record, and an error message has been set describing the nature of the failure",
+                "When": "The error handling routine is invoked following either a 'no record found' or a 'database error' outcome from the update operation",
+                "Then": "The system displays the error message describing the failure, sets the processing return code to 4 to signal that an error has occurred, and returns control so that processing of subsequent input records can continue"
+            },
+            "Rule_Name": "Invoke Error Handler for Update Failures",
+            "Rule_Description": "When any error condition is encountered during the update of a transaction type \u2014 whether the record is not found or a database error occurs \u2014 the system must invoke a centralized error handling routine that logs the error and marks the overall process as having encountered an error, while allowing subsequent records to continue processing."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00040",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid input record with Record Type 'D' has been read from the input file, containing a Transaction Number (INPUT-REC-NUMBER) that serves as the key to identify the Transaction Type record to be removed",
+                "When": "The system executes a delete operation against the CARDDEMO.TRANSACTION_TYPE table targeting the row where TR_TYPE matches the Transaction Number provided in the input record",
+                "Then": "The matching Transaction Type record is permanently removed from the CARDDEMO.TRANSACTION_TYPE table"
+            },
+            "Rule_Name": "Attempt to Remove Transaction Type Record from Database",
+            "Rule_Description": "When a Delete operation is requested, the system attempts to permanently remove the matching Transaction Type record from the TRANSACTION_TYPE table using the Transaction Number as the unique identifier."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00041",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "The database confirms the record was successfully removed (no errors and record was found and deleted)",
+                "Then": "The system displays the message 'RECORD DELETED SUCCESSFULLY' and continues processing the next input record without setting any error condition"
+            },
+            "Rule_Name": "Confirm Successful Deletion of Transaction Type Record",
+            "Rule_Description": "When a Transaction Type record is successfully deleted from the database, the system confirms the successful deletion and continues processing the remaining input records."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00042",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "The database reports that no matching record was found for the provided Transaction Number (record not found condition)",
+                "Then": "The system captures the error message 'No records found.' into the error message field and invokes the error handling process, which displays the error message and sets the program Return Code to 4, then continues processing the next input record"
+            },
+            "Rule_Name": "Handle Transaction Number Not Found During Deletion",
+            "Rule_Description": "When a delete operation is attempted but no matching Transaction Type record exists in the database for the given Transaction Number, the system treats this as an error condition and captures an appropriate error message."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Number",
+                "When": "The database returns an error condition (a negative error code) indicating the TRANSACTION_TYPE table could not be accessed successfully",
+                "Then": "The system captures an error message composed of the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, then invokes the error handling process which displays the error message and sets the program Return Code to 4, then continues processing the next input record"
+            },
+            "Rule_Name": "Handle Database Access Error During Deletion",
+            "Rule_Description": "When a delete operation fails due to a database access error, the system captures a descriptive error message including the database error code and invokes the error handling process."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00044",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error condition has been detected during the deletion of a Transaction Type record, and an error message has been captured describing either 'No records found.' or 'Error accessing: TRANSACTION_TYPE table. SQLCODE: [error code]'",
+                "When": "The error handling routine is invoked",
+                "Then": "The system displays the captured error message to the output log and sets the program-level Return Code to 4 to signal that an error occurred, after which processing continues with the next input record without terminating the program"
+            },
+            "Rule_Name": "Invoke Error Handler for Failed Deletion",
+            "Rule_Description": "When any error condition occurs during the deletion of a Transaction Type record (either record not found or database access failure), the system invokes the central error handling routine to log the error and flag the program as having encountered an error."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00045",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance file and is ready for processing",
+                "When": "The Record Type Indicator field of the input record contains an asterisk character ('*')",
+                "Then": "The record is identified as a commented line, no database action (Insert, Update, or Delete) is performed against the TRANSACTION_TYPE table, and the program returns to read the next input record without logging any error or success message"
+            },
+            "Rule_Name": "Identify and Skip Commented Input Records",
+            "Rule_Description": "When processing input records from the Transaction Type maintenance file, any record marked with an asterisk (*) in the Record Type field must be recognized as a comment line and excluded from all database processing."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00046",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record from the Transaction Type maintenance file has been identified as a commented line because its Record Type Indicator is '*'",
+                "When": "The program evaluates the Record Type Indicator and finds it equals '*'",
+                "Then": "The program displays the message 'IGNORING COMMENTED LINE', performs no Insert, Update, or Delete operation on the CARDDEMO.TRANSACTION_TYPE table, does not set any error condition or Return Code, and immediately proceeds to read the next input record from the file"
+            },
+            "Rule_Name": "Bypass Database Action for Commented Records",
+            "Rule_Description": "Commented records marked with an asterisk (*) must be completely bypassed in the Transaction Type maintenance process, ensuring no unintended modifications are made to the TRANSACTION_TYPE table for such records."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00047",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance file and its Record Type field (INPUT-REC-TYPE) is available for evaluation",
+                "When": "The Record Type value is assessed against the list of permitted values: 'A' (Add), 'U' (Update), 'D' (Delete), and '*' (Comment/Skip)",
+                "Then": "If the Record Type matches one of the four permitted values ('A', 'U', 'D', or '*'), the record is considered valid and the corresponding business action is initiated; if the Record Type does not match any of the four permitted values, the record is flagged as invalid and error processing is triggered"
+            },
+            "Rule_Name": "Validate Transaction Record Type Against Allowed Values",
+            "Rule_Description": "Each input record must carry a Record Type indicator that belongs to the set of recognized operation codes: A (Add), U (Update), D (Delete), or * (Comment/Skip). Any value outside this set is considered invalid and must be flagged as an error before any database action is attempted."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00048",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record has been read from the Transaction Type maintenance file and its Record Type field (INPUT-REC-TYPE) has been evaluated and found to not match any of the valid values: 'A', 'U', 'D', or '*'",
+                "When": "The Record Type is determined to be unrecognized (WHEN OTHER condition is met in the record type evaluation)",
+                "Then": "The error message 'ERROR: TYPE NOT VALID' is constructed and stored in the program's return message field (WS-RETURN-MSG), ready to be displayed to the operator and used for error reporting"
+            },
+            "Rule_Name": "Build Error Message for Unrecognized Record Type",
+            "Rule_Description": "When an input record contains a Record Type that is not one of the four recognized values (A, U, D, *), the program must construct a specific error message to communicate the nature of the failure before logging and flagging the error."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00049",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with an unrecognized Record Type has been detected and the error message 'ERROR: TYPE NOT VALID' has been stored in the return message field (WS-RETURN-MSG)",
+                "When": "The error handling routine (9999-ABEND) is invoked following the detection of the invalid Record Type",
+                "Then": "The contents of the return message field (WS-RETURN-MSG), containing 'ERROR: TYPE NOT VALID', are displayed to the operator as a visible notification of the invalid record condition"
+            },
+            "Rule_Name": "Display Invalid Record Type Error Message to Operator",
+            "Rule_Description": "Once an invalid Record Type error message has been built, it must be immediately displayed to the operator so that the data quality issue is visible and can be investigated or corrected."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00050",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with an unrecognized Record Type has been detected, the error message 'ERROR: TYPE NOT VALID' has been built and displayed, and the error handling routine (9999-ABEND) is executing",
+                "When": "The error handling routine completes its display of the error message",
+                "Then": "The program's Return Code is set to 4 to flag that an error condition was encountered during the run; the program does NOT terminate but instead returns control so that processing of subsequent records in the input file can continue"
+            },
+            "Rule_Name": "Set Program Error Return Code Upon Invalid Record Type Detection",
+            "Rule_Description": "When an invalid Record Type is encountered, the program must set its completion status to indicate that one or more errors occurred during processing. A Return Code of 4 signals a warning-level error to downstream processes or job schedulers, while allowing the program to continue processing remaining records."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00051",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with an unrecognized Record Type has been processed, the error message has been displayed, and the Return Code has been set to 4",
+                "When": "The error handling routine (9999-ABEND) exits and control is returned to the main record processing loop (1001-READ-NEXT-RECORDS)",
+                "Then": "The program does not stop or terminate; it proceeds to read the next record from the Transaction Type maintenance input file and continues the processing loop until all records in the file have been evaluated"
+            },
+            "Rule_Name": "Continue Processing Remaining Records After Invalid Record Type Error",
+            "Rule_Description": "Detection of an invalid Record Type on one input record must not halt the entire batch run. The program must continue reading and processing all remaining records in the input file, ensuring maximum throughput even when individual records contain errors."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00052",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record is being processed and its Record Type field does not match any of the valid values: 'A' (Add), 'U' (Update), 'D' (Delete), or '*' (Comment/Skip)",
+                "When": "The program evaluates the Record Type and finds it does not match any recognized operation code",
+                "Then": "The program prepares the error message 'ERROR: TYPE NOT VALID' and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message for Invalid Transaction Record Type",
+            "Rule_Description": "When an input record contains a Record Type that is not one of the recognized values (A, U, D, or *), the program must prepare a specific error message indicating the record type is not valid."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00053",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'A' (Add) has been submitted to insert a new Transaction Type into the TRANSACTION_TYPE table",
+                "When": "The database insert operation returns a negative error code indicating a failure",
+                "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message for Failed Transaction Type Insert Operation",
+            "Rule_Description": "When an attempt to add a new Transaction Type record to the database fails due to a database error, the program must prepare a descriptive error message that identifies the affected table and the specific error code returned."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00054",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'U' (Update) has been submitted to update the description of an existing Transaction Type identified by its Transaction Type Code",
+                "When": "The database update operation returns a 'no data found' condition, meaning no row in the TRANSACTION_TYPE table matches the provided Transaction Type Code",
+                "Then": "The program prepares the error message 'No records found.' and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message When Transaction Type to Update is Not Found",
+            "Rule_Description": "When an attempt to update a Transaction Type record fails because no matching Transaction Type Code exists in the database, the program must prepare an error message indicating that no records were found."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00055",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'U' (Update) has been submitted to update the description of an existing Transaction Type in the TRANSACTION_TYPE table",
+                "When": "The database update operation returns a negative error code indicating a failure",
+                "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message for Failed Transaction Type Update Operation",
+            "Rule_Description": "When an attempt to update a Transaction Type record fails due to a database error (other than record not found), the program must prepare a descriptive error message that identifies the affected table and the specific error code returned."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00056",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'D' (Delete) has been submitted to remove an existing Transaction Type identified by its Transaction Type Code",
+                "When": "The database delete operation returns a 'no data found' condition, meaning no row in the TRANSACTION_TYPE table matches the provided Transaction Type Code",
+                "Then": "The program prepares the error message 'No records found.' and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message When Transaction Type to Delete is Not Found",
+            "Rule_Description": "When an attempt to delete a Transaction Type record fails because no matching Transaction Type Code exists in the database, the program must prepare an error message indicating that no records were found."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00057",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'D' (Delete) has been submitted to remove an existing Transaction Type from the TRANSACTION_TYPE table",
+                "When": "The database delete operation returns a negative error code indicating a failure",
+                "Then": "The program prepares an error message containing the text 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the actual database error code value, and stores it in the return message field for subsequent display and error reporting"
+            },
+            "Rule_Name": "Prepare Error Message for Failed Transaction Type Delete Operation",
+            "Rule_Description": "When an attempt to delete a Transaction Type record fails due to a database error (other than record not found), the program must prepare a descriptive error message that identifies the affected table and the specific error code returned."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00058",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error condition has been detected during processing of an input record (invalid record type, failed insert, failed update, update record not found, failed delete, or delete record not found) and an error message has been prepared",
+                "When": "The error handling routine is invoked",
+                "Then": "The program displays the prepared error message to the output console AND sets the Program Return Code to 4 to indicate that the batch job completed with errors"
+            },
+            "Rule_Name": "Display Error Message and Set Program Error Return Code",
+            "Rule_Description": "After any error condition is detected and an error message is prepared, the program must display the error message to the output and set the program return code to 4 to signal that one or more errors occurred during the batch run."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00059",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error has been detected and handled for a specific input record \u2014 the error message has been displayed and the Program Return Code has been set to 4",
+                "When": "The error handling routine completes",
+                "Then": "The program does not terminate and instead resumes processing by moving on to the next record in the input file, ensuring all remaining records are processed regardless of prior errors"
+            },
+            "Rule_Name": "Continue Processing Remaining Records After an Error",
+            "Rule_Description": "Errors encountered during the processing of an individual input record must not stop the batch job. After logging the error and setting the return code, the program must continue processing the next record in the input file, ensuring all records are attempted."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00060",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All records in the input transaction file (TR-RECORD) have been read and processed, and the end of file condition has been reached (LASTREC = 'Y')",
+                "When": "The program completes its record processing loop and invokes the close and stop routine",
+                "Then": "The input transaction file (TR-RECORD) is closed and the program ends"
+            },
+            "Rule_Name": "Close Input File Upon Completion of All Record Processing",
+            "Rule_Description": "Once all records in the input file have been processed and the end of file is reached, the input transaction file must be properly closed before the program terminates."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00061",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input record with Record Type 'U' has been read from the input file, containing a valid Transaction Type Code (INPUT-REC-NUMBER) and a new Transaction Description (INPUT-REC-DESC)",
+                "When": "The system executes an update operation against the CARDDEMO.TRANSACTION_TYPE table",
+                "Then": "The Transaction Description (TR_DESCRIPTION) for the row where Transaction Type Code (TR_TYPE) matches the input Transaction Type Code must be updated to the new description provided in the input record; no other fields or rows are modified"
+            },
+            "Rule_Name": "Update Transaction Type Description in Database",
+            "Rule_Description": "When a record with type 'U' is read from the input file, the system must update the Transaction Description for the matching Transaction Type Code in the TRANSACTION_TYPE table. Only the description is modified; the Transaction Type Code serves as the unique identifier and is not changed."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00062",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Type Code",
+                "When": "The update operation completes successfully with no errors and at least one row is updated",
+                "Then": "The system must display the message 'RECORD UPDATED SUCCESSFULLY' and return control to process the next input record"
+            },
+            "Rule_Name": "Confirm Successful Update of Transaction Type",
+            "Rule_Description": "When the update operation on the TRANSACTION_TYPE table completes successfully, the system must confirm the successful update by displaying a success message before returning to process the next record."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00063",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table using the input Transaction Type Code as the search key",
+                "When": "No matching row is found in the TRANSACTION_TYPE table for the given Transaction Type Code",
+                "Then": "The system must generate the error message 'No records found.' and invoke the error handling process"
+            },
+            "Rule_Name": "Handle No Matching Transaction Type Found During Update",
+            "Rule_Description": "When an update is attempted for a Transaction Type Code that does not exist in the TRANSACTION_TYPE table, the system must treat this as a business error. Attempting to update a non-existent transaction type is not a silent skip \u2014 it must be flagged as an error condition."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00064",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An update operation has been executed against the CARDDEMO.TRANSACTION_TYPE table for a given Transaction Type Code",
+                "When": "The database returns a failure response indicating the update could not be completed due to a database error",
+                "Then": "The system must generate an error message identifying the TRANSACTION_TYPE table as the source of the failure and invoke the error handling process"
+            },
+            "Rule_Name": "Handle Database Failure During Transaction Type Update",
+            "Rule_Description": "When the update operation against the TRANSACTION_TYPE table encounters a database failure, the system must capture the failure details and invoke the error handling process to log the error and flag the run as having encountered errors."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00065",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error condition has been detected during the update of a Transaction Type record, and an error message has been populated (either 'No records found.' or a database failure message referencing the TRANSACTION_TYPE table)",
+                "When": "The error handling process is invoked",
+                "Then": "The system must display the error message stored in the error message field, set the program-level Return Code to 4 to indicate an error condition, and return control so that processing continues with the next input record without terminating the program"
+            },
+            "Rule_Name": "Log Error and Set Error Return Code for Update Failures",
+            "Rule_Description": "When any error condition occurs during the update of a Transaction Type record \u2014 whether the record was not found or a database failure occurred \u2014 the system must display the error message and set the program return code to 4 to signal that errors were encountered. Processing then continues with the next input record rather than terminating the program."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00066",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid input record with Record Type 'D' has been read, containing a Transaction Number (TR_TYPE) that identifies the Transaction Type record to be removed from the CARDDEMO.TRANSACTION_TYPE table",
+                "When": "The system attempts to remove the Transaction Type record from the CARDDEMO.TRANSACTION_TYPE table where the Transaction Type Code matches the Transaction Number provided in the input record",
+                "Then": "The matching Transaction Type record is removed from the CARDDEMO.TRANSACTION_TYPE table using the Transaction Number as the lookup key"
+            },
+            "Rule_Name": "Delete Transaction Type Record from Database",
+            "Rule_Description": "When a delete operation is requested, the system attempts to remove the matching Transaction Type record from the TRANSACTION_TYPE table using the Transaction Number as the unique identifier."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00067",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                "When": "The record is successfully removed from the TRANSACTION_TYPE table with no errors",
+                "Then": "The system displays the message 'RECORD DELETED SUCCESSFULLY' and returns control to main processing without any error condition"
+            },
+            "Rule_Name": "Confirm Successful Deletion of Transaction Type",
+            "Rule_Description": "When a Transaction Type record is successfully removed from the database, the system confirms the successful deletion by displaying a success message."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00068",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                "When": "No matching record is found in the TRANSACTION_TYPE table for the provided Transaction Number",
+                "Then": "The system sets the error message to 'No records found.' and proceeds to the error handler to display the error message and set the Error Return Code to 4"
+            },
+            "Rule_Name": "Handle Transaction Type Not Found During Deletion",
+            "Rule_Description": "When a delete operation is attempted but no matching Transaction Type record exists in the database for the given Transaction Number, the system treats this as an error condition and sets an appropriate error message."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00069",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been attempted on the CARDDEMO.TRANSACTION_TYPE table for a specific Transaction Number",
+                "When": "The delete operation fails due to a database error (any error condition other than record not found)",
+                "Then": "The system sets the error message to 'Error accessing: TRANSACTION_TYPE table. SQLCODE:' concatenated with the database error code value, and proceeds to the error handler to display the error message and set the Error Return Code to 4"
+            },
+            "Rule_Name": "Handle Database Error During Transaction Type Deletion",
+            "Rule_Description": "When a delete operation fails due to a database error, the system captures the error details including the TRANSACTION_TYPE table name and the database error code, and sets an appropriate error message for reporting."
+        },
+        {
+            "Rule_Id": "R-COBTUPDT-cbl-00070",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An error condition has been identified during the deletion of a Transaction Type record, and an error message has been set describing either 'No records found.' or 'Error accessing: TRANSACTION_TYPE table. SQLCODE: [error code]'",
+                "When": "The error handler is invoked after a failed delete operation",
+                "Then": "The system displays the error message stored in the error message field, sets the program Error Return Code to 4 to signal that an error occurred, and returns control to main processing so that the remaining input records continue to be processed"
+            },
+            "Rule_Name": "Process Deletion Error and Set Error Return Code",
+            "Rule_Description": "When any error occurs during the deletion of a Transaction Type record \u2014 whether the record was not found or a database error occurred \u2014 the system logs the error and sets a standard error return code of 4, then continues processing remaining records without terminating the program."
+        }
+    ],
+    "description": "COBTUPDT is a batch business logic program that processes transaction type maintenance records from a sequential input file and applies the corresponding Add, Update, or Delete operations to the CARDDEMO.TRANSACTION_TYPE DB2 table based on the record type indicator provided in each input record. The program reads each record sequentially, evaluates the operation type (A/U/D), executes the appropriate SQL statement, and terminates with an error code if any invalid record type or database error is encountered.\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: DB2, Sequential File\n- **MQ Calls**: No\n- **Module Type**: Main/Driver module\n\n<br>\n\n### Key Functionalities:\n\n1: Open Input File - Open the sequential input file containing transaction type records to be processed\n\n2: Read Input Records - Read each record sequentially from the input file until end of file is reached\n\n3: Determine Record Action Type - Evaluate the record type indicator (A/U/D/*) from each input record to determine the operation to perform\n\n4: Insert Transaction Type - Add a new transaction type record to the TRANSACTION_TYPE table using the transaction number and description from the input record\n\n5: Update Transaction Type - Modify the description of an existing transaction type record in the TRANSACTION_TYPE table identified by the transaction number\n\n6: Delete Transaction Type - Remove an existing transaction type record from the TRANSACTION_TYPE table identified by the transaction number\n\n7: Skip Commented Lines - Ignore and bypass input records marked with an asterisk (*) as comment lines\n\n8: Validate Record Type - Detect and handle invalid record type codes that are not A, U, D, or *, flagging them as errors\n\n9: Handle Processing Errors - Capture and display error messages when database operations fail or invalid data is encountered, and set error return code\n\n10: Close Input File and Stop - Close the input file upon completion of all record processing and end the program\n\n"
+}

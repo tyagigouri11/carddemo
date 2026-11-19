@@ -1,0 +1,445 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COCRDUPC.cbl",
+        "type": "cobol",
+        "transaction_id": "CCUP"
+      },
+      "overview": "This program is part of a credit card management system operating within a CICS mainframe environment, serving as the business logic layer for card account maintenance workflows. It sits between the card listing screen (COCRDLIC) and the underlying card data files, enabling authorized users to locate and modify credit card details. The program (COCRDUPC, transaction ID 'CCUP') accepts user input to retrieve a specific credit card record by account and card number, presents the current card details for editing, validates all proposed changes, and upon user confirmation, commits the updates to the card master file (CARDDAT). It solves the problem of controlled, validated updates to sensitive credit card data by enforcing a multi-step review-and-confirm workflow before any changes are persisted.",
+      "key_features": [
+        {
+          "feature": "Card Record Retrieval",
+          "description": "Reads a credit card record from the CARDDAT file using account ID and card number as search keys, populating the screen with current card details."
+        },
+        {
+          "feature": "Multi-Step Update Workflow",
+          "description": "Enforces a structured flow: search → display details → edit → validate → confirm (PF5) → save, preventing accidental or unreviewed changes."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates all editable fields including account number (11-digit numeric), card number (16-digit numeric), cardholder name (alphabetic only), active status (Y/N), and expiry month (1-12) and year (1950-2099)."
+        },
+        {
+          "feature": "Optimistic Concurrency Check",
+          "description": "Before writing updates, re-reads and locks the record, then compares current file data against the originally fetched snapshot to detect and reject concurrent modifications by other users."
+        },
+        {
+          "feature": "Screen Attribute Management",
+          "description": "Dynamically controls field protection, cursor positioning, and color highlighting (red for errors) based on the current workflow state to guide the user through the update process."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Supports PF3 to exit back to the calling program or main menu, PF5 to confirm and save validated changes, and PF12 to cancel edits and refresh the original card data."
+        },
+        {
+          "feature": "Error Messaging",
+          "description": "Provides contextual informational and error messages on-screen for each validation failure, lock conflict, update failure, or successful commit."
+        },
+        {
+          "feature": "Inter-Program Communication",
+          "description": "Uses a shared COMMAREA (CARDDEMO-COMMAREA) to pass context such as originating program, transaction ID, account ID, and card number between this program and calling/called programs like the card list screen and main menu."
+        },
+        {
+          "feature": "Abend Handling",
+          "description": "Implements a centralized abend routine that displays diagnostic information and issues a CICS ABEND with code '9999' for unexpected error conditions."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDAT",
+        "type": "Read/Write",
+        "description": "Card data file - read to retrieve credit card details by card number for display, and updated (rewritten) with new card details including embossed name, expiration date, CVV, and active status after user confirmation"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program receives control via CICS. If EIBCALEN is zero or entry is from the main menu without re-entry, the CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA are initialized fresh. Otherwise, the passed COMMAREA is split into CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA for context restoration.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CCUP-CHANGE-ACTION",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "PF Key Mapping and Validation",
+          "description": "The CSSTRPFY copybook routine is performed to remap and store the current PF key pressed by the user. Valid keys at this point are Enter, PF03, PF05 (only when changes are pending confirmation), and PF12 (only when card details have been fetched). Invalid keys are remapped to Enter.",
+          "records": [
+            "WS-PFK-FLAG",
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "WS-TRANID"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Main Action Routing via EVALUATE",
+          "description": "The program evaluates the combination of PF key pressed and the current program state (CCUP-CHANGE-ACTION) to route to one of several processing paths: exit/transfer, fetch card data from list, fresh entry prompt, post-update reset, or general input processing.",
+          "records": [
+            "CCUP-CHANGE-ACTION",
+            "CCARD-AID-PFK03",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-PGM-ENTER",
+            "CCUP-DETAILS-NOT-FETCHED",
+            "CCUP-CHANGES-OKAYED-AND-DONE",
+            "CCUP-CHANGES-FAILED"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Exit / Transfer to Calling Program",
+          "description": "When PF03 is pressed or update is complete and caller was the card list screen, a CICS SYNCPOINT is issued and XCTL transfers control to the originating program (card list or main menu), passing the updated CARDDEMO-COMMAREA. Account and card number are cleared if returning from the list screen.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-TO-TRANID",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Fetch Card Data from Card List Context",
+          "description": "When the program is entered from the credit card list program (COCRDLIC) or PF12 is pressed with that context, account and card number are taken from CDEMO-ACCT-ID and CDEMO-CARD-NUM, input flags are set valid, and the card record is read from the CARDDAT file. The screen is then sent with the fetched details.",
+          "records": [
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CC-ACCT-ID-N",
+            "CC-CARD-NUM-N",
+            "CCUP-OLD-DETAILS",
+            "CARD-RECORD"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Fresh Entry Screen Prompt",
+          "description": "On first entry or when coming from the main menu, WS-THIS-PROGCOMMAREA is initialized and the map is sent with a prompt asking the user to enter account and card number search keys. Program state is set to re-enter with details not yet fetched.",
+          "records": [
+            "WS-THIS-PROGCOMMAREA",
+            "CCUP-DETAILS-NOT-FETCHED",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Post-Update Reset and Re-prompt",
+          "description": "After a successful or failed update, the program commarea, misc storage, and search keys (CDEMO-ACCT-ID, CDEMO-CARD-NUM) are cleared. The map is sent again prompting for fresh search criteria.",
+          "records": [
+            "WS-THIS-PROGCOMMAREA",
+            "WS-MISC-STORAGE",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CCUP-DETAILS-NOT-FETCHED"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Receive and Parse Screen Input",
+          "description": "The CICS RECEIVE MAP command reads user input from the CCRDUPA map into CCRDUPAI. Fields for account ID, card number, card name, card status, expiry month, and expiry year are extracted. Asterisk or space values are normalized to LOW-VALUES. Results are stored in CCUP-NEW-DETAILS and CC-ACCT-ID / CC-CARD-NUM.",
+          "records": [
+            "CCRDUPAI",
+            "CCUP-NEW-ACCTID",
+            "CCUP-NEW-CARDID",
+            "CCUP-NEW-CRDNAME",
+            "CCUP-NEW-CRDSTCD",
+            "CCUP-NEW-EXPMON",
+            "CCUP-NEW-EXPYEAR",
+            "CCUP-NEW-EXPDAY",
+            "CC-ACCT-ID",
+            "CC-CARD-NUM"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Input Validation - Search Keys (Account and Card Number)",
+          "description": "When card details have not yet been fetched, account number is validated as non-blank, non-zero, and numeric (11 digits). Card number is validated as non-blank, non-zero, and numeric (16 digits). Validation flags (FLG-ACCTFILTER, FLG-CARDFILTER) and error messages are set accordingly. If both are blank, NO-SEARCH-CRITERIA-RECEIVED is set.",
+          "records": [
+            "CC-ACCT-ID",
+            "CC-ACCT-ID-N",
+            "CC-CARD-NUM",
+            "CC-CARD-NUM-N",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "WS-EDIT-ACCT-FLAG",
+            "WS-EDIT-CARD-FLAG",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Input Validation - Card Update Fields",
+          "description": "When card details are already displayed, the new card data fields are validated: card name must be non-blank and contain only alphabetic characters and spaces (checked via INSPECT CONVERTING); card status must be Y or N; expiry month must be numeric and between 1 and 12; expiry year must be numeric and between 1950 and 2099. Validation flags and error messages are set per field.",
+          "records": [
+            "CCUP-NEW-CRDNAME",
+            "CCUP-NEW-CRDSTCD",
+            "CCUP-NEW-EXPMON",
+            "CCUP-NEW-EXPYEAR",
+            "CARD-NAME-CHECK",
+            "CARD-MONTH-CHECK-N",
+            "CARD-YEAR-CHECK-N",
+            "WS-EDIT-CARDNAME-FLAG",
+            "WS-EDIT-CARDSTATUS-FLAG",
+            "WS-EDIT-CARDEXPMON-FLAG",
+            "WS-EDIT-CARDEXPYEAR-FLAG"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Change Detection",
+          "description": "After validation, the new card data (CCUP-NEW-CARDDATA) is compared to the old card data (CCUP-OLD-CARDDATA) using FUNCTION UPPER-CASE for case-insensitive comparison. If they are equal, NO-CHANGES-DETECTED is set and further validation is skipped. If changes exist and all validations pass, CCUP-CHANGES-OK-NOT-CONFIRMED is set.",
+          "records": [
+            "CCUP-NEW-CARDDATA",
+            "CCUP-OLD-CARDDATA",
+            "CCUP-NEW-CRDNAME",
+            "CCUP-OLD-CRDNAME",
+            "CCUP-NEW-CRDSTCD",
+            "CCUP-OLD-CRDSTCD",
+            "CCUP-NEW-EXPMON",
+            "CCUP-NEW-EXPYEAR"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Action Decision - Read or Write",
+          "description": "Based on the current state, the program decides to: read card data (9000-READ-DATA) when search keys are valid and details not yet fetched or PF12 cancel is pressed; proceed to write processing (9200-WRITE-PROCESSING) when changes are confirmed via PF05; or simply re-display the screen with current state. Update outcome sets CCUP-CHANGES-OKAYED-AND-DONE, CCUP-CHANGES-OKAYED-LOCK-ERROR, CCUP-CHANGES-OKAYED-BUT-FAILED, or CCUP-SHOW-DETAILS.",
+          "records": [
+            "CCUP-CHANGE-ACTION",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "FLG-ACCTFILTER-ISVALID",
+            "FLG-CARDFILTER-ISVALID"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Card Record Read (CARDDAT File)",
+          "description": "The card number (WS-CARD-RID-CARDNUM) is used as the RIDFLD key to perform a CICS READ against the CARDDAT file. On success, CARD-RECORD fields (CVV, embossed name, expiration date, active status) are extracted and stored in CCUP-OLD-DETAILS. The embossed name is converted to uppercase via INSPECT CONVERTING. On NOTFND, DID-NOT-FIND-ACCTCARD-COMBO is set. On other errors, a file error message is constructed.",
+          "records": [
+            "WS-CARD-RID-CARDNUM",
+            "CARD-RECORD",
+            "CARD-CVV-CD",
+            "CARD-EMBOSSED-NAME",
+            "CARD-EXPIRAION-DATE",
+            "CARD-ACTIVE-STATUS",
+            "CCUP-OLD-CVV-CD",
+            "CCUP-OLD-CRDNAME",
+            "CCUP-OLD-EXPYEAR",
+            "CCUP-OLD-EXPMON",
+            "CCUP-OLD-EXPDAY",
+            "CCUP-OLD-CRDSTCD",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Card Record Lock and Concurrent Change Check",
+          "description": "For update processing, a CICS READ with UPDATE option is issued against CARDDAT using the card number key to lock the record. If locking fails, COULD-NOT-LOCK-FOR-UPDATE is set. If locking succeeds, 9300-CHECK-CHANGE-IN-REC compares the freshly read record fields against the previously stored CCUP-OLD-DETAILS to detect concurrent modifications. If a change is detected, DATA-WAS-CHANGED-BEFORE-UPDATE is set, old details are refreshed, and the update is aborted.",
+          "records": [
+            "WS-CARD-RID-CARDNUM",
+            "CARD-RECORD",
+            "CARD-CVV-CD",
+            "CARD-EMBOSSED-NAME",
+            "CARD-EXPIRAION-DATE",
+            "CARD-ACTIVE-STATUS",
+            "CCUP-OLD-CVV-CD",
+            "CCUP-OLD-CRDNAME",
+            "CCUP-OLD-EXPYEAR",
+            "CCUP-OLD-EXPMON",
+            "CCUP-OLD-EXPDAY",
+            "CCUP-OLD-CRDSTCD",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Card Record Update (REWRITE)",
+          "description": "CARD-UPDATE-RECORD is populated from CCUP-NEW-DETAILS: card number, account ID, CVV code, embossed name, expiration date (STRING-assembled as YYYY-MM-DD), and active status. A CICS REWRITE is issued against CARDDAT. On success, processing continues normally. On failure, LOCKED-BUT-UPDATE-FAILED is set.",
+          "records": [
+            "CARD-UPDATE-RECORD",
+            "CARD-UPDATE-NUM",
+            "CARD-UPDATE-ACCT-ID",
+            "CARD-UPDATE-CVV-CD",
+            "CARD-UPDATE-EMBOSSED-NAME",
+            "CARD-UPDATE-EXPIRAION-DATE",
+            "CARD-UPDATE-ACTIVE-STATUS",
+            "CCUP-NEW-CARDID",
+            "CCUP-NEW-CRDNAME",
+            "CCUP-NEW-EXPYEAR",
+            "CCUP-NEW-EXPMON",
+            "CCUP-NEW-EXPDAY",
+            "CCUP-NEW-CRDSTCD",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Screen Preparation and Send",
+          "description": "The output map CCRDUPAO is initialized with current date/time, titles, transaction ID, and program name. Screen fields are populated based on program state (CCUP-CHANGE-ACTION): search key fields, card detail fields (old or new values depending on state). Information messages (WS-INFO-MSG) and error messages (WS-RETURN-MSG) are moved to map output fields. Field attributes (protected/unprotected, color, cursor position) are set contextually. The map is sent via CICS SEND MAP with ERASE and FREEKB.",
+          "records": [
+            "CCRDUPAO",
+            "CCRDUPAI",
+            "WS-INFO-MSG",
+            "WS-RETURN-MSG",
+            "CCARD-ERROR-MSG",
+            "ACCTSIDO",
+            "CARDSIDO",
+            "CRDNAMEO",
+            "CRDSTCDO",
+            "EXPMONO",
+            "EXPYEARO",
+            "EXPDAYO",
+            "INFOMSGO",
+            "ERRMSGO",
+            "WS-CURDATE-DATA",
+            "WS-CURTIME-HH-MM-SS"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "CICS RETURN with COMMAREA",
+          "description": "Before returning, WS-RETURN-MSG is moved to CCARD-ERROR-MSG. CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA are packed into WS-COMMAREA. CICS RETURN is issued with transaction ID CCUP and the combined COMMAREA, suspending the program and awaiting the next user interaction.",
+          "records": [
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CCARD-ERROR-MSG",
+            "LIT-THISTRANID"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA state continuity",
+          "description": "The program relies on EIBCALEN and the content of DFHCOMMAREA to restore both CARDDEMO-COMMAREA (common inter-program context) and WS-THIS-PROGCOMMAREA (program-specific state including CCUP-CHANGE-ACTION, CCUP-OLD-DETAILS, CCUP-NEW-DETAILS). Incorrect or missing COMMAREA on re-entry causes full re-initialization, losing all prior context."
+        },
+        {
+          "dependency": "CCUP-CHANGE-ACTION state machine",
+          "description": "The entire program flow is governed by the CCUP-CHANGE-ACTION flag acting as a state machine. Valid transitions are: LOW-VALUES/SPACES (not fetched) -> S (show details) -> E (changes not ok) or N (changes ok, not confirmed) -> C (done) or L/F (failed). Incorrect state values trigger an ABEND with code 9999."
+        },
+        {
+          "dependency": "CCUP-OLD-DETAILS preservation for optimistic locking",
+          "description": "CCUP-OLD-DETAILS (CVV, name, expiry year/month/day, status) must be preserved across CICS pseudo-conversational returns in WS-THIS-PROGCOMMAREA. These values are used in 9300-CHECK-CHANGE-IN-REC to detect concurrent record modifications between the initial read and the update write. Loss or corruption of these values will cause false change detection or missed conflict detection."
+        },
+        {
+          "dependency": "CARDDAT file record lock sequencing",
+          "description": "The update path requires a READ with UPDATE (exclusive lock) on CARDDAT before REWRITE. The lock is obtained in 9200-WRITE-PROCESSING and must be held until the REWRITE completes. The concurrent change check (9300) occurs between the locked READ and the REWRITE, meaning the lock must not be released between these steps. Any GO TO 9200-WRITE-PROCESSING-EXIT before the REWRITE implicitly releases the lock via CICS task termination or SYNCPOINT."
+        },
+        {
+          "dependency": "Input validation flag sequencing",
+          "description": "WS-RETURN-MSG is only set once per validation pass (guarded by WS-RETURN-MSG-OFF check). The first validation error encountered sets the message and subsequent errors only set their respective flags. This means the displayed error message reflects only the first error found, and the calling code must check individual flags for complete error state."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM and CDEMO-LAST-MAPSET for navigation context",
+          "description": "The program uses CDEMO-FROM-PROGRAM to determine whether it was called from the card list (COCRDLIC) or the main menu (COMEN01C), which affects whether search keys are pre-populated or must be entered. CDEMO-LAST-MAPSET determines whether account/card IDs should be cleared on PF03 exit. These fields must be correctly set by the calling program."
+        },
+        {
+          "dependency": "Card number as sole CARDDAT lookup key",
+          "description": "The CARDDAT file is accessed exclusively by card number (WS-CARD-RID-CARDNUM, 16 digits) as the RIDFLD. The account ID is not used as a key for the file read, meaning the program trusts that the card number uniquely identifies the record. The account ID from the screen is used only for the update record population, not for record retrieval or cross-validation against the file."
+        },
+        {
+          "dependency": "Expiry day field non-editability",
+          "description": "CCUP-NEW-EXPDAY is received from the map but the expiry day field (EXPDAYA) is commented out of the unprotect attribute assignments, making it effectively display-only. During update record construction, CCUP-NEW-EXPDAY (which holds the received value) is used in the STRING for CARD-UPDATE-EXPIRAION-DATE, but the screen always shows CCUP-OLD-EXPDAY. This creates a dependency where the day value passed through must match the original to avoid unintended changes."
+        },
+        {
+          "dependency": "CVV code handling in update",
+          "description": "CCUP-NEW-CVV-CD is moved to CARD-CVV-CD-X (redefines as numeric CARD-CVV-CD-N) and then CARD-CVV-CD-N is moved to CARD-UPDATE-CVV-CD. However, CCUP-NEW-CVV-CD is initialized in 1100-RECEIVE-MAP but the CVV field is not present on the update screen for user input, meaning the CVV in the update record will always be zero/blank unless carried from the old details, which it is not explicitly. This is a potential data integrity dependency."
+        },
+        {
+          "dependency": "CICS SYNCPOINT before XCTL on PF03 exit",
+          "description": "A CICS SYNCPOINT is explicitly issued before the XCTL transfer on PF03 exit. This commits any recoverable resource changes made during the current task before transferring control. Any update operations that were performed and not yet committed would be committed at this point, making the SYNCPOINT placement critical to transactional integrity."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction processing monitor",
+          "purpose": "Provides the entire runtime environment including pseudo-conversational transaction management (CICS RETURN with TRANSID/COMMAREA), BMS map send/receive for terminal I/O (CICS SEND MAP, CICS RECEIVE MAP), VSAM file I/O (CICS READ, CICS READ UPDATE, CICS REWRITE against CARDDAT), program transfer (CICS XCTL), transaction synchronization (CICS SYNCPOINT), abend handling (CICS HANDLE ABEND, CICS ABEND), and EIB fields (EIBCALEN) for COMMAREA length detection."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Each input field (account ID, card number, card name, card status, expiry month, expiry year) is validated in dedicated paragraphs (1210 through 1260). Errors set INPUT-ERROR flag and field-specific NOT-OK or BLANK flags. A single WS-RETURN-MSG is populated with the first error message encountered (guarded by WS-RETURN-MSG-OFF check to prevent overwriting). Invalid fields are highlighted in red (DFHRED) on the screen, blank required fields are marked with '*', and the cursor is positioned to the first offending field. Validation covers: presence checks (LOW-VALUES, SPACES, ZEROS), numeric checks (IS NOT NUMERIC), range checks (VALID-MONTH 1-12, VALID-YEAR 1950-2099), and alphabetic-only checks for card name using INSPECT/CONVERTING."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "CICS READ operations in paragraph 9100-GETCARD-BYACCTCARD capture RESP and RESP2 codes into WS-RESP-CD and WS-REAS-CD. An EVALUATE on WS-RESP-CD handles three cases: DFHRESP(NORMAL) sets FOUND-CARDS-FOR-ACCOUNT; DFHRESP(NOTFND) sets INPUT-ERROR, marks both account and card filters as NOT-OK, and sets DID-NOT-FIND-ACCTCARD-COMBO message; any OTHER response sets INPUT-ERROR, populates a structured WS-FILE-ERROR-MESSAGE with operation name ('READ'), file name, RESP, and RESP2 codes, and moves it to WS-RETURN-MSG."
+      },
+      {
+        "category": "Record Lock Errors",
+        "description": "In paragraph 9200-WRITE-PROCESSING, the CICS READ UPDATE response is checked. If WS-RESP-CD is not DFHRESP(NORMAL), INPUT-ERROR is set, COULD-NOT-LOCK-FOR-UPDATE message is set in WS-RETURN-MSG, and processing exits immediately via GO TO 9200-WRITE-PROCESSING-EXIT. The program state is set to CCUP-CHANGES-OKAYED-LOCK-ERROR, and the screen displays an INFORM-FAILURE informational message to the user."
+      },
+      {
+        "category": "Concurrent Update / Lost Update Detection",
+        "description": "Paragraph 9300-CHECK-CHANGE-IN-REC implements optimistic concurrency control by comparing all key fields of the freshly locked record (CVV, name, expiry year/month/day, active status) against the previously fetched old values stored in CCUP-OLD-DETAILS. If any field differs, DATA-WAS-CHANGED-BEFORE-UPDATE is set, the old details are refreshed with the current database values, and processing exits without performing the REWRITE. The screen state reverts to CCUP-SHOW-DETAILS so the user can review the externally changed data."
+      },
+      {
+        "category": "Record Update (REWRITE) Errors",
+        "description": "After a successful READ UPDATE and concurrency check, a CICS REWRITE is issued. The RESP code is checked; if not DFHRESP(NORMAL), LOCKED-BUT-UPDATE-FAILED is set. This causes the program state to become CCUP-CHANGES-OKAYED-BUT-FAILED, and the screen displays INFORM-FAILURE. No structured file error message is built for this case; only the flag-based message is used."
+      },
+      {
+        "category": "Unexpected / Unhandled Abend Errors",
+        "description": "At program entry, EXEC CICS HANDLE ABEND LABEL(ABEND-ROUTINE) is registered to catch any unexpected CICS abends. The ABEND-ROUTINE paragraph populates ABEND-DATA fields (culprit program set to LIT-THISPGM, code '9999', message defaulting to 'UNEXPECTED ABEND OCCURRED.' if not pre-set), sends the abend data to the screen with ERASE, cancels the abend handler, then issues EXEC CICS ABEND ABCODE('9999') to terminate the transaction. Within 2000-DECIDE-ACTION, an unexpected EVALUATE WHEN OTHER branch explicitly calls ABEND-ROUTINE with code '0001' and message 'UNEXPECTED DATA SCENARIO'."
+      },
+      {
+        "category": "No-Change / No-Criteria Detection",
+        "description": "Two logical error conditions are treated as user-facing informational errors rather than hard failures. If both account and card filter fields are blank, NO-SEARCH-CRITERIA-RECEIVED is set in WS-RETURN-MSG. If the new card data (CCUP-NEW-CARDDATA) matches the old data (CCUP-OLD-CARDDATA) via FUNCTION UPPER-CASE comparison, NO-CHANGES-DETECTED is set in WS-RETURN-MSG. Both conditions prevent further processing and prompt the user with appropriate messages without setting INPUT-ERROR."
+      },
+      {
+        "category": "Invalid PF Key Handling",
+        "description": "At program entry, PFK-INVALID is set by default. Only specific AID keys are accepted as valid in context (Enter, PF03, PF05 when confirmation pending, PF12 when details are fetched). If an invalid key is pressed, PFK-INVALID remains set and the AID is overridden to CCARD-AID-ENTER, effectively treating the keystroke as an Enter press and re-displaying the current screen state without taking any destructive action."
+      },
+      {
+        "category": "Screen Send Errors",
+        "description": "The CICS SEND MAP in paragraph 3400-SEND-SCREEN captures the response in WS-RESP-CD but does not explicitly evaluate or handle a non-normal response code. Errors from the SEND operation are implicitly left to the HANDLE ABEND mechanism registered at program startup to intercept any resulting CICS abend."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COCRDUP",
+        "map_name": "CCRDUPA",
+        "business_function": "Provides a CICS 3270 terminal interface for updating credit card details. The screen allows users to search for a credit card by Account Number and Card Number, then modify editable card attributes including the cardholder name, active status (Y/N), and expiry date (month/year). The program supports a multi-step workflow: search, display, edit, validate, confirm, and save. It performs optimistic locking by detecting concurrent record changes before committing updates to the CARDDAT file."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COCRDUP - Card Update Screen</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ff00;width:80ch;font-size:16px;line-height:1.5;padding:4px;border:1px solid #444;white-space:pre;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .red{color:#ff5555;} .white{color:#ffffff;} .neutral{color:#aaaaaa;} .green{color:#00ff00;} .field-input{color:#00ffff;text-decoration:underline;} .field-prot{color:#5555ff;} .field-dark{color:#000000;} .bright{font-weight:bold;} .label{color:#00ffff;}</style></head><body><div class='terminal'><span class='blue'>Tran: </span><span class='blue field-prot'>CCUP</span><span>                </span><span class='yellow'>Credit Card Update              </span><span>        </span><span class='blue'>Date: </span><span class='blue'>08/22/22</span>\n<span class='blue'>Prog: </span><span class='blue field-prot'>COCRDUPC</span><span>            </span><span class='yellow'>                                        </span><span>    </span><span class='blue'>Time: </span><span class='blue'>14:30:00</span>\n\n<span>                             </span><span class='neutral'>Update Credit Card Details</span><span>                    </span>\n\n<span>                                                                                </span>\n<span>                                                                                </span>\n<span>                      </span><span class='turquoise'>Account Number    :</span><span> </span><span class='field-input'>12345678901</span><span>                    </span>\n<span>                      </span><span class='turquoise'>Card Number       :</span><span> </span><span class='field-input'>4111111111111111</span><span>               </span>\n\n<span>                                                                                </span>\n<span>                                                                                </span>\n<span>   </span><span class='turquoise'>Name on card      :</span><span> </span><span class='field-input'>JOHN HENRY SMITH                                  </span><span> </span>\n\n<span>                                                                                </span>\n<span>   </span><span class='turquoise'>Card Active Y/N   : </span><span class='field-input'>Y</span><span>                                                      </span>\n\n<span>                                                                                </span>\n<span>   </span><span class='turquoise'>Expiry Date       : </span><span class='field-input'>12</span><span>/</span><span class='field-input'>2025</span><span> </span><span class='field-dark'>  </span><span>                                        </span>\n\n<span>                                                                                </span>\n<span>                                                                                </span>\n<span>                                                                                </span>\n<span>                                                                                </span>\n<span>                        </span><span class='neutral'>Details of selected card shown above    </span><span>           </span>\n\n<span>                                                                                </span>\n<span class='red bright'>                                                                                </span>\n<span class='yellow'>ENTER=Process F3=Exit</span><span> </span><span class='yellow'>F5=Save F12=Cancel</span><span>                                     </span></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the current screen input. In search mode, fetches card details by Account Number and Card Number. In edit mode, validates the entered changes and prepares for confirmation."
+        },
+        {
+          "key": "F3",
+          "action": "Exit the card update screen and return to the calling program (Credit Card List screen or Main Menu), discarding any unsaved changes."
+        },
+        {
+          "key": "F5",
+          "action": "Save/confirm validated changes to the credit card record in the CARDDAT file. Only active when changes have been validated and are pending confirmation (CCUP-CHANGES-OK-NOT-CONFIRMED state)."
+        },
+        {
+          "key": "F12",
+          "action": "Cancel current edits and reload the original card details from the database, reverting any unsaved changes. Only active when card details have already been fetched."
+        }
+      ]
+    }
+  }
+}

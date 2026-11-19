@@ -1,0 +1,338 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBTRN03C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBTRN03C is a batch reporting program within the CardDemo credit card management application, operating as part of the transaction processing workflow to produce audit-ready financial reports. It serves the back-office reporting function, transforming raw transaction data into a structured, human-readable detail report for business analysts, auditors, or operations staff. The program reads a sequential transaction file, filters records by a configurable date range, enriches each transaction with descriptive lookups (card-to-account cross-reference, transaction type, and transaction category), and writes a formatted detail report with page-level, account-level, and grand total summaries.",
+      "key_features": [
+        {
+          "feature": "Date Range Filtering",
+          "description": "Reads start and end dates from a parameter file to include only transactions processed within the specified reporting period."
+        },
+        {
+          "feature": "Transaction Enrichment",
+          "description": "Performs random-access lookups against three indexed reference files (card cross-reference, transaction type, and transaction category) to add descriptive labels to each transaction record."
+        },
+        {
+          "feature": "Card-to-Account Cross-Reference",
+          "description": "Resolves a card number to its associated account ID using an indexed XREF file, grouping report output by account."
+        },
+        {
+          "feature": "Paginated Report Output",
+          "description": "Produces a formatted sequential report file with headers, detail lines, and page totals, resetting every 20 lines per page."
+        },
+        {
+          "feature": "Account-Level Subtotals",
+          "description": "Detects card number breaks and writes account subtotal lines whenever transactions transition from one card number to another."
+        },
+        {
+          "feature": "Grand Total Summary",
+          "description": "Accumulates a running grand total across all pages and writes a final grand total line at the end of the report."
+        },
+        {
+          "feature": "Robust Error Handling",
+          "description": "Checks file status codes after every I/O operation and abends the program with a diagnostic message if any unexpected error occurs, ensuring data integrity."
+        },
+        {
+          "feature": "Multi-File Orchestration",
+          "description": "Coordinates the opening, reading, and closing of six distinct files (transaction, report, cross-reference, transaction type, transaction category, and date parameters) in a controlled sequence."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRANSACT-FILE",
+        "type": "Read",
+        "description": "Sequential transaction file (TRANFILE) - reads transaction records containing transaction ID, type, category, amount, card number, timestamps, and other transaction details for report generation"
+      },
+      {
+        "name": "XREF-FILE",
+        "type": "Read",
+        "description": "Indexed card cross-reference file (CARDXREF) - randomly accessed by card number to look up associated customer ID and account ID for each transaction"
+      },
+      {
+        "name": "TRANTYPE-FILE",
+        "type": "Read",
+        "description": "Indexed transaction type file (TRANTYPE) - randomly accessed by transaction type code to retrieve the transaction type description for the report"
+      },
+      {
+        "name": "TRANCATG-FILE",
+        "type": "Read",
+        "description": "Indexed transaction category file (TRANCATG) - randomly accessed by composite key of transaction type code and category code to retrieve the category description for the report"
+      },
+      {
+        "name": "DATE-PARMS-FILE",
+        "type": "Read",
+        "description": "Sequential date parameters file (DATEPARM) - reads a single record containing the start date and end date range used to filter transactions included in the report"
+      },
+      {
+        "name": "REPORT-FILE",
+        "type": "Write",
+        "description": "Sequential report output file (TRANREPT) - writes the formatted daily transaction detail report including page headers, transaction detail lines, page totals, account totals, and grand totals"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Open All Files",
+          "description": "Opens all input files (TRANSACT-FILE, XREF-FILE, TRANTYPE-FILE, TRANCATG-FILE, DATE-PARMS-FILE) and output file (REPORT-FILE) with error handling and abend on failure",
+          "records": [
+            "TRANFILE-STATUS",
+            "CARDXREF-STATUS",
+            "TRANTYPE-STATUS",
+            "TRANCATG-STATUS",
+            "TRANREPT-STATUS",
+            "DATEPARM-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Date Parameters",
+          "description": "Reads a single record from DATE-PARMS-FILE into WS-DATEPARM-RECORD to establish the reporting date range filter; abends on read error",
+          "records": [
+            "WS-START-DATE",
+            "WS-END-DATE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Read Transaction Record",
+          "description": "Sequentially reads the next record from TRANSACT-FILE into TRAN-RECORD (defined by CVTRA05Y copybook); sets END-OF-FILE flag on EOF",
+          "records": [
+            "TRAN-ID",
+            "TRAN-CARD-NUM",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-AMT",
+            "TRAN-SOURCE",
+            "TRAN-PROC-TS"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Filter by Date Range",
+          "description": "Compares TRAN-PROC-TS (first 10 characters) against WS-START-DATE and WS-END-DATE; records outside the range are skipped via NEXT SENTENCE",
+          "records": [
+            "TRAN-PROC-TS",
+            "WS-START-DATE",
+            "WS-END-DATE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Detect Card Number Change",
+          "description": "Compares TRAN-CARD-NUM against WS-CURR-CARD-NUM; if different and not first time, writes account totals, then updates WS-CURR-CARD-NUM and triggers cross-reference lookup",
+          "records": [
+            "TRAN-CARD-NUM",
+            "WS-CURR-CARD-NUM",
+            "WS-FIRST-TIME",
+            "WS-ACCOUNT-TOTAL"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Cross-Reference Lookup (XREF)",
+          "description": "Performs a random READ on XREF-FILE using FD-XREF-CARD-NUM (set from TRAN-CARD-NUM) to retrieve CARD-XREF-RECORD containing the associated account ID; abends on invalid key",
+          "records": [
+            "FD-XREF-CARD-NUM",
+            "XREF-ACCT-ID",
+            "CARD-XREF-RECORD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Transaction Type Lookup",
+          "description": "Performs a random READ on TRANTYPE-FILE using FD-TRAN-TYPE (set from TRAN-TYPE-CD) to retrieve TRAN-TYPE-RECORD containing the transaction type description; abends on invalid key",
+          "records": [
+            "FD-TRAN-TYPE",
+            "TRAN-TYPE-DESC",
+            "TRAN-TYPE-RECORD"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Transaction Category Lookup",
+          "description": "Performs a random READ on TRANCATG-FILE using composite key FD-TRAN-CAT-KEY (FD-TRAN-TYPE-CD + FD-TRAN-CAT-CD) to retrieve TRAN-CAT-RECORD containing the category description; abends on invalid key",
+          "records": [
+            "FD-TRAN-TYPE-CD",
+            "FD-TRAN-CAT-CD",
+            "FD-TRAN-CAT-KEY",
+            "TRAN-CAT-TYPE-DESC",
+            "TRAN-CAT-RECORD"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Write Report Headers",
+          "description": "On first transaction or when page size (20 lines) is reached, writes report name header, blank line, and two column header lines to REPORT-FILE; also writes page totals before new headers",
+          "records": [
+            "WS-FIRST-TIME",
+            "WS-LINE-COUNTER",
+            "WS-PAGE-SIZE",
+            "REPT-START-DATE",
+            "REPT-END-DATE",
+            "REPORT-NAME-HEADER",
+            "TRANSACTION-HEADER-1",
+            "TRANSACTION-HEADER-2"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Write Transaction Detail Line",
+          "description": "Initializes TRANSACTION-DETAIL-REPORT, populates it with TRAN-ID, XREF-ACCT-ID, type code, type description, category code, category description, source, and amount, then writes to REPORT-FILE; increments line counter",
+          "records": [
+            "TRAN-ID",
+            "XREF-ACCT-ID",
+            "TRAN-TYPE-CD",
+            "TRAN-TYPE-DESC",
+            "TRAN-CAT-CD",
+            "TRAN-CAT-TYPE-DESC",
+            "TRAN-SOURCE",
+            "TRAN-AMT",
+            "TRANSACTION-DETAIL-REPORT",
+            "WS-LINE-COUNTER"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Accumulate Totals",
+          "description": "Adds TRAN-AMT to WS-PAGE-TOTAL and WS-ACCOUNT-TOTAL for each detail line; WS-PAGE-TOTAL is rolled into WS-GRAND-TOTAL and reset at each page break",
+          "records": [
+            "TRAN-AMT",
+            "WS-PAGE-TOTAL",
+            "WS-ACCOUNT-TOTAL",
+            "WS-GRAND-TOTAL"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Write Page Totals",
+          "description": "Writes REPORT-PAGE-TOTALS record with WS-PAGE-TOTAL to REPORT-FILE at each page break; adds page total to grand total and resets page total to zero",
+          "records": [
+            "WS-PAGE-TOTAL",
+            "REPT-PAGE-TOTAL",
+            "REPORT-PAGE-TOTALS",
+            "WS-GRAND-TOTAL"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Write Account Totals",
+          "description": "When card number changes (and not first time), writes REPORT-ACCOUNT-TOTALS record with WS-ACCOUNT-TOTAL to REPORT-FILE and resets account total to zero",
+          "records": [
+            "WS-ACCOUNT-TOTAL",
+            "REPT-ACCOUNT-TOTAL",
+            "REPORT-ACCOUNT-TOTALS"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Write Grand Totals",
+          "description": "At end of file, writes REPORT-GRAND-TOTALS record with WS-GRAND-TOTAL to REPORT-FILE as the final summary line",
+          "records": [
+            "WS-GRAND-TOTAL",
+            "REPT-GRAND-TOTAL",
+            "REPORT-GRAND-TOTALS"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Close All Files",
+          "description": "Closes all six files (TRANSACT-FILE, REPORT-FILE, XREF-FILE, TRANTYPE-FILE, TRANCATG-FILE, DATE-PARMS-FILE) with error handling and abend on failure",
+          "records": [
+            "TRANFILE-STATUS",
+            "TRANREPT-STATUS",
+            "CARDXREF-STATUS",
+            "TRANTYPE-STATUS",
+            "TRANCATG-STATUS",
+            "DATEPARM-STATUS"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Date parameter must be read before transaction processing",
+          "description": "WS-START-DATE and WS-END-DATE are populated from DATE-PARMS-FILE in step 0550-DATEPARM-READ before the main processing loop begins; without valid date parameters the program either sets END-OF-FILE to 'Y' (skipping all processing) or abends"
+        },
+        {
+          "dependency": "XREF lookup depends on card number change detection",
+          "description": "The cross-reference lookup (1500-A-LOOKUP-XREF) is only triggered when TRAN-CARD-NUM differs from WS-CURR-CARD-NUM, meaning XREF-ACCT-ID used in detail lines is carried over from the previous lookup for all transactions with the same card number"
+        },
+        {
+          "dependency": "Report header write depends on WS-FIRST-TIME flag",
+          "description": "Headers are written only on the first call to 1100-WRITE-TRANSACTION-REPORT (WS-FIRST-TIME = 'Y'); the flag is set to 'N' immediately after, so headers are only written once at report start and then at each page break via line counter modulo check"
+        },
+        {
+          "dependency": "Page total must be written before headers on page break",
+          "description": "In 1100-WRITE-TRANSACTION-REPORT, 1110-WRITE-PAGE-TOTALS is called before 1120-WRITE-HEADERS when the line counter modulo page size equals zero, ensuring totals from the previous page appear before the new page header"
+        },
+        {
+          "dependency": "Account total write depends on card number sequence",
+          "description": "Account totals are written only when a new card number is detected and WS-FIRST-TIME is 'N'; this assumes the TRANSACT-FILE is sorted or grouped by TRAN-CARD-NUM, otherwise account totals will be incomplete or incorrect"
+        },
+        {
+          "dependency": "Transaction type and category lookups depend on valid reference data",
+          "description": "TRANTYPE-FILE and TRANCATG-FILE must contain matching records for every TRAN-TYPE-CD and TRAN-TYPE-CD/TRAN-CAT-CD combination present in TRANSACT-FILE; an INVALID KEY condition causes an immediate program abend with no recovery"
+        },
+        {
+          "dependency": "XREF-FILE must contain a record for every card number in TRANSACT-FILE",
+          "description": "The READ of XREF-FILE in 1500-A-LOOKUP-XREF uses INVALID KEY to abend the program; there is no soft-error handling, so every card number in the transaction file must have a corresponding cross-reference entry"
+        },
+        {
+          "dependency": "Composite key integrity for TRANCATG-FILE lookup",
+          "description": "FD-TRAN-CAT-KEY is built from two separate fields (FD-TRAN-TYPE-CD from TRAN-TYPE-CD and FD-TRAN-CAT-CD from TRAN-CAT-CD); both fields must be correctly populated in TRAN-RECORD before 1500-C-LOOKUP-TRANCATG is called"
+        },
+        {
+          "dependency": "End-of-file branch contains misplaced logic",
+          "description": "The ELSE branch of 'IF END-OF-FILE = N' in the main loop executes ADD TRAN-AMT and page/grand total writes when END-OF-FILE is 'Y'; this means the last transaction amount is added to totals in the EOF branch rather than the normal detail path, creating a data flow dependency on the EOF detection timing"
+        },
+        {
+          "dependency": "WS-GRAND-TOTAL accumulation depends on page total writes",
+          "description": "WS-GRAND-TOTAL is only incremented inside 1110-WRITE-PAGE-TOTALS; if no page break occurs before EOF, the final page total added in the EOF branch must also flow through 1110-WRITE-PAGE-TOTALS to be included in the grand total"
+        },
+        {
+          "dependency": "All files must be successfully opened before processing begins",
+          "description": "All six OPEN statements are performed sequentially before any data is read; failure of any open causes an immediate abend via 9999-ABEND-PROGRAM, so all files are a hard prerequisite for execution"
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "All six files (TRANFILE, REPTFILE, CARDXREF, TRANTYPE, TRANCATG, DATEPARM) follow an identical pattern: APPL-RESULT is pre-set to 8 before the OPEN, then set to 0 on success or 12 on failure. If not APPL-AOK, a descriptive DISPLAY message is issued, the file status is moved to IO-STATUS, 9910-DISPLAY-IO-STATUS is performed, and 9999-ABEND-PROGRAM is called. All file open errors are fatal and immediately terminate the program."
+      },
+      {
+        "category": "File Read Errors (Sequential Files)",
+        "description": "For TRANSACT-FILE (1000-TRANFILE-GET-NEXT) and DATE-PARMS-FILE (0550-DATEPARM-READ), file status is evaluated using EVALUATE: '00' maps to APPL-RESULT=0 (success), '10' maps to APPL-RESULT=16 (EOF), and any OTHER maps to APPL-RESULT=12 (error). EOF sets END-OF-FILE='Y' to gracefully terminate the main loop. Any other read error triggers a DISPLAY message, IO-STATUS population, 9910-DISPLAY-IO-STATUS, and 9999-ABEND-PROGRAM for a fatal termination."
+      },
+      {
+        "category": "Indexed File Lookup Errors (INVALID KEY)",
+        "description": "Random reads against XREF-FILE (1500-A-LOOKUP-XREF), TRANTYPE-FILE (1500-B-LOOKUP-TRANTYPE), and TRANCATG-FILE (1500-C-LOOKUP-TRANCATG) use the INVALID KEY clause. When a key is not found, a DISPLAY message identifies the invalid key value, IO-STATUS is set to 23 (a standard VSAM not-found code), 9910-DISPLAY-IO-STATUS is performed, and 9999-ABEND-PROGRAM is called. All invalid key conditions are treated as fatal; there is no soft-error or skip logic for missing reference data."
+      },
+      {
+        "category": "File Write Errors",
+        "description": "In 1111-WRITE-REPORT-REC, after each WRITE to REPORT-FILE, TRANREPT-STATUS is checked: '00' sets APPL-RESULT=0, anything else sets APPL-RESULT=12. If not APPL-AOK, 'ERROR WRITING REPTFILE' is displayed, TRANREPT-STATUS is moved to IO-STATUS, 9910-DISPLAY-IO-STATUS is performed, and 9999-ABEND-PROGRAM is called. All write errors are fatal."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "All six close routines (9000–9500) follow the same pattern as open routines: APPL-RESULT is pre-set to 8, then evaluated after CLOSE. A status of '00' resets APPL-RESULT to 0; otherwise it is set to 12. Failures trigger a descriptive DISPLAY, IO-STATUS population, 9910-DISPLAY-IO-STATUS, and 9999-ABEND-PROGRAM. Close errors are fatal. Note: 9000 and 9100 use arithmetic idioms (ADD 8 TO ZERO, SUBTRACT APPL-RESULT FROM APPL-RESULT) functionally equivalent to MOVE."
+      },
+      {
+        "category": "IO Status Display and Decoding",
+        "description": "9910-DISPLAY-IO-STATUS provides a centralized status decoder. If IO-STATUS is non-numeric or IO-STAT1='9' (indicating a system/hardware error), it extracts the binary second byte via TWO-BYTES-BINARY redefinition to produce a numeric status code displayed as IO-STATUS-04. For standard numeric statuses, it formats and displays the two-byte code in a four-character field. This routine is always called before abending to provide diagnostic detail."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "9999-ABEND-PROGRAM provides a single centralized abend routine. It displays 'ABENDING PROGRAM', sets TIMING=0 and ABCODE=999, then calls the IBM Language Environment routine 'CEE3ABD' to force a controlled abnormal termination with a user abend code of 999. This ensures the job step fails with a recognizable abend code and that upstream job schedulers or JCL can detect the failure."
+      },
+      {
+        "category": "Date Range Filtering (Soft Skip Logic)",
+        "description": "Within the main processing loop, transactions whose TRAN-PROC-TS falls outside the WS-START-DATE to WS-END-DATE range are silently skipped using NEXT SENTENCE. This is not an error condition per se but represents the only non-fatal data-level filtering; no message is logged for out-of-range transactions."
+      }
+    ]
+  }
+}

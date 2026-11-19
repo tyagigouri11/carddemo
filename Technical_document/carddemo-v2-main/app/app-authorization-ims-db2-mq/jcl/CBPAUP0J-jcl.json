@@ -1,0 +1,122 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBPAUP0J.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **CBPAUP0J**, executes an IMS Batch Message Processing (BMP) program called **CBPAUP0C** to delete expired authorizations within a CardDemo application. It runs against IMS databases using the Program Specification Block (PSB) **PSBPAUTB**, which defines the database access requirements for the authorization purge process. The job serves a critical data maintenance function by removing outdated or expired authorization records, ensuring the system remains clean and operationally efficient.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "CBPAUP0J",
+          "description": "The name assigned to this job, used to identify it in the job queue and system logs. It allows operators and users to track and manage the job."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "CARDDEMO",
+          "description": "The accounting information positional parameter passed to the installation accounting routine. Used for job tracking, billing, and resource accounting purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to a specific initiator class, determining scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (JES message log). MSGCLASS=H directs the system messages and job log to output class H, determining where the job log is routed for printing or viewing."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including operator commands and responses to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. REGION=0M allows the job to use the maximum available region size, effectively removing memory constraints on the job execution."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, sending a TSO notification message upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP01",
+        "purpose": "Executes the IMS BMP (Batch Message Processing) application program CBPAUP0C to delete expired authorizations from the IMS database DBPAUTP0, using PSB PSBPAUTB which provides access to the PAUTSUM0 and PAUTDTL1 segments.",
+        "programs": "DFSRRC00 (CBPAUP0C)*",
+        "inputs": "SYSIN (control parameters: 00,00001,00001,Y); IMS.PSBLIB (PSB library containing PSBPAUTB); IMS.DBDLIB (DBD library containing DBPAUTP0); IMS.PROCLIB (IMS procedure library); IMS.SDFSRESL (IMS system resident library)",
+        "outputs": "SYSOUX (system output), SYSOUT (system output), SYSABOUT (abend output), ABENDAID (abend diagnostic output), SYSPRINT (print output), SYSUDUMP (system dump output), IMSERR (IMS error output); IEFRDER (dummy), IMSLOGR (dummy)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.SDFSRESL",
+        "operations": "READ",
+        "description": "STEPLIB - IMS system load library providing IMS runtime modules for the BMP region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "XXXXXXXX.PROD.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB - Customer application load library containing the CBPAUP0C program"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.SDFSRESL",
+        "operations": "READ",
+        "description": "DFSRESLB - IMS resident library used by the IMS region controller"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.PROCLIB",
+        "operations": "READ",
+        "description": "PROCLIB - IMS procedure library providing IMS configuration and execution procedures"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.SDFSRESL",
+        "operations": "READ",
+        "description": "DFSSEL - IMS system executable library referenced for IMS region execution"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.PSBLIB",
+        "operations": "READ",
+        "description": "IMS DD - PSB library providing the PSBPAUTB program specification block definition"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "IMS.DBDLIB",
+        "operations": "READ",
+        "description": "IMS DD - DBD library providing the database descriptor definitions for IMS databases"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSIN",
+        "operations": "READ",
+        "description": "Inline SYSIN control parameters (00,00001,00001,Y) passed to the IMS BMP region for program execution control"
+      },
+      {
+        "step": "STEP01",
+        "type": "IMS",
+        "objects": "DBPAUTP0 (segments: PAUTSUM0, PAUTDTL1)",
+        "operations": "READ, DELETE",
+        "description": "IMS BMP program CBPAUP0C accesses IMS database DBPAUTP0 via PSB PSBPAUTB with PROCOPT=AP (read and delete). It reads and deletes expired authorizations from the PAUTSUM0 (root segment) and PAUTDTL1 (child segment under PAUTSUM0) segments of the DBPAUTP0 database"
+      }
+    ]
+  }
+}

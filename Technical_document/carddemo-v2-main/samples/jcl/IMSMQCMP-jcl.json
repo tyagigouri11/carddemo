@@ -1,0 +1,287 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "IMSMQCMP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job (IMSMQCMP) compiles and link-edits a COBOL program (IMSMQPGM) that integrates three middleware technologies: CICS (transaction processing), IMS (database access), and MQ (message queuing). The job first translates the COBOL source through the CICS preprocessor to handle embedded CICS commands, then compiles the translated code using the IBM COBOL compiler, and finally link-edits the resulting object module with the necessary CICS, IMS, and MQ stub libraries. The end result is an executable load module stored in a CICS load library, enabling the program to process transactions that interact with both IMS databases and MQ message queues within a CICS environment.",
+      "parameters": [
+        {
+          "name": "ACTINFO1",
+          "value": "ACTINFO1",
+          "description": "Positional parameter specifying the accounting information for the job, used for billing and resource tracking purposes."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": null,
+          "description": "Not explicitly specified in this JCL."
+        },
+        {
+          "name": "NAME",
+          "value": "Compile CICS IMS MQ",
+          "description": "Positional parameter providing a descriptive name or programmer name for the job, appearing on job output and logs to identify the job's purpose."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class that determines which initiator will pick up and execute the job, controlling job scheduling and resource allocation on the system."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion or failure. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "TRN",
+        "purpose": "Translates the CICS/DLI/COBOL3 source program IMSMQPGM using the CICS Command Level Interpreter (DFHECP1$), converting CICS commands into standard COBOL statements suitable for compilation.",
+        "programs": "DFHECP1$*",
+        "inputs": "SYSIN: AWS.M2.COBOL.SRC(IMSMQPGM); STEPLIB: CICSTS.CICS.SDFHLOAD",
+        "outputs": "SYSPUNCH: &&SYSCIN (temporary dataset, passed to next step); SYSPRINT: SYSOUT"
+      },
+      {
+        "step": "COBOL",
+        "purpose": "Compiles the CICS-translated COBOL source for IMSMQPGM using the IBM Enterprise COBOL compiler (IGYCRCTL) with options NODYNAM, OBJECT, RENT, APOST, MAP, and XREF, producing an object module for linking.",
+        "programs": "IGYCRCTL*",
+        "inputs": "SYSIN: &&SYSCIN (translated source from TRN step); SYSLIB: CEE.SCEESAMP, CICSTS.CICS.SDFHCOB, MQ.SCSQCOBC, AWS.M2.COBCOPY; STEPLIB: IGY.SIGYCOMP.V63, CEE.SCEERUN, CEE.SCEERUN2",
+        "outputs": "SYSLIN: &&LOADSET (object module, passed to LKED step); SYSPRINT: SYSOUT; SYSUT1-SYSUT15, SYSMDECK: temporary work datasets"
+      },
+      {
+        "step": "COPYIMS",
+        "purpose": "Uses IEBGENER to create a temporary sequential dataset containing the linkage editor control statements that define the entry point and module name for IMSMQPGM.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: inline data containing 'ENTRY IMSMQPGM' and 'NAME IMSMQPGM(R)' statements; SYSIN: DUMMY",
+        "outputs": "SYSUT2: &&COPYIMS (temporary dataset with IMS link control statements, passed to LKED step); SYSPRINT: SYSOUT"
+      },
+      {
+        "step": "COPYLINK",
+        "purpose": "Uses IEBGENER to create a temporary sequential dataset containing the INCLUDE statement for the CICS interface stub module DFHELII, which is required for linking CICS programs.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: inline data containing 'INCLUDE SYSLIB(DFHELII)' statement; SYSIN: DUMMY",
+        "outputs": "SYSUT2: &&COPYLINK (temporary dataset with CICS link control statements, passed to LKED step); SYSPRINT: SYSOUT"
+      },
+      {
+        "step": "COPYMQ",
+        "purpose": "Uses IEBGENER to create a temporary sequential dataset containing the INCLUDE statement for the MQ stub module CSQCSTUB, which is required for linking MQ-enabled programs.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: inline data containing 'INCLUDE CSQSTUB(CSQCSTUB)' statement; SYSIN: DUMMY",
+        "outputs": "SYSUT2: &&COPYMQ (temporary dataset with MQ link control statements, passed to LKED step); SYSPRINT: SYSOUT"
+      },
+      {
+        "step": "LKED",
+        "purpose": "Links the compiled object module for IMSMQPGM together with the CICS interface stub (DFHELII), the MQ stub (CSQCSTUB), and IMS entry point definitions using the IBM Linkage Editor (IEWL) with LIST and XREF options, producing an executable load module stored in the CICS load library.",
+        "programs": "IEWL*",
+        "inputs": "SYSLIN: &&COPYLINK (CICS INCLUDE control), &&COPYMQ (MQ INCLUDE control), &&LOADSET (compiled object module), &&COPYIMS (IMS entry/name control); SYSLIB: MQ.SCSQLOAD, SYS1.LINKLIB, CEE.SCEELKED, CICSTS.CICS.SDFHLOAD, IMS.SDFSRESL; CSQSTUB: MQ.SCSQLOAD",
+        "outputs": "SYSLMOD: AWS.M2.CICSLOAD(IMSMQPGM) (executable load module); SYSPRINT: SYSOUT; SYSUT1: temporary work dataset"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "CICSTS.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "STEPLIB - CICS load library used to execute the DFHECP1$ CICS translator program"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "AWS.M2.COBOL.SRC(IMSMQPGM)",
+        "operations": "READ",
+        "description": "SYSIN - Source COBOL program IMSMQPGM read as input to the CICS translator"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSPRINT - Translator listing output written to SYSOUT"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "&&SYSCIN",
+        "operations": "WRITE",
+        "description": "SYSPUNCH - Translated CICS COBOL source written to temporary dataset &&SYSCIN, passed to next step"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "IGY.SIGYCOMP.V63",
+        "operations": "READ",
+        "description": "STEPLIB - IBM Enterprise COBOL compiler library"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "CEE.SCEERUN",
+        "operations": "READ",
+        "description": "STEPLIB - Language Environment runtime library"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "CEE.SCEERUN2",
+        "operations": "READ",
+        "description": "STEPLIB - Language Environment runtime library 2"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSPRINT - COBOL compiler listing output written to SYSOUT"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "WRITE",
+        "description": "SYSLIN - Compiled object deck written to temporary dataset &&LOADSET, passed to LKED step"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "CEE.SCEESAMP",
+        "operations": "READ",
+        "description": "SYSLIB - Language Environment sample copybook library used during compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "CICSTS.CICS.SDFHCOB",
+        "operations": "READ",
+        "description": "SYSLIB - CICS COBOL copybook library used during compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "MQ.SCSQCOBC",
+        "operations": "READ",
+        "description": "SYSLIB - MQ COBOL copybook library used during compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "AWS.M2.COBCOPY",
+        "operations": "READ",
+        "description": "SYSLIB - Application COBOL copybook library used during compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "&&SYSCIN",
+        "operations": "READ",
+        "description": "SYSIN - Translated CICS COBOL source from TRN step read as compiler input, then deleted"
+      },
+      {
+        "step": "COPYIMS",
+        "type": "Dataset",
+        "objects": "&&COPYIMS",
+        "operations": "WRITE",
+        "description": "SYSUT2 - IEBGENER copies inline ENTRY/NAME linkage control statements for IMSMQPGM to temporary dataset &&COPYIMS, passed to LKED step"
+      },
+      {
+        "step": "COPYLINK",
+        "type": "Dataset",
+        "objects": "&&COPYLINK",
+        "operations": "WRITE",
+        "description": "SYSUT2 - IEBGENER copies inline INCLUDE SYSLIB(DFHELII) linkage control statement to temporary dataset &&COPYLINK, passed to LKED step"
+      },
+      {
+        "step": "COPYMQ",
+        "type": "Dataset",
+        "objects": "&&COPYMQ",
+        "operations": "WRITE",
+        "description": "SYSUT2 - IEBGENER copies inline INCLUDE CSQSTUB(CSQCSTUB) linkage control statement to temporary dataset &&COPYMQ, passed to LKED step"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "MQ.SCSQLOAD",
+        "operations": "READ",
+        "description": "SYSLIB - MQ load library searched for modules during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYS1.LINKLIB",
+        "operations": "READ",
+        "description": "SYSLIB - System link library searched for modules during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKED",
+        "operations": "READ",
+        "description": "SYSLIB - Language Environment link-edit library searched for modules during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CICSTS.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "SYSLIB - CICS load library searched for modules during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "IMS.SDFSRESL",
+        "operations": "READ",
+        "description": "SYSLIB - IMS load library searched for modules during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "MQ.SCSQLOAD",
+        "operations": "READ",
+        "description": "CSQSTUB - MQ stub load library used to resolve MQ stub module CSQCSTUB during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&COPYLINK",
+        "operations": "READ",
+        "description": "SYSLIN - Linkage control statements including DFHELII read from temporary dataset, then deleted"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&COPYMQ",
+        "operations": "READ",
+        "description": "SYSLIN - Linkage control statements including CSQCSTUB read from temporary dataset, then deleted"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "READ",
+        "description": "SYSLIN - Compiled object deck read from temporary dataset, then deleted"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&COPYIMS",
+        "operations": "READ",
+        "description": "SYSLIN - ENTRY/NAME linkage control statements for IMSMQPGM read from temporary dataset, then deleted"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSPRINT - Linkage editor map and cross-reference listing written to SYSOUT"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CICSLOAD(IMSMQPGM)",
+        "operations": "WRITE",
+        "description": "SYSLMOD - Linked executable load module IMSMQPGM written to the CICS load library"
+      }
+    ]
+  }
+}

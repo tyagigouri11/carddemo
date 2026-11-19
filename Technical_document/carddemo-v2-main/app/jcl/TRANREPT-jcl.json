@@ -1,0 +1,141 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANREPT.jcl",
+        "type": "jcl"
+      },
+      "overview": "The TRANREPT job generates a formatted transaction report for the CardDemo credit card application by processing VSAM transaction data through a three-step pipeline. It first unloads the transaction VSAM dataset to a sequential backup file, then filters and sorts transactions within a specific date range (January 1, 2022 to July 6, 2022) by card number, and finally produces a formatted report using the CBTRN03C program. The business purpose is to provide a structured, date-filtered summary of processed credit card transactions, enriched with card cross-reference, transaction type, and category data.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "TRANREPT",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, logging, and referencing the job in the JES queue."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'TRANSACTION REPORT'",
+          "description": "The accounting information or job description string passed to the system for billing or identification purposes. It labels this job as a Transaction Report job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class that determines which initiator will pick up and execute the job. Class A typically represents a general-purpose or default execution class, affecting scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages (JES job log). Class 0 determines where the job's system output messages are routed, such as to a specific spool output queue or printer."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion or failure. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, ensuring the submitter receives a completion notification."
+        },
+        {
+          "name": "JCLLIB ORDER",
+          "value": "'AWS.M2.CARDDEMO.PROC'",
+          "description": "Defines the private procedure library search order for the job. It instructs JES to search the dataset AWS.M2.CARDDEMO.PROC when resolving cataloged procedures (such as REPROC) referenced in the job steps, before searching system procedure libraries."
+        }
+      ],
+      "procedures": [
+        "REPROC"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PRC001",
+        "purpose": "Unloads the processed transaction VSAM KSDS dataset into a sequential backup file using IDCAMS REPRO. This creates a new generation of the backup GDG dataset from the VSAM source.",
+        "programs": "IDCAMS*",
+        "inputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (FILEIN)",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1) (FILEOUT, new GDG generation, LRECL=350, RECFM=FB); SYSPRINT"
+      },
+      {
+        "step": "STEP05R",
+        "purpose": "Filters the transaction backup file to include only transactions with a processing date between 2022-01-01 and 2022-07-06, then sorts the filtered records in ascending order by card number (TRAN-CARD-NUM). The output is stored as a new generation of the daily transaction dataset.",
+        "programs": "SORT*",
+        "inputs": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1) (SORTIN); SYMNAMES: TRAN-CARD-NUM at position 263 length 16 (ZD), TRAN-PROC-DT at position 305 length 10 (CH), PARM-START-DATE=C'2022-01-01', PARM-END-DATE=C'2022-07-06'; SYSIN: SORT FIELDS=(TRAN-CARD-NUM,A), INCLUDE COND=(TRAN-PROC-DT,GE,PARM-START-DATE,AND,TRAN-PROC-DT,LE,PARM-END-DATE)",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.DALY(+1) (SORTOUT, new GDG generation, DCB inherited from SORTIN); SYSOUT"
+      },
+      {
+        "step": "STEP10R",
+        "purpose": "Executes the customer application program CBTRN03C to produce a formatted transaction report for the filtered and sorted daily transactions. The program reads transaction data along with card cross-reference, transaction type, transaction category, and date parameter files to generate a formatted report output.",
+        "programs": "CBTRN03C",
+        "inputs": "AWS.M2.CARDDEMO.TRANSACT.DALY(+1) (TRANFILE), AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (CARDXREF), AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS (TRANTYPE), AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS (TRANCATG), AWS.M2.CARDDEMO.DATEPARM (DATEPARM)",
+        "outputs": "AWS.M2.CARDDEMO.TRANREPT(+1) (TRANREPT, new GDG generation, LRECL=133, RECFM=FB); SYSOUT, SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads from the VSAM KSDS transaction file as input"
+      },
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO writes a copy of the VSAM KSDS transaction file to a new generation of the backup sequential dataset"
+      },
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)",
+        "operations": "READ",
+        "description": "SORT reads the newly created backup sequential transaction dataset as input"
+      },
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.DALY(+1)",
+        "operations": "WRITE",
+        "description": "SORT writes filtered and sorted records to a new generation of the daily transaction dataset; records are included only where TRAN-PROC-DT is between 2022-01-01 and 2022-07-06, sorted ascending by TRAN-CARD-NUM"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.DALY(+1)",
+        "operations": "READ",
+        "description": "CBTRN03C reads the filtered and sorted daily transaction dataset as input for report generation"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBTRN03C reads the card cross-reference VSAM KSDS to look up card information during report processing"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBTRN03C reads the transaction type VSAM KSDS to look up transaction type descriptions during report processing"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBTRN03C reads the transaction category VSAM KSDS to look up transaction category descriptions during report processing"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DATEPARM",
+        "operations": "READ",
+        "description": "CBTRN03C reads the date parameter dataset to obtain date parameters used in report processing"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANREPT(+1)",
+        "operations": "WRITE",
+        "description": "CBTRN03C writes the formatted transaction report output to a new generation of the report dataset with LRECL=133 fixed-block format"
+      }
+    ]
+  }
+}

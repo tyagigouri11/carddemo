@@ -1,0 +1,1461 @@
+{
+    "name": "CBACT02C.cbl",
+    "program_name": "CBACT02C.cbl",
+    "generated_at": "2026-11-05T08:42:18Z",
+    "overview": {
+        "total_key_functionalities": 10,
+        "total_rules": 56,
+        "main_flow_diagram": "flowchart TD\n    A([Program Start]):::start\n    B[1:Program Initialization\nDisplay 'START OF EXECUTION OF PROGRAM CBACT02C']:::process\n    C[2:Card File Open\nOpen CARDFILE-FILE for sequential reading]:::process\n    CARDFILE1[(CARDFILE-FILE\nVSAM KSDS Indexed)]:::datasource\n    D{File Open\nSuccessful?}:::decision\n    E[9:Error Reporting\nDisplay 'ERROR OPENING CARDFILE'\nDisplay IO Status Message]:::process\n    F[10:Abnormal Program Termination\nAbend Program with Code 999]:::final\n    G{6:Card File Processing Loop\nEnd of File Reached?}:::decision\n    H[3:Sequential Card Record Read\nRead next card record from CARDFILE-FILE]:::process\n    I{4:End-of-File Detection\nIs EOF flag set?}:::decision\n    J[5:Card Record Display\nDisplay Card Number and Card Data]:::process\n    K[9:Error Reporting\nDisplay 'ERROR READING CARDFILE'\nDisplay IO Status Message]:::process\n    L[10:Abnormal Program Termination\nAbend Program with Code 999]:::final\n    M[7:Card File Close\nClose CARDFILE-FILE]:::process\n    N{File Close\nSuccessful?}:::decision\n    O[9:Error Reporting\nDisplay 'ERROR CLOSING CARDFILE'\nDisplay IO Status Message]:::process\n    P[10:Abnormal Program Termination\nAbend Program with Code 999]:::final\n    Q[8:Program Completion\nDisplay 'END OF EXECUTION OF PROGRAM CBACT02C']:::process\n    R([Program End]):::final\n\n    A --> B\n    B --> C\n    CARDFILE1 -.->|Open File| C\n    C --> D\n    D -->|No - Open Failed| E\n    E --> F\n    D -->|Yes - Open Success| G\n    G -->|No - Continue Reading| H\n    CARDFILE1 -.->|Read Record| H\n    H --> I\n    I -->|No - Record Retrieved| J\n    J --> G\n    I -->|Yes - EOF Detected| G\n    H --> K\n    K -->|Read Error Occurred| L\n    G -->|Yes - EOF Reached| M\n    CARDFILE1 -.->|Close File| M\n    M --> N\n    N -->|No - Close Failed| O\n    O --> P\n    N -->|Yes - Close Success| Q\n    Q --> R\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-CBACT02C-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Initialization Announcement",
+                "rule_description": "The program must announce its start before any card file processing begins, providing a clear audit trail marker for the beginning of execution.",
+                "sub_graph_node_text": "1:Program Initialization\nDisplay 'START OF EXECUTION OF PROGRAM CBACT02C'",
+                "acceptance_criteria": {
+                    "Given": "The Card File Reader program CBACT02C is invoked",
+                    "When": "The program begins execution before any file operations are performed",
+                    "Then": "The program displays the message 'START OF EXECUTION OF PROGRAM CBACT02C' to signal the beginning of processing"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "Card File Open for Sequential Reading",
+                "rule_description": "Before any card records can be read and displayed, the Card File (CARDFILE-FILE) must be successfully opened for sequential input reading.",
+                "sub_graph_node_text": "2:Card File Open\nOpen CARDFILE-FILE for sequential reading",
+                "acceptance_criteria": {
+                    "Given": "The program has announced its start and is ready to process card records",
+                    "When": "The program attempts to open the Card File (CARDFILE-FILE) for sequential reading",
+                    "Then": "The Card File is opened for input access, making all card records available for sequential retrieval"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00003",
+                "rule_type": "Decision Rules",
+                "rule_name": "Card File Open Success Validation",
+                "rule_description": "The program must verify that the Card File was successfully opened before proceeding to read any card records. If the file cannot be opened, processing cannot continue.",
+                "sub_graph_node_text": "File Open\nSuccessful?",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to open the Card File (CARDFILE-FILE) for sequential reading",
+                    "When": "The file open operation completes and the file status is evaluated",
+                    "Then": "If the file status is successful (status code '00'), the program proceeds to the card file processing loop; if the file status indicates any failure (any status other than '00'), the program triggers an error reporting and abnormal termination sequence"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00004",
+                "rule_type": "Process Rules",
+                "rule_name": "Card File Open Error Reporting",
+                "rule_description": "When the Card File cannot be opened, the program must report the failure with a descriptive error message and the specific file status details to support problem diagnosis.",
+                "sub_graph_node_text": "9:Error Reporting\nDisplay 'ERROR OPENING CARDFILE'\nDisplay IO Status Message",
+                "acceptance_criteria": {
+                    "Given": "The program attempted to open the Card File (CARDFILE-FILE) and the open operation failed",
+                    "When": "The file open failure is detected",
+                    "Then": "The program displays the message 'ERROR OPENING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00005",
+                "rule_type": "Action Rules",
+                "rule_name": "Abnormal Program Termination on Card File Open Failure",
+                "rule_description": "When the Card File cannot be opened, the program must terminate abnormally with a specific abend code to signal a critical failure to the operations team.",
+                "sub_graph_node_text": "10:Abnormal Program Termination\nAbend Program with Code 999",
+                "acceptance_criteria": {
+                    "Given": "The Card File open operation has failed and the error message has been displayed",
+                    "When": "The program invokes the abnormal termination routine",
+                    "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00006",
+                "rule_type": "Decision Rules",
+                "rule_name": "Card File Processing Loop - End of File Check",
+                "rule_description": "The program must continuously read and display card records in a loop, checking after each read cycle whether the end of the Card File has been reached to determine if processing should continue or stop.",
+                "sub_graph_node_text": "6:Card File Processing Loop\nEnd of File Reached?",
+                "acceptance_criteria": {
+                    "Given": "The Card File has been successfully opened and the program is in the card record processing loop",
+                    "When": "The end-of-file flag is evaluated at the start of each loop iteration",
+                    "Then": "If the end-of-file flag is 'N' (not reached), the program proceeds to read the next card record; if the end-of-file flag is 'Y' (end reached), the program exits the loop and proceeds to close the Card File"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00007",
+                "rule_type": "Process Rules",
+                "rule_name": "Sequential Card Record Read",
+                "rule_description": "Within the processing loop, the program reads the next available card record sequentially from the Card File into the card record data area.",
+                "sub_graph_node_text": "3:Sequential Card Record Read\nRead next card record from CARDFILE-FILE",
+                "acceptance_criteria": {
+                    "Given": "The Card File is open, the end-of-file flag is 'N', and the program is inside the card file processing loop",
+                    "When": "The program reads the next record from the Card File (CARDFILE-FILE) into the CARD-RECORD data area",
+                    "Then": "The card record data is loaded into CARD-RECORD and the file status is set to reflect the outcome of the read operation (successful read, end of file, or read error)"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00008",
+                "rule_type": "Decision Rules",
+                "rule_name": "End-of-File Detection After Card Record Read",
+                "rule_description": "After each card record read attempt, the program must determine whether the end of the Card File was reached or a valid record was retrieved, to decide whether to display the record or exit the loop.",
+                "sub_graph_node_text": "4:End-of-File Detection\nIs EOF flag set?",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to read the next card record from the Card File",
+                    "When": "The file status returned from the read operation is evaluated",
+                    "Then": "If the file status is successful (status code '00'), the end-of-file flag remains 'N' and the program proceeds to display the card record; if the file status indicates end of file (status code '10'), the end-of-file flag is set to 'Y' and the program returns to the loop condition check without displaying a record; if the file status indicates any other error condition, the program triggers read error reporting and abnormal termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00009",
+                "rule_type": "Process Rules",
+                "rule_name": "Card Record Display",
+                "rule_description": "Each successfully retrieved card record must be displayed in full, presenting all card data contained within the record.",
+                "sub_graph_node_text": "5:Card Record Display\nDisplay Card Number and Card Data",
+                "acceptance_criteria": {
+                    "Given": "A card record has been successfully read from the Card File and the end-of-file flag is still 'N'",
+                    "When": "The program processes the successfully retrieved card record",
+                    "Then": "The complete contents of the CARD-RECORD (including card number and all card data fields) are displayed to the output"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00010",
+                "rule_type": "Process Rules",
+                "rule_name": "Card File Read Error Reporting",
+                "rule_description": "When an unexpected error occurs while reading a card record (not an end-of-file condition), the program must report the failure with a descriptive error message and the specific file status details.",
+                "sub_graph_node_text": "9:Error Reporting\nDisplay 'ERROR READING CARDFILE'\nDisplay IO Status Message",
+                "acceptance_criteria": {
+                    "Given": "The program attempted to read the next card record from the Card File and the read operation returned a status other than successful (status '00') or end-of-file (status '10')",
+                    "When": "The read error condition is detected",
+                    "Then": "The program displays the message 'ERROR READING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00011",
+                "rule_type": "Action Rules",
+                "rule_name": "Abnormal Program Termination on Card File Read Error",
+                "rule_description": "When an unexpected error occurs while reading a card record, the program must terminate abnormally with a specific abend code to signal a critical failure.",
+                "sub_graph_node_text": "10:Abnormal Program Termination\nAbend Program with Code 999",
+                "acceptance_criteria": {
+                    "Given": "A card file read error has occurred and the error message has been displayed",
+                    "When": "The program invokes the abnormal termination routine",
+                    "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00012",
+                "rule_type": "Process Rules",
+                "rule_name": "Card File Close After Processing Completion",
+                "rule_description": "After all card records have been read and displayed (end of file reached), the Card File must be properly closed to complete the processing cycle.",
+                "sub_graph_node_text": "7:Card File Close\nClose CARDFILE-FILE",
+                "acceptance_criteria": {
+                    "Given": "The end-of-file flag has been set to 'Y', indicating all card records have been processed, and the program has exited the processing loop",
+                    "When": "The program executes the Card File close operation",
+                    "Then": "The Card File (CARDFILE-FILE) is closed and the file status is set to reflect the outcome of the close operation"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00013",
+                "rule_type": "Decision Rules",
+                "rule_name": "Card File Close Success Validation",
+                "rule_description": "The program must verify that the Card File was successfully closed after all records have been processed. A failure to close the file is treated as a critical error.",
+                "sub_graph_node_text": "File Close\nSuccessful?",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to close the Card File (CARDFILE-FILE) after completing all record processing",
+                    "When": "The file close operation completes and the file status is evaluated",
+                    "Then": "If the file status is successful (status code '00'), the program proceeds to display the program completion message; if the file status indicates any failure (any status other than '00'), the program triggers an error reporting and abnormal termination sequence"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00014",
+                "rule_type": "Process Rules",
+                "rule_name": "Card File Close Error Reporting",
+                "rule_description": "When the Card File cannot be properly closed after processing, the program must report the failure with a descriptive error message and the specific file status details.",
+                "sub_graph_node_text": "9:Error Reporting\nDisplay 'ERROR CLOSING CARDFILE'\nDisplay IO Status Message",
+                "acceptance_criteria": {
+                    "Given": "The program attempted to close the Card File (CARDFILE-FILE) and the close operation failed",
+                    "When": "The file close failure is detected",
+                    "Then": "The program displays the message 'ERROR CLOSING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00015",
+                "rule_type": "Action Rules",
+                "rule_name": "Abnormal Program Termination on Card File Close Failure",
+                "rule_description": "When the Card File cannot be properly closed, the program must terminate abnormally with a specific abend code to signal a critical failure.",
+                "sub_graph_node_text": "10:Abnormal Program Termination\nAbend Program with Code 999",
+                "acceptance_criteria": {
+                    "Given": "The Card File close operation has failed and the error message has been displayed",
+                    "When": "The program invokes the abnormal termination routine",
+                    "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT02C-cbl-00016",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Completion Announcement",
+                "rule_description": "Upon successful completion of all card file processing and file closure, the program must announce its normal end to provide a clear audit trail marker for the completion of execution.",
+                "sub_graph_node_text": "8:Program Completion\nDisplay 'END OF EXECUTION OF PROGRAM CBACT02C'",
+                "acceptance_criteria": {
+                    "Given": "All card records have been successfully read and displayed, and the Card File has been successfully closed",
+                    "When": "The program reaches its normal completion point",
+                    "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT02C' and terminates normally"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "program-initialization",
+            "title": "Program Initialization",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Program Start])\n    B[Display Program Start Message\\n'START OF EXECUTION OF PROGRAM CBACT02C']\n    C([Proceed to Card File Open])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00017",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Program Execution Start Announcement",
+                    "rule_description": "Before any card data file processing begins, the program must announce its start of execution by displaying a start message. This ensures traceability and confirms the program has been initiated successfully.",
+                    "sub_graph_node_text": "Display Program Start Message\n'START OF EXECUTION OF PROGRAM CBACT02C'",
+                    "acceptance_criteria": {
+                        "Given": "The Card Data File Reading program CBACT02C has been invoked and is ready to begin execution",
+                        "When": "The program starts its execution before performing any file operations or data processing",
+                        "Then": "The program must display the message 'START OF EXECUTION OF PROGRAM CBACT02C' to confirm that execution has commenced, after which the program proceeds to open the Card File"
+                    },
+                    "key_functionality_id": "program-initialization"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Initialization"
+        },
+        {
+            "id": "card-file-open",
+            "title": "Card File Open",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Card File Open])\n    B[Attempt to Open\\nCard Data File\\nfor Sequential Reading]\n    CARDFILE1[(CARDFILE-FILE\\nVSAM KSDS Indexed)]\n    C{Was File\\nOpened\\nSuccessfully?}\n    D[Card File Ready\\nfor Processing]\n    E[Display Error Message:\\n'ERROR OPENING CARDFILE']\n    F[Display Detailed\\nFile Status Information]\n    G[Terminate Program\\nAbnormally]\n    H([End: Card File Open])\n\n    A --> B\n    B -.->|Open Request| CARDFILE1\n    CARDFILE1 -.->|Open Response| C\n    C -->|Yes - File Opened Successfully| D\n    D --> H\n    C -->|No - File Open Failed| E\n    E --> F\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00018",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Open Card Data File for Sequential Reading",
+                    "rule_description": "The Card Data File must be opened for sequential reading before any card records can be accessed or processed. This is the mandatory first step in the card file processing workflow.",
+                    "sub_graph_node_text": "Attempt to Open Card Data File for Sequential Reading",
+                    "acceptance_criteria": {
+                        "Given": "The Card Data File (CARDFILE-FILE) is available and the program is starting its card record processing workflow",
+                        "When": "The program initiates the Card Data File open operation for sequential reading (INPUT mode)",
+                        "Then": "The Card Data File is prepared and made available for sequential record-by-record reading, allowing the program to proceed with processing all card records"
+                    },
+                    "key_functionality_id": "card-file-open"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00019",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Card File Open Success Validation",
+                    "rule_description": "After attempting to open the Card Data File, the program must verify whether the open operation completed successfully. A successful open means the file is ready for processing; any other outcome is treated as a failure.",
+                    "sub_graph_node_text": "Was File Opened Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "An attempt has been made to open the Card Data File for sequential reading",
+                        "When": "The file system returns a response to the open request \u2014 either a successful open confirmation (file status '00') or any other status indicating a failure",
+                        "Then": "If the file status is '00' (successful), the Card Data File is marked as ready for processing and the program continues normally; if the file status is anything other than '00', the open is treated as a failure and error handling is triggered"
+                    },
+                    "key_functionality_id": "card-file-open"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00020",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Card File Ready for Processing",
+                    "rule_description": "When the Card Data File has been successfully opened, it is confirmed as ready and the program proceeds to the card record reading and display workflow without any interruption.",
+                    "sub_graph_node_text": "Card File Ready for Processing",
+                    "acceptance_criteria": {
+                        "Given": "The Card Data File open operation has been attempted",
+                        "When": "The file open response confirms success (file status equals '00'), meaning the file is accessible and positioned at the first record",
+                        "Then": "The Card Data File is confirmed as ready for sequential record processing, and the program proceeds to the main card record reading loop without displaying any messages or errors"
+                    },
+                    "key_functionality_id": "card-file-open"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00021",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Error Notification on Card File Open Failure",
+                    "rule_description": "When the Card Data File cannot be opened successfully, the program must immediately notify the user or operator with a clear error message identifying that the Card File open operation has failed.",
+                    "sub_graph_node_text": "Display Error Message: 'ERROR OPENING CARDFILE'",
+                    "acceptance_criteria": {
+                        "Given": "An attempt has been made to open the Card Data File for sequential reading",
+                        "When": "The file open operation fails \u2014 the file status returned is anything other than '00' (successful)",
+                        "Then": "The program displays the error message 'ERROR OPENING CARDFILE' to alert the operator that the Card Data File could not be opened and processing cannot continue"
+                    },
+                    "key_functionality_id": "card-file-open"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00022",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Detailed File Status Information on Open Failure",
+                    "rule_description": "Following the error notification for a Card File open failure, the program must display detailed file status information to assist in diagnosing the root cause of the failure. This provides additional context beyond the simple error message.",
+                    "sub_graph_node_text": "Display Detailed File Status Information",
+                    "acceptance_criteria": {
+                        "Given": "The Card Data File open operation has failed and the error message 'ERROR OPENING CARDFILE' has been displayed",
+                        "When": "The program proceeds to report the detailed status of the failed file operation by invoking the file status display routine (9910-DISPLAY-IO-STATUS), which formats and displays the file status code \u2014 handling both numeric status codes (displayed as a 4-character formatted status in the pattern 'FILE STATUS IS: NNNN' followed by the status value) and non-numeric or system-specific status codes (where the first status character and a binary-converted second status character are combined and displayed in the same 'FILE STATUS IS: NNNN' pattern)",
+                        "Then": "The detailed file status information is displayed to the operator, providing the specific status code that caused the open failure to support problem diagnosis and resolution"
+                    },
+                    "key_functionality_id": "card-file-open"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00023",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Abnormal Program Termination on Card File Open Failure",
+                    "rule_description": "When the Card Data File cannot be opened, the program cannot perform its core function of reading and displaying card records. Therefore, after reporting the error and file status details, the program must terminate abnormally to signal that processing did not complete successfully.",
+                    "sub_graph_node_text": "Terminate Program Abnormally",
+                    "acceptance_criteria": {
+                        "Given": "The Card Data File open operation has failed, the error message has been displayed, and the detailed file status information has been shown",
+                        "When": "The program invokes the abnormal termination routine (9999-ABEND-PROGRAM), which calls the system abnormal termination service 'CEE3ABD' with an abort code of 999",
+                        "Then": "The program terminates abnormally with abort code 999, displaying 'ABENDING PROGRAM' before termination, signaling to the operator and any calling processes that the Card File processing job has failed and did not complete successfully \u2014 no card records are read or displayed"
+                    },
+                    "key_functionality_id": "card-file-open"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card File Open"
+        },
+        {
+            "id": "sequential-card-record-read",
+            "title": "Sequential Card Record Read",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Read Next Card Record])\n    B[Read Next Card Record\\nSequentially from CARDFILE-FILE]\n    CARDFILE1[(CARDFILE-FILE\\nVSAM KSDS Indexed)]\n    C{Was Record\\nRead Successfully?}\n    D{Has End of\\nFile Been Reached?}\n    E[Mark End-of-File Flag\\nas 'Y']\n    F[Card Record Successfully\\nLoaded into Memory\\nReady for Display]\n    G[Display Error Message\\n'ERROR READING CARDFILE'\\nwith IO Status Details]\n    H[Terminate Program\\nAbnormally]\n    I([Return: Record Ready\\nfor Processing])\n    J([Return: End of File\\nSignaled])\n\n    A --> B\n    CARDFILE1 -.->|Sequential Read| B\n    B --> C\n    C -->|Yes - Record Retrieved| F\n    F --> I\n    C -->|No - Read Failed| D\n    D -->|Yes - No More Records| E\n    E --> J\n    D -->|No - Unexpected Read Error| G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00024",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Read of Next Card Record from Card File",
+                    "rule_description": "The program reads the next available card record sequentially from the Card File, one record at a time, loading it into memory for further processing.",
+                    "sub_graph_node_text": "Read Next Card Record\nSequentially from CARDFILE-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Card File has been successfully opened and is ready for sequential reading, and the End-of-File flag is set to 'N' indicating records may still be available",
+                        "When": "The program requests the next card record sequentially from the Card File",
+                        "Then": "The next card record is retrieved from the Card File and loaded into the card record memory area, making it available for display and processing"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00025",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Successful Card Record Retrieval Confirmation",
+                    "rule_description": "When a card record is read without any errors, the record is confirmed as successfully loaded into memory and is marked as ready for display.",
+                    "sub_graph_node_text": "Card Record Successfully\nLoaded into Memory\nReady for Display",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Card File",
+                        "When": "The Card File returns a successful read status indicating the record was retrieved without any issues",
+                        "Then": "The card record is confirmed as successfully loaded into memory, the operation result is marked as successful (AOK), and the record is ready to be displayed"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00026",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Detection During Card Record Read",
+                    "rule_description": "When a read attempt on the Card File does not return a record successfully, the program determines whether the condition is a normal end-of-file or an unexpected error.",
+                    "sub_graph_node_text": "Has End of\nFile Been Reached?",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Card File and the read was not successful",
+                        "When": "The Card File returns an end-of-file status indicating there are no more records to be read",
+                        "Then": "The operation result is marked as End-of-File (EOF), signaling that all card records have been processed and no more records are available"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00027",
+                    "rule_type": "Action Rules",
+                    "rule_name": "End-of-File Flag Set to Stop Card Record Processing",
+                    "rule_description": "When the end of the Card File is reached, the End-of-File flag is set to 'Y' to signal the processing loop to stop reading and exit gracefully.",
+                    "sub_graph_node_text": "Mark End-of-File Flag\nas 'Y'",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Card File and the end-of-file condition has been detected",
+                        "When": "The program confirms that the end-of-file status has been reached with no more card records available",
+                        "Then": "The End-of-File flag is set to 'Y', which will cause the card record processing loop to exit on its next iteration check, stopping all further card record reads"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00028",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Unexpected Card File Read Error Detection",
+                    "rule_description": "When a card record read fails for any reason other than a normal end-of-file, the program identifies it as an unexpected read error and displays a descriptive error message along with the file status details.",
+                    "sub_graph_node_text": "Display Error Message\n'ERROR READING CARDFILE'\nwith IO Status Details",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Card File, the read was not successful, and the condition is not a normal end-of-file",
+                        "When": "The Card File returns an unexpected error status that is neither a successful read nor an end-of-file condition",
+                        "Then": "The operation result is marked as an error, the message 'ERROR READING CARDFILE' is displayed, and the file status details are captured and displayed to identify the nature of the read failure"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00029",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Program Termination on Unrecoverable Card File Read Error",
+                    "rule_description": "When an unexpected and unrecoverable error occurs while reading a card record, the program terminates abnormally to prevent processing of incomplete or corrupt data.",
+                    "sub_graph_node_text": "Terminate Program\nAbnormally",
+                    "acceptance_criteria": {
+                        "Given": "An unexpected error has occurred during a card record read operation, the error message 'ERROR READING CARDFILE' and file status details have been displayed",
+                        "When": "The program determines the card file read error is unrecoverable and cannot continue processing",
+                        "Then": "The program terminates abnormally immediately, halting all further card record processing to prevent any incomplete or erroneous data from being processed or displayed"
+                    },
+                    "key_functionality_id": "sequential-card-record-read"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Sequential Card Record Read"
+        },
+        {
+            "id": "end",
+            "title": "End",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([After Card Record Read Attempt])\n    B{Was Read\\nSuccessful?\\nStatus = 00}\n    C{Did We Reach\\nEnd of Card File?\\nStatus = 10}\n    D[Signal End of Processing\\nSet End-of-File Flag to YES]\n    E[Report Read Error\\nDisplay Error Message]\n    F[10:Abnormal Program Termination\\nAbend Program]\n    G{Is End-of-File\\nFlag Set to YES?}\n    H([Exit Processing Loop\\nNo More Cards to Read])\n    I([Continue to Next\\nCard Record])\n\n    A --> B\n    B -->|Yes - Record Read OK| G\n    B -->|No - Read Failed| C\n    C -->|Yes - No More Records| D\n    C -->|No - Unexpected Error| E\n    E --> F\n    D --> G\n    G -->|Yes - EOF Detected| H\n    G -->|No - More Records Exist| I",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00030",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Successful Card Record Read Confirmation",
+                    "rule_description": "After attempting to read a card record, the system confirms whether the read operation completed successfully, marking the record as available for display and further processing.",
+                    "sub_graph_node_text": "Was Read Successful? Status = 00",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been attempted on the Card File to retrieve the next card record",
+                        "When": "The Card File returns a successful read status indicating the record was retrieved without any issues",
+                        "Then": "The system marks the operation result as successful (result code = 0), confirming the card record is available and valid for display and processing"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00031",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End of Card File Detection",
+                    "rule_description": "After an unsuccessful card record read, the system determines whether the failure was due to reaching the natural end of the Card File, distinguishing a normal completion condition from an unexpected error.",
+                    "sub_graph_node_text": "Did We Reach End of Card File? Status = 10",
+                    "acceptance_criteria": {
+                        "Given": "A read operation on the Card File did not return a successful status, meaning no new card record was retrieved",
+                        "When": "The Card File signals that there are no more records to read, indicating the end of the file has been reached",
+                        "Then": "The system marks the operation result as an end-of-file condition (result code = 16), signaling that all card records have been processed and no further reads should be attempted"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00032",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Signal End of Card Processing Loop",
+                    "rule_description": "When the end of the Card File is detected, the system sets the End-of-File flag to YES to formally signal that all card records have been read and the processing loop should be terminated.",
+                    "sub_graph_node_text": "Signal End of Processing - Set End-of-File Flag to YES",
+                    "acceptance_criteria": {
+                        "Given": "The system has determined that the Card File has reached its end-of-file condition (result code = 16)",
+                        "When": "The end-of-file result is confirmed after the read attempt",
+                        "Then": "The End-of-File flag is set to YES, formally signaling that all card records have been exhausted and no further card records are available for processing"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00033",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Unexpected Card File Read Error Reporting and Termination",
+                    "rule_description": "When a card record read fails for any reason other than a normal end-of-file, the system reports the error with a descriptive message and the file status details, then immediately terminates the program abnormally to prevent further incorrect processing.",
+                    "sub_graph_node_text": "Report Read Error - Display Error Message",
+                    "acceptance_criteria": {
+                        "Given": "A read operation on the Card File has failed and the failure is not due to reaching the end of the file",
+                        "When": "An unexpected error condition is detected during the card record read attempt",
+                        "Then": "The system displays the message 'ERROR READING CARDFILE', displays the detailed file status information to assist in diagnosing the issue, and immediately triggers an abnormal program termination (abend) to halt all further processing"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00034",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Exit Card Processing Loop When All Records Are Read",
+                    "rule_description": "The card record processing loop continuously checks the End-of-File flag before each iteration. Once the flag is set to YES, the loop exits immediately, ensuring no further read attempts are made after all card records have been processed.",
+                    "sub_graph_node_text": "Exit Processing Loop - No More Cards to Read",
+                    "acceptance_criteria": {
+                        "Given": "The card record processing loop is actively running and evaluating whether more records need to be processed",
+                        "When": "The End-of-File flag has been set to YES, indicating that all card records in the Card File have been read and displayed",
+                        "Then": "The processing loop exits immediately without attempting any further card record reads, and control passes to the Card File closure step"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00035",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue Processing Next Card Record When File Not Exhausted",
+                    "rule_description": "After a successful card record read, the system verifies the End-of-File flag is still set to NO before displaying the record, ensuring only valid, fully retrieved records are displayed and the loop continues to the next card.",
+                    "sub_graph_node_text": "Continue to Next Card Record",
+                    "acceptance_criteria": {
+                        "Given": "A card record read attempt has been completed and the End-of-File flag status is being evaluated",
+                        "When": "The End-of-File flag remains set to NO after the read, confirming a valid card record was successfully retrieved",
+                        "Then": "The successfully retrieved card record is displayed, and the processing loop continues to attempt reading the next card record from the Card File"
+                    },
+                    "key_functionality_id": "end"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "End"
+        },
+        {
+            "id": "card-record-display",
+            "title": "Card Record Display",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Card Record Retrieved Successfully])\n    B{Is Current Record\\nValid?\\nEnd-of-File = No}\n    C[Extract Card Details\\nfrom Card Record]\n    D[Display Card Number]\n    E[Display Associated\\nCard Data]\n    F([Return to\\nProcessing Loop])\n    G([Skip Display\\nEnd of File Reached])\n\n    A --> B\n    B -->|Yes - Valid Record Available| C\n    C --> D\n    D --> E\n    E --> F\n    B -->|No - End of File Detected| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00036",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Card Record Availability Before Display",
+                    "rule_description": "Before displaying a card record, the system must verify that the record retrieved is a valid, non-end-of-file record. Only records confirmed as available (End-of-File flag is 'No') are eligible for display. This rule prevents display of a non-existent record when the end of the Card File has been reached.",
+                    "sub_graph_node_text": "Is Current Record Valid?\nEnd-of-File = No",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Card File and a result has been returned",
+                        "When": "The system evaluates whether the End-of-File flag is set to 'No', indicating a real card record was successfully retrieved",
+                        "Then": "If the End-of-File flag is 'No', the card record is considered valid and eligible for display; if the End-of-File flag is 'Yes', the record is not valid and display is skipped"
+                    },
+                    "key_functionality_id": "card-record-display"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00037",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Valid Card Record Details",
+                    "rule_description": "When a valid card record has been confirmed as available (End-of-File is 'No'), the complete card record \u2014 including the card number and all associated card data \u2014 must be displayed to the output. This is the core business output action of the program.",
+                    "sub_graph_node_text": "Display Card Number\nDisplay Associated Card Data",
+                    "acceptance_criteria": {
+                        "Given": "A card record has been successfully retrieved from the Card File and the End-of-File flag is confirmed as 'No'",
+                        "When": "The system processes the valid card record for output",
+                        "Then": "The complete card record details, including the card number and all associated card data contained within the record, are displayed to the output"
+                    },
+                    "key_functionality_id": "card-record-display"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00038",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Skip Card Record Display When End of File Is Reached",
+                    "rule_description": "When the Card File signals that there are no more records to process (End-of-File condition is detected), the display step must be bypassed entirely. No output is produced for the end-of-file condition itself, and control returns to the processing loop which will then terminate.",
+                    "sub_graph_node_text": "Skip Display\nEnd of File Reached",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Card File and the End-of-File flag has been set to 'Yes', indicating no further card records are available",
+                        "When": "The system evaluates the End-of-File flag and finds it is not 'No'",
+                        "Then": "The card record display step is skipped entirely, no card data is output, and control returns to the processing loop to allow it to terminate"
+                    },
+                    "key_functionality_id": "card-record-display"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00039",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Extract Card Details from Retrieved Card Record",
+                    "rule_description": "When a valid card record is confirmed as available, the card details \u2014 comprising the card number and all associated card data \u2014 are sourced directly from the card record that was read from the Card File into the card record storage area during the retrieval step.",
+                    "sub_graph_node_text": "Extract Card Details\nfrom Card Record",
+                    "acceptance_criteria": {
+                        "Given": "A successful read operation has populated the card record storage area with data from the Card File",
+                        "When": "The End-of-File flag is confirmed as 'No', indicating the card record storage area contains valid card data",
+                        "Then": "The card record storage area, containing the card number and all associated card data as read directly from the Card File, is used as the source for display output"
+                    },
+                    "key_functionality_id": "card-record-display"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card Record Display"
+        },
+        {
+            "id": "card-file-processing-loop",
+            "title": "Card File Processing Loop",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start Card File Processing Loop])\n    B{Is End of\\nFile Reached?}\n    C[Read Next Card Record\\nfrom CARDFILE-FILE]\n    D{Was Record\\nRead Successfully?}\n    E{Is End of\\nFile Detected?}\n    F[Display Card Record\\nCard Number and Card Data]\n    G[Display Error Message\\nfor Failed Read]\n    H[10: Abnormal Program\\nTermination]\n    I([End of Loop\\nProceed to File Close])\n\n    A --> B\n    B -->|No - Continue Processing| C\n    C --> D\n    D -->|Yes - Record Retrieved| F\n    F --> B\n    D -->|No - Check Reason| E\n    E -->|Yes - EOF Reached\\nSet EOF Flag| B\n    B -->|Yes - EOF Flag Set| I\n    E -->|No - Read Error Occurred| G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00040",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Evaluate End-of-File Status Before Reading Next Card Record",
+                    "rule_description": "Before attempting to read the next card record, the program checks whether the end of the Card File has already been reached. If the end-of-file flag is set, no further reading is attempted and the loop exits to proceed with file closure.",
+                    "sub_graph_node_text": "Is End of File Reached?",
+                    "acceptance_criteria": {
+                        "Given": "The Card File processing loop is active and the End-of-File flag is being evaluated",
+                        "When": "The End-of-File flag is checked at the start of each loop iteration",
+                        "Then": "If the End-of-File flag is set to 'Y', the loop terminates and processing proceeds to close the Card File; if the End-of-File flag is 'N', the program proceeds to read the next card record"
+                    },
+                    "key_functionality_id": "card-file-processing-loop"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00041",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Read Next Card Record from Card File",
+                    "rule_description": "When the end of file has not been reached, the program reads the next sequential card record from the Card File into the Card Record data area for further processing.",
+                    "sub_graph_node_text": "Read Next Card Record from CARDFILE-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Card File is open for reading and the End-of-File flag is 'N'",
+                        "When": "The program attempts to retrieve the next card record from the Card File",
+                        "Then": "The next card record is read from the Card File and stored in the Card Record data area, and the read result status is evaluated to determine the next action"
+                    },
+                    "key_functionality_id": "card-file-processing-loop"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00042",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Card Record Upon Successful Read",
+                    "rule_description": "When a card record is successfully retrieved from the Card File, the complete card record \u2014 including card number and all card data \u2014 is displayed. The loop then continues to check for the next record.",
+                    "sub_graph_node_text": "Display Card Record Card Number and Card Data",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Card File and the End-of-File flag remains 'N' after the read",
+                        "When": "The card record is confirmed as successfully retrieved (read status is successful and end-of-file flag is not set)",
+                        "Then": "The complete Card Record is displayed, and the loop iterates back to check the End-of-File flag for the next read cycle"
+                    },
+                    "key_functionality_id": "card-file-processing-loop"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect End-of-File Condition and Stop Card Record Processing",
+                    "rule_description": "When a read attempt returns an end-of-file indicator (no more card records exist in the file), the End-of-File flag is set to signal that all card records have been processed. The loop then re-evaluates the flag and exits cleanly.",
+                    "sub_graph_node_text": "Is End of File Detected?",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Card File and the read did not return a successful record",
+                        "When": "The read result indicates that the end of the Card File has been reached (file status is end-of-file)",
+                        "Then": "The End-of-File flag is set to 'Y', the loop re-evaluates the flag, determines EOF is reached, and exits the loop to proceed with Card File closure \u2014 no card record is displayed"
+                    },
+                    "key_functionality_id": "card-file-processing-loop"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00044",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Handle Card File Read Failure with Error Display and Program Termination",
+                    "rule_description": "When a card record read operation fails for any reason other than a normal end-of-file condition, an error message is displayed along with the file status details, and the program is immediately terminated abnormally to prevent further incorrect processing.",
+                    "sub_graph_node_text": "Display Error Message for Failed Read",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Card File and the read did not return a successful record",
+                        "When": "The read result indicates an unexpected failure \u2014 neither a successful read nor a normal end-of-file condition",
+                        "Then": "The message 'ERROR READING CARDFILE' is displayed, the Card File status details are displayed, and the program is immediately terminated abnormally \u2014 no further card records are read or displayed"
+                    },
+                    "key_functionality_id": "card-file-processing-loop"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card File Processing Loop"
+        },
+        {
+            "id": "card-file-close",
+            "title": "Card File Close",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Card File Close - Start])\n    B[Close CARDFILE-FILE]\n    CARDFILE1[(CARDFILE-FILE\\nVSAM KSDS Indexed)]\n    C{Close Operation\\nSuccessful?}\n    D[9:Error Reporting\\nDisplay 'ERROR CLOSING CARDFILE'\\nDisplay Detailed IO Status Message]\n    E[10:Abnormal Program Termination\\nTerminate Program Abnormally]\n    F([Card File Close - End])\n\n    A --> B\n    CARDFILE1 -.->|Close File| B\n    B --> C\n    C -->|Yes - File Closed Successfully| F\n    C -->|No - Close Operation Failed| D\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00045",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Card File Must Be Closed After All Records Are Processed",
+                    "rule_description": "After all card records have been read and displayed, the Card File must be formally closed to complete the processing cycle.",
+                    "sub_graph_node_text": "Close CARDFILE-FILE",
+                    "acceptance_criteria": {
+                        "Given": "All card records have been read and displayed from the Card File",
+                        "When": "The end of the Card File has been reached and the read loop has completed",
+                        "Then": "The Card File is closed to finalize the processing session"
+                    },
+                    "key_functionality_id": "card-file-close"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00046",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Card File Close Operation Must Complete Successfully",
+                    "rule_description": "The Card File close operation must be verified for success. A successful close confirms the Card File processing session has ended cleanly with no data integrity issues.",
+                    "sub_graph_node_text": "Close Operation Successful?",
+                    "acceptance_criteria": {
+                        "Given": "A close operation has been attempted on the Card File",
+                        "When": "The Card File close operation returns a successful completion status",
+                        "Then": "The Card File close process ends normally and program execution continues to completion"
+                    },
+                    "key_functionality_id": "card-file-close"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00047",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Card File Close Failure Must Be Reported as an Error",
+                    "rule_description": "If the Card File cannot be closed successfully, a descriptive error message must be displayed along with the detailed file status information to identify the nature of the failure.",
+                    "sub_graph_node_text": "9:Error Reporting\nDisplay 'ERROR CLOSING CARDFILE'\nDisplay Detailed IO Status Message",
+                    "acceptance_criteria": {
+                        "Given": "A close operation has been attempted on the Card File",
+                        "When": "The Card File close operation does not return a successful completion status",
+                        "Then": "The error message 'ERROR CLOSING CARDFILE' is displayed, followed by a detailed file status message showing the specific status code in the format 'FILE STATUS IS: NNNN' with the actual status value appended"
+                    },
+                    "key_functionality_id": "card-file-close"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00048",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Program Must Terminate Abnormally When Card File Cannot Be Closed",
+                    "rule_description": "A failure to close the Card File is a critical error condition that requires immediate abnormal termination of the program to prevent data loss or corruption.",
+                    "sub_graph_node_text": "10:Abnormal Program Termination\nTerminate Program Abnormally",
+                    "acceptance_criteria": {
+                        "Given": "The Card File close operation has failed and the error details have been displayed",
+                        "When": "The close failure error reporting is complete",
+                        "Then": "The program is immediately terminated abnormally by invoking the abnormal termination routine with termination code 999"
+                    },
+                    "key_functionality_id": "card-file-close"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card File Close"
+        },
+        {
+            "id": "program-completion",
+            "title": "Program Completion",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Enter Program Completion])\n    B[Display 'END OF EXECUTION OF\\nPROGRAM CBACT02C']\n    C([Program Returns Control\\nto Calling System])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00049",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Program Completion Message",
+                    "rule_description": "Upon successful completion of reading and displaying all card records from the Card File, the program must display a message confirming the end of execution before returning control to the calling system.",
+                    "sub_graph_node_text": "Display 'END OF EXECUTION OF PROGRAM CBACT02C'",
+                    "acceptance_criteria": {
+                        "Given": "The program has successfully completed reading all card records from the Card File and has closed the Card File without errors",
+                        "When": "All card records have been processed and displayed, and the Card File has been closed successfully",
+                        "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT02C' to confirm successful completion of the card data file reading and printing process, and then returns control to the calling system"
+                    },
+                    "key_functionality_id": "program-completion"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Completion"
+        },
+        {
+            "id": "error-reporting",
+            "title": "Error Reporting",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Error Reporting Triggered])\n    B[Display Operation-Specific\\nError Message\\ne.g. ERROR OPENING/READING/CLOSING CARDFILE]\n    C[Capture Current\\nFile Status Code]\n    D{Is File Status\\nNon-Numeric OR\\nStatus starts with '9'?}\n    E[Format Status as\\nVendor-Specific Code\\nUsing Binary Conversion]\n    F[Format Status as\\nStandard 4-Digit\\nNumeric Code]\n    G[Display Formatted\\nFile Status Message\\n'FILE STATUS IS: NNNN' + Status Code]\n    H([Return to Calling\\nFile Operation])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes - Special/Vendor Status| E\n    D -->|No - Standard Numeric Status| F\n    E --> G\n    F --> G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00050",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Operation-Specific Error Message on File Operation Failure",
+                    "rule_description": "When a Card File operation (open, read, or close) fails, the system must immediately display a descriptive error message that identifies which specific operation encountered the failure, so that the nature of the problem is clearly communicated.",
+                    "sub_graph_node_text": "Display Operation-Specific Error Message e.g. ERROR OPENING/READING/CLOSING CARDFILE",
+                    "acceptance_criteria": {
+                        "Given": "A Card File operation (open, read, or close) has been attempted and has resulted in a failure condition",
+                        "When": "The error reporting process is triggered by the failed file operation",
+                        "Then": "The system must display a specific error message corresponding to the failed operation: 'ERROR OPENING CARDFILE' if the failure occurred during file open, 'ERROR READING CARDFILE' if the failure occurred during file read, or 'ERROR CLOSING CARDFILE' if the failure occurred during file close"
+                    },
+                    "key_functionality_id": "error-reporting"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00051",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture Current File Status Code at Point of Failure",
+                    "rule_description": "At the moment a Card File operation fails, the current file status code must be captured and preserved so it can be formatted and displayed as part of the error report.",
+                    "sub_graph_node_text": "Capture Current File Status Code",
+                    "acceptance_criteria": {
+                        "Given": "A Card File operation has failed and the operation-specific error message has been displayed",
+                        "When": "The error reporting process proceeds to capture the failure details",
+                        "Then": "The current Card File status code must be captured from the Card File status indicator and stored in the IO Status field for subsequent formatting and display"
+                    },
+                    "key_functionality_id": "error-reporting"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00052",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Classify File Status as Vendor-Specific or Standard for Error Formatting",
+                    "rule_description": "Before formatting the file status for display, the system must determine whether the captured status code represents a vendor-specific or non-standard error condition versus a standard numeric file status, as each type requires a different formatting approach.",
+                    "sub_graph_node_text": "Is File Status Non-Numeric OR Status starts with '9'?",
+                    "acceptance_criteria": {
+                        "Given": "The Card File status code has been captured into the IO Status field following a file operation failure",
+                        "When": "The error reporting process evaluates the nature of the status code",
+                        "Then": "If the IO Status value is non-numeric OR the first character of the IO Status (IO-STAT1) is '9', the status is classified as a vendor-specific or special status and must be formatted using the vendor-specific method; otherwise, if the IO Status is fully numeric and does not start with '9', it is classified as a standard status and must be formatted using the standard numeric method"
+                    },
+                    "key_functionality_id": "error-reporting"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00053",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Format Vendor-Specific or Non-Numeric File Status for Error Display",
+                    "rule_description": "When the file status is identified as vendor-specific or non-numeric, it must be formatted using a binary conversion method to accurately represent the status code in a displayable 4-character format, preserving the full meaning of the vendor-specific status.",
+                    "sub_graph_node_text": "Format Status as Vendor-Specific Code Using Binary Conversion",
+                    "acceptance_criteria": {
+                        "Given": "The Card File status code has been classified as vendor-specific or non-numeric (IO Status is non-numeric OR IO-STAT1 equals '9')",
+                        "When": "The vendor-specific status formatting process is applied",
+                        "Then": "The first character of the IO Status (IO-STAT1) must be placed in the first position of the 4-character display status field (IO-STATUS-04); the second character of the IO Status (IO-STAT2) must be converted through a binary representation (setting a two-byte binary field to zero, moving IO-STAT2 into the right byte, then moving the binary value to the status display sub-field IO-STATUS-0403) to produce the final 4-character formatted status code ready for display"
+                    },
+                    "key_functionality_id": "error-reporting"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00054",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Format Standard Numeric File Status for Error Display",
+                    "rule_description": "When the file status is identified as a standard numeric code, it must be formatted into a 4-character display field by padding with leading zeros and placing the 2-character status in the last two positions, producing a consistent 4-digit display format.",
+                    "sub_graph_node_text": "Format Status as Standard 4-Digit Numeric Code",
+                    "acceptance_criteria": {
+                        "Given": "The Card File status code has been classified as a standard numeric status (IO Status is fully numeric AND IO-STAT1 does not equal '9')",
+                        "When": "The standard numeric status formatting process is applied",
+                        "Then": "The 4-character display status field (IO-STATUS-04) must first be initialized to '0000', and then the 2-character IO Status value must be placed into positions 3 and 4 of the display field, resulting in a zero-padded 4-digit representation of the standard file status code"
+                    },
+                    "key_functionality_id": "error-reporting"
+                },
+                {
+                    "rule_id": "R-CBACT02C-cbl-00055",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Formatted File Status Error Message",
+                    "rule_description": "After the file status code has been formatted (either as vendor-specific or standard numeric), the system must display the formatted status code with a standard label so that the exact failure status is visible and meaningful to the user or operator.",
+                    "sub_graph_node_text": "Display Formatted File Status Message 'FILE STATUS IS: NNNN' + Status Code",
+                    "acceptance_criteria": {
+                        "Given": "The Card File status code has been formatted into the 4-character display field (IO-STATUS-04) using either the vendor-specific or standard numeric formatting method",
+                        "When": "The final step of the error reporting process executes",
+                        "Then": "The system must display the message 'FILE STATUS IS: NNNN' immediately followed by the 4-character formatted status code (IO-STATUS-04), providing the complete error status information before returning control to the calling file operation handler"
+                    },
+                    "key_functionality_id": "error-reporting"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Error Reporting"
+        },
+        {
+            "id": "abnormal-program-termination",
+            "title": "Abnormal Program Termination",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Critical File Error Detected])\n    B[Display 'ABENDING PROGRAM'\\nNotify that program is terminating abnormally]\n    C[Set Abnormal Termination Code 999\\nMark program for abnormal end]\n    D([Program Terminated Abnormally])\n\n    A --> B\n    B --> C\n    C --> D",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT02C-cbl-00056",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Abnormal Program Termination on Critical Card File Error",
+                    "rule_description": "When a critical and unrecoverable error occurs during card file processing (any file operation failure that is neither a successful operation nor a normal end-of-file condition), the program must notify operators of the abnormal termination and immediately abort execution with a designated termination code.",
+                    "sub_graph_node_text": "Critical File Error Detected",
+                    "acceptance_criteria": {
+                        "Given": "The card file processing is in progress (either during open, read, or close operations) AND a critical file error has been detected that is not a normal end-of-file condition",
+                        "When": "The file operation status is neither successful (status 00) nor end-of-file (status 10), indicating an unrecoverable file error has occurred",
+                        "Then": "The program must: (1) Display the message 'ABENDING PROGRAM' to notify operators that the program is terminating abnormally, (2) Set the abnormal termination code to 999 to mark the program for abnormal end, and (3) Terminate the program immediately and abnormally \u2014 no further card file records are read or displayed, and normal end-of-program processing is bypassed"
+                    },
+                    "key_functionality_id": "abnormal-program-termination"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Abnormal Program Termination"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File Reader program CBACT02C is invoked",
+                "When": "The program begins execution before any file operations are performed",
+                "Then": "The program displays the message 'START OF EXECUTION OF PROGRAM CBACT02C' to signal the beginning of processing"
+            },
+            "Rule_Name": "Program Initialization Announcement",
+            "Rule_Description": "The program must announce its start before any card file processing begins, providing a clear audit trail marker for the beginning of execution."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has announced its start and is ready to process card records",
+                "When": "The program attempts to open the Card File (CARDFILE-FILE) for sequential reading",
+                "Then": "The Card File is opened for input access, making all card records available for sequential retrieval"
+            },
+            "Rule_Name": "Card File Open for Sequential Reading",
+            "Rule_Description": "Before any card records can be read and displayed, the Card File (CARDFILE-FILE) must be successfully opened for sequential input reading."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00003",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to open the Card File (CARDFILE-FILE) for sequential reading",
+                "When": "The file open operation completes and the file status is evaluated",
+                "Then": "If the file status is successful (status code '00'), the program proceeds to the card file processing loop; if the file status indicates any failure (any status other than '00'), the program triggers an error reporting and abnormal termination sequence"
+            },
+            "Rule_Name": "Card File Open Success Validation",
+            "Rule_Description": "The program must verify that the Card File was successfully opened before proceeding to read any card records. If the file cannot be opened, processing cannot continue."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00004",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program attempted to open the Card File (CARDFILE-FILE) and the open operation failed",
+                "When": "The file open failure is detected",
+                "Then": "The program displays the message 'ERROR OPENING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+            },
+            "Rule_Name": "Card File Open Error Reporting",
+            "Rule_Description": "When the Card File cannot be opened, the program must report the failure with a descriptive error message and the specific file status details to support problem diagnosis."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00005",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File open operation has failed and the error message has been displayed",
+                "When": "The program invokes the abnormal termination routine",
+                "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+            },
+            "Rule_Name": "Abnormal Program Termination on Card File Open Failure",
+            "Rule_Description": "When the Card File cannot be opened, the program must terminate abnormally with a specific abend code to signal a critical failure to the operations team."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00006",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File has been successfully opened and the program is in the card record processing loop",
+                "When": "The end-of-file flag is evaluated at the start of each loop iteration",
+                "Then": "If the end-of-file flag is 'N' (not reached), the program proceeds to read the next card record; if the end-of-file flag is 'Y' (end reached), the program exits the loop and proceeds to close the Card File"
+            },
+            "Rule_Name": "Card File Processing Loop - End of File Check",
+            "Rule_Description": "The program must continuously read and display card records in a loop, checking after each read cycle whether the end of the Card File has been reached to determine if processing should continue or stop."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00007",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File is open, the end-of-file flag is 'N', and the program is inside the card file processing loop",
+                "When": "The program reads the next record from the Card File (CARDFILE-FILE) into the CARD-RECORD data area",
+                "Then": "The card record data is loaded into CARD-RECORD and the file status is set to reflect the outcome of the read operation (successful read, end of file, or read error)"
+            },
+            "Rule_Name": "Sequential Card Record Read",
+            "Rule_Description": "Within the processing loop, the program reads the next available card record sequentially from the Card File into the card record data area."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00008",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to read the next card record from the Card File",
+                "When": "The file status returned from the read operation is evaluated",
+                "Then": "If the file status is successful (status code '00'), the end-of-file flag remains 'N' and the program proceeds to display the card record; if the file status indicates end of file (status code '10'), the end-of-file flag is set to 'Y' and the program returns to the loop condition check without displaying a record; if the file status indicates any other error condition, the program triggers read error reporting and abnormal termination"
+            },
+            "Rule_Name": "End-of-File Detection After Card Record Read",
+            "Rule_Description": "After each card record read attempt, the program must determine whether the end of the Card File was reached or a valid record was retrieved, to decide whether to display the record or exit the loop."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00009",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A card record has been successfully read from the Card File and the end-of-file flag is still 'N'",
+                "When": "The program processes the successfully retrieved card record",
+                "Then": "The complete contents of the CARD-RECORD (including card number and all card data fields) are displayed to the output"
+            },
+            "Rule_Name": "Card Record Display",
+            "Rule_Description": "Each successfully retrieved card record must be displayed in full, presenting all card data contained within the record."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00010",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program attempted to read the next card record from the Card File and the read operation returned a status other than successful (status '00') or end-of-file (status '10')",
+                "When": "The read error condition is detected",
+                "Then": "The program displays the message 'ERROR READING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+            },
+            "Rule_Name": "Card File Read Error Reporting",
+            "Rule_Description": "When an unexpected error occurs while reading a card record (not an end-of-file condition), the program must report the failure with a descriptive error message and the specific file status details."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00011",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A card file read error has occurred and the error message has been displayed",
+                "When": "The program invokes the abnormal termination routine",
+                "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+            },
+            "Rule_Name": "Abnormal Program Termination on Card File Read Error",
+            "Rule_Description": "When an unexpected error occurs while reading a card record, the program must terminate abnormally with a specific abend code to signal a critical failure."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00012",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The end-of-file flag has been set to 'Y', indicating all card records have been processed, and the program has exited the processing loop",
+                "When": "The program executes the Card File close operation",
+                "Then": "The Card File (CARDFILE-FILE) is closed and the file status is set to reflect the outcome of the close operation"
+            },
+            "Rule_Name": "Card File Close After Processing Completion",
+            "Rule_Description": "After all card records have been read and displayed (end of file reached), the Card File must be properly closed to complete the processing cycle."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00013",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to close the Card File (CARDFILE-FILE) after completing all record processing",
+                "When": "The file close operation completes and the file status is evaluated",
+                "Then": "If the file status is successful (status code '00'), the program proceeds to display the program completion message; if the file status indicates any failure (any status other than '00'), the program triggers an error reporting and abnormal termination sequence"
+            },
+            "Rule_Name": "Card File Close Success Validation",
+            "Rule_Description": "The program must verify that the Card File was successfully closed after all records have been processed. A failure to close the file is treated as a critical error."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00014",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program attempted to close the Card File (CARDFILE-FILE) and the close operation failed",
+                "When": "The file close failure is detected",
+                "Then": "The program displays the message 'ERROR CLOSING CARDFILE', followed by the file status indicator message in the format 'FILE STATUS IS: NNNN' with the specific status value appended, before proceeding to abnormal termination"
+            },
+            "Rule_Name": "Card File Close Error Reporting",
+            "Rule_Description": "When the Card File cannot be properly closed after processing, the program must report the failure with a descriptive error message and the specific file status details."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00015",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File close operation has failed and the error message has been displayed",
+                "When": "The program invokes the abnormal termination routine",
+                "Then": "The program calls the system abend routine 'CEE3ABD' with abend code 999 and timing value 0, causing an immediate abnormal program termination"
+            },
+            "Rule_Name": "Abnormal Program Termination on Card File Close Failure",
+            "Rule_Description": "When the Card File cannot be properly closed, the program must terminate abnormally with a specific abend code to signal a critical failure."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00016",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All card records have been successfully read and displayed, and the Card File has been successfully closed",
+                "When": "The program reaches its normal completion point",
+                "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT02C' and terminates normally"
+            },
+            "Rule_Name": "Program Completion Announcement",
+            "Rule_Description": "Upon successful completion of all card file processing and file closure, the program must announce its normal end to provide a clear audit trail marker for the completion of execution."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00017",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data File Reading program CBACT02C has been invoked and is ready to begin execution",
+                "When": "The program starts its execution before performing any file operations or data processing",
+                "Then": "The program must display the message 'START OF EXECUTION OF PROGRAM CBACT02C' to confirm that execution has commenced, after which the program proceeds to open the Card File"
+            },
+            "Rule_Name": "Program Execution Start Announcement",
+            "Rule_Description": "Before any card data file processing begins, the program must announce its start of execution by displaying a start message. This ensures traceability and confirms the program has been initiated successfully."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00018",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data File (CARDFILE-FILE) is available and the program is starting its card record processing workflow",
+                "When": "The program initiates the Card Data File open operation for sequential reading (INPUT mode)",
+                "Then": "The Card Data File is prepared and made available for sequential record-by-record reading, allowing the program to proceed with processing all card records"
+            },
+            "Rule_Name": "Open Card Data File for Sequential Reading",
+            "Rule_Description": "The Card Data File must be opened for sequential reading before any card records can be accessed or processed. This is the mandatory first step in the card file processing workflow."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00019",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An attempt has been made to open the Card Data File for sequential reading",
+                "When": "The file system returns a response to the open request \u2014 either a successful open confirmation (file status '00') or any other status indicating a failure",
+                "Then": "If the file status is '00' (successful), the Card Data File is marked as ready for processing and the program continues normally; if the file status is anything other than '00', the open is treated as a failure and error handling is triggered"
+            },
+            "Rule_Name": "Card File Open Success Validation",
+            "Rule_Description": "After attempting to open the Card Data File, the program must verify whether the open operation completed successfully. A successful open means the file is ready for processing; any other outcome is treated as a failure."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00020",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data File open operation has been attempted",
+                "When": "The file open response confirms success (file status equals '00'), meaning the file is accessible and positioned at the first record",
+                "Then": "The Card Data File is confirmed as ready for sequential record processing, and the program proceeds to the main card record reading loop without displaying any messages or errors"
+            },
+            "Rule_Name": "Card File Ready for Processing",
+            "Rule_Description": "When the Card Data File has been successfully opened, it is confirmed as ready and the program proceeds to the card record reading and display workflow without any interruption."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00021",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An attempt has been made to open the Card Data File for sequential reading",
+                "When": "The file open operation fails \u2014 the file status returned is anything other than '00' (successful)",
+                "Then": "The program displays the error message 'ERROR OPENING CARDFILE' to alert the operator that the Card Data File could not be opened and processing cannot continue"
+            },
+            "Rule_Name": "Display Error Notification on Card File Open Failure",
+            "Rule_Description": "When the Card Data File cannot be opened successfully, the program must immediately notify the user or operator with a clear error message identifying that the Card File open operation has failed."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00022",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data File open operation has failed and the error message 'ERROR OPENING CARDFILE' has been displayed",
+                "When": "The program proceeds to report the detailed status of the failed file operation by invoking the file status display routine (9910-DISPLAY-IO-STATUS), which formats and displays the file status code \u2014 handling both numeric status codes (displayed as a 4-character formatted status in the pattern 'FILE STATUS IS: NNNN' followed by the status value) and non-numeric or system-specific status codes (where the first status character and a binary-converted second status character are combined and displayed in the same 'FILE STATUS IS: NNNN' pattern)",
+                "Then": "The detailed file status information is displayed to the operator, providing the specific status code that caused the open failure to support problem diagnosis and resolution"
+            },
+            "Rule_Name": "Display Detailed File Status Information on Open Failure",
+            "Rule_Description": "Following the error notification for a Card File open failure, the program must display detailed file status information to assist in diagnosing the root cause of the failure. This provides additional context beyond the simple error message."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00023",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Data File open operation has failed, the error message has been displayed, and the detailed file status information has been shown",
+                "When": "The program invokes the abnormal termination routine (9999-ABEND-PROGRAM), which calls the system abnormal termination service 'CEE3ABD' with an abort code of 999",
+                "Then": "The program terminates abnormally with abort code 999, displaying 'ABENDING PROGRAM' before termination, signaling to the operator and any calling processes that the Card File processing job has failed and did not complete successfully \u2014 no card records are read or displayed"
+            },
+            "Rule_Name": "Abnormal Program Termination on Card File Open Failure",
+            "Rule_Description": "When the Card Data File cannot be opened, the program cannot perform its core function of reading and displaying card records. Therefore, after reporting the error and file status details, the program must terminate abnormally to signal that processing did not complete successfully."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00024",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File has been successfully opened and is ready for sequential reading, and the End-of-File flag is set to 'N' indicating records may still be available",
+                "When": "The program requests the next card record sequentially from the Card File",
+                "Then": "The next card record is retrieved from the Card File and loaded into the card record memory area, making it available for display and processing"
+            },
+            "Rule_Name": "Sequential Read of Next Card Record from Card File",
+            "Rule_Description": "The program reads the next available card record sequentially from the Card File, one record at a time, loading it into memory for further processing."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00025",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Card File",
+                "When": "The Card File returns a successful read status indicating the record was retrieved without any issues",
+                "Then": "The card record is confirmed as successfully loaded into memory, the operation result is marked as successful (AOK), and the record is ready to be displayed"
+            },
+            "Rule_Name": "Successful Card Record Retrieval Confirmation",
+            "Rule_Description": "When a card record is read without any errors, the record is confirmed as successfully loaded into memory and is marked as ready for display."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00026",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Card File and the read was not successful",
+                "When": "The Card File returns an end-of-file status indicating there are no more records to be read",
+                "Then": "The operation result is marked as End-of-File (EOF), signaling that all card records have been processed and no more records are available"
+            },
+            "Rule_Name": "End-of-File Detection During Card Record Read",
+            "Rule_Description": "When a read attempt on the Card File does not return a record successfully, the program determines whether the condition is a normal end-of-file or an unexpected error."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00027",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Card File and the end-of-file condition has been detected",
+                "When": "The program confirms that the end-of-file status has been reached with no more card records available",
+                "Then": "The End-of-File flag is set to 'Y', which will cause the card record processing loop to exit on its next iteration check, stopping all further card record reads"
+            },
+            "Rule_Name": "End-of-File Flag Set to Stop Card Record Processing",
+            "Rule_Description": "When the end of the Card File is reached, the End-of-File flag is set to 'Y' to signal the processing loop to stop reading and exit gracefully."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00028",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Card File, the read was not successful, and the condition is not a normal end-of-file",
+                "When": "The Card File returns an unexpected error status that is neither a successful read nor an end-of-file condition",
+                "Then": "The operation result is marked as an error, the message 'ERROR READING CARDFILE' is displayed, and the file status details are captured and displayed to identify the nature of the read failure"
+            },
+            "Rule_Name": "Unexpected Card File Read Error Detection",
+            "Rule_Description": "When a card record read fails for any reason other than a normal end-of-file, the program identifies it as an unexpected read error and displays a descriptive error message along with the file status details."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00029",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An unexpected error has occurred during a card record read operation, the error message 'ERROR READING CARDFILE' and file status details have been displayed",
+                "When": "The program determines the card file read error is unrecoverable and cannot continue processing",
+                "Then": "The program terminates abnormally immediately, halting all further card record processing to prevent any incomplete or erroneous data from being processed or displayed"
+            },
+            "Rule_Name": "Program Termination on Unrecoverable Card File Read Error",
+            "Rule_Description": "When an unexpected and unrecoverable error occurs while reading a card record, the program terminates abnormally to prevent processing of incomplete or corrupt data."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00030",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been attempted on the Card File to retrieve the next card record",
+                "When": "The Card File returns a successful read status indicating the record was retrieved without any issues",
+                "Then": "The system marks the operation result as successful (result code = 0), confirming the card record is available and valid for display and processing"
+            },
+            "Rule_Name": "Successful Card Record Read Confirmation",
+            "Rule_Description": "After attempting to read a card record, the system confirms whether the read operation completed successfully, marking the record as available for display and further processing."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00031",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation on the Card File did not return a successful status, meaning no new card record was retrieved",
+                "When": "The Card File signals that there are no more records to read, indicating the end of the file has been reached",
+                "Then": "The system marks the operation result as an end-of-file condition (result code = 16), signaling that all card records have been processed and no further reads should be attempted"
+            },
+            "Rule_Name": "End of Card File Detection",
+            "Rule_Description": "After an unsuccessful card record read, the system determines whether the failure was due to reaching the natural end of the Card File, distinguishing a normal completion condition from an unexpected error."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00032",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has determined that the Card File has reached its end-of-file condition (result code = 16)",
+                "When": "The end-of-file result is confirmed after the read attempt",
+                "Then": "The End-of-File flag is set to YES, formally signaling that all card records have been exhausted and no further card records are available for processing"
+            },
+            "Rule_Name": "Signal End of Card Processing Loop",
+            "Rule_Description": "When the end of the Card File is detected, the system sets the End-of-File flag to YES to formally signal that all card records have been read and the processing loop should be terminated."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00033",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation on the Card File has failed and the failure is not due to reaching the end of the file",
+                "When": "An unexpected error condition is detected during the card record read attempt",
+                "Then": "The system displays the message 'ERROR READING CARDFILE', displays the detailed file status information to assist in diagnosing the issue, and immediately triggers an abnormal program termination (abend) to halt all further processing"
+            },
+            "Rule_Name": "Unexpected Card File Read Error Reporting and Termination",
+            "Rule_Description": "When a card record read fails for any reason other than a normal end-of-file, the system reports the error with a descriptive message and the file status details, then immediately terminates the program abnormally to prevent further incorrect processing."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00034",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card record processing loop is actively running and evaluating whether more records need to be processed",
+                "When": "The End-of-File flag has been set to YES, indicating that all card records in the Card File have been read and displayed",
+                "Then": "The processing loop exits immediately without attempting any further card record reads, and control passes to the Card File closure step"
+            },
+            "Rule_Name": "Exit Card Processing Loop When All Records Are Read",
+            "Rule_Description": "The card record processing loop continuously checks the End-of-File flag before each iteration. Once the flag is set to YES, the loop exits immediately, ensuring no further read attempts are made after all card records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00035",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A card record read attempt has been completed and the End-of-File flag status is being evaluated",
+                "When": "The End-of-File flag remains set to NO after the read, confirming a valid card record was successfully retrieved",
+                "Then": "The successfully retrieved card record is displayed, and the processing loop continues to attempt reading the next card record from the Card File"
+            },
+            "Rule_Name": "Continue Processing Next Card Record When File Not Exhausted",
+            "Rule_Description": "After a successful card record read, the system verifies the End-of-File flag is still set to NO before displaying the record, ensuring only valid, fully retrieved records are displayed and the loop continues to the next card."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00036",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Card File and a result has been returned",
+                "When": "The system evaluates whether the End-of-File flag is set to 'No', indicating a real card record was successfully retrieved",
+                "Then": "If the End-of-File flag is 'No', the card record is considered valid and eligible for display; if the End-of-File flag is 'Yes', the record is not valid and display is skipped"
+            },
+            "Rule_Name": "Validate Card Record Availability Before Display",
+            "Rule_Description": "Before displaying a card record, the system must verify that the record retrieved is a valid, non-end-of-file record. Only records confirmed as available (End-of-File flag is 'No') are eligible for display. This rule prevents display of a non-existent record when the end of the Card File has been reached."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00037",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A card record has been successfully retrieved from the Card File and the End-of-File flag is confirmed as 'No'",
+                "When": "The system processes the valid card record for output",
+                "Then": "The complete card record details, including the card number and all associated card data contained within the record, are displayed to the output"
+            },
+            "Rule_Name": "Display Valid Card Record Details",
+            "Rule_Description": "When a valid card record has been confirmed as available (End-of-File is 'No'), the complete card record \u2014 including the card number and all associated card data \u2014 must be displayed to the output. This is the core business output action of the program."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00038",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Card File and the End-of-File flag has been set to 'Yes', indicating no further card records are available",
+                "When": "The system evaluates the End-of-File flag and finds it is not 'No'",
+                "Then": "The card record display step is skipped entirely, no card data is output, and control returns to the processing loop to allow it to terminate"
+            },
+            "Rule_Name": "Skip Card Record Display When End of File Is Reached",
+            "Rule_Description": "When the Card File signals that there are no more records to process (End-of-File condition is detected), the display step must be bypassed entirely. No output is produced for the end-of-file condition itself, and control returns to the processing loop which will then terminate."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00039",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A successful read operation has populated the card record storage area with data from the Card File",
+                "When": "The End-of-File flag is confirmed as 'No', indicating the card record storage area contains valid card data",
+                "Then": "The card record storage area, containing the card number and all associated card data as read directly from the Card File, is used as the source for display output"
+            },
+            "Rule_Name": "Extract Card Details from Retrieved Card Record",
+            "Rule_Description": "When a valid card record is confirmed as available, the card details \u2014 comprising the card number and all associated card data \u2014 are sourced directly from the card record that was read from the Card File into the card record storage area during the retrieval step."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00040",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File processing loop is active and the End-of-File flag is being evaluated",
+                "When": "The End-of-File flag is checked at the start of each loop iteration",
+                "Then": "If the End-of-File flag is set to 'Y', the loop terminates and processing proceeds to close the Card File; if the End-of-File flag is 'N', the program proceeds to read the next card record"
+            },
+            "Rule_Name": "Evaluate End-of-File Status Before Reading Next Card Record",
+            "Rule_Description": "Before attempting to read the next card record, the program checks whether the end of the Card File has already been reached. If the end-of-file flag is set, no further reading is attempted and the loop exits to proceed with file closure."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00041",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File is open for reading and the End-of-File flag is 'N'",
+                "When": "The program attempts to retrieve the next card record from the Card File",
+                "Then": "The next card record is read from the Card File and stored in the Card Record data area, and the read result status is evaluated to determine the next action"
+            },
+            "Rule_Name": "Read Next Card Record from Card File",
+            "Rule_Description": "When the end of file has not been reached, the program reads the next sequential card record from the Card File into the Card Record data area for further processing."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00042",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Card File and the End-of-File flag remains 'N' after the read",
+                "When": "The card record is confirmed as successfully retrieved (read status is successful and end-of-file flag is not set)",
+                "Then": "The complete Card Record is displayed, and the loop iterates back to check the End-of-File flag for the next read cycle"
+            },
+            "Rule_Name": "Display Card Record Upon Successful Read",
+            "Rule_Description": "When a card record is successfully retrieved from the Card File, the complete card record \u2014 including card number and all card data \u2014 is displayed. The loop then continues to check for the next record."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Card File and the read did not return a successful record",
+                "When": "The read result indicates that the end of the Card File has been reached (file status is end-of-file)",
+                "Then": "The End-of-File flag is set to 'Y', the loop re-evaluates the flag, determines EOF is reached, and exits the loop to proceed with Card File closure \u2014 no card record is displayed"
+            },
+            "Rule_Name": "Detect End-of-File Condition and Stop Card Record Processing",
+            "Rule_Description": "When a read attempt returns an end-of-file indicator (no more card records exist in the file), the End-of-File flag is set to signal that all card records have been processed. The loop then re-evaluates the flag and exits cleanly."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00044",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Card File and the read did not return a successful record",
+                "When": "The read result indicates an unexpected failure \u2014 neither a successful read nor a normal end-of-file condition",
+                "Then": "The message 'ERROR READING CARDFILE' is displayed, the Card File status details are displayed, and the program is immediately terminated abnormally \u2014 no further card records are read or displayed"
+            },
+            "Rule_Name": "Handle Card File Read Failure with Error Display and Program Termination",
+            "Rule_Description": "When a card record read operation fails for any reason other than a normal end-of-file condition, an error message is displayed along with the file status details, and the program is immediately terminated abnormally to prevent further incorrect processing."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00045",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All card records have been read and displayed from the Card File",
+                "When": "The end of the Card File has been reached and the read loop has completed",
+                "Then": "The Card File is closed to finalize the processing session"
+            },
+            "Rule_Name": "Card File Must Be Closed After All Records Are Processed",
+            "Rule_Description": "After all card records have been read and displayed, the Card File must be formally closed to complete the processing cycle."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00046",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A close operation has been attempted on the Card File",
+                "When": "The Card File close operation returns a successful completion status",
+                "Then": "The Card File close process ends normally and program execution continues to completion"
+            },
+            "Rule_Name": "Card File Close Operation Must Complete Successfully",
+            "Rule_Description": "The Card File close operation must be verified for success. A successful close confirms the Card File processing session has ended cleanly with no data integrity issues."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00047",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A close operation has been attempted on the Card File",
+                "When": "The Card File close operation does not return a successful completion status",
+                "Then": "The error message 'ERROR CLOSING CARDFILE' is displayed, followed by a detailed file status message showing the specific status code in the format 'FILE STATUS IS: NNNN' with the actual status value appended"
+            },
+            "Rule_Name": "Card File Close Failure Must Be Reported as an Error",
+            "Rule_Description": "If the Card File cannot be closed successfully, a descriptive error message must be displayed along with the detailed file status information to identify the nature of the failure."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00048",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File close operation has failed and the error details have been displayed",
+                "When": "The close failure error reporting is complete",
+                "Then": "The program is immediately terminated abnormally by invoking the abnormal termination routine with termination code 999"
+            },
+            "Rule_Name": "Program Must Terminate Abnormally When Card File Cannot Be Closed",
+            "Rule_Description": "A failure to close the Card File is a critical error condition that requires immediate abnormal termination of the program to prevent data loss or corruption."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00049",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has successfully completed reading all card records from the Card File and has closed the Card File without errors",
+                "When": "All card records have been processed and displayed, and the Card File has been closed successfully",
+                "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT02C' to confirm successful completion of the card data file reading and printing process, and then returns control to the calling system"
+            },
+            "Rule_Name": "Display Program Completion Message",
+            "Rule_Description": "Upon successful completion of reading and displaying all card records from the Card File, the program must display a message confirming the end of execution before returning control to the calling system."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00050",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Card File operation (open, read, or close) has been attempted and has resulted in a failure condition",
+                "When": "The error reporting process is triggered by the failed file operation",
+                "Then": "The system must display a specific error message corresponding to the failed operation: 'ERROR OPENING CARDFILE' if the failure occurred during file open, 'ERROR READING CARDFILE' if the failure occurred during file read, or 'ERROR CLOSING CARDFILE' if the failure occurred during file close"
+            },
+            "Rule_Name": "Display Operation-Specific Error Message on File Operation Failure",
+            "Rule_Description": "When a Card File operation (open, read, or close) fails, the system must immediately display a descriptive error message that identifies which specific operation encountered the failure, so that the nature of the problem is clearly communicated."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00051",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Card File operation has failed and the operation-specific error message has been displayed",
+                "When": "The error reporting process proceeds to capture the failure details",
+                "Then": "The current Card File status code must be captured from the Card File status indicator and stored in the IO Status field for subsequent formatting and display"
+            },
+            "Rule_Name": "Capture Current File Status Code at Point of Failure",
+            "Rule_Description": "At the moment a Card File operation fails, the current file status code must be captured and preserved so it can be formatted and displayed as part of the error report."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00052",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File status code has been captured into the IO Status field following a file operation failure",
+                "When": "The error reporting process evaluates the nature of the status code",
+                "Then": "If the IO Status value is non-numeric OR the first character of the IO Status (IO-STAT1) is '9', the status is classified as a vendor-specific or special status and must be formatted using the vendor-specific method; otherwise, if the IO Status is fully numeric and does not start with '9', it is classified as a standard status and must be formatted using the standard numeric method"
+            },
+            "Rule_Name": "Classify File Status as Vendor-Specific or Standard for Error Formatting",
+            "Rule_Description": "Before formatting the file status for display, the system must determine whether the captured status code represents a vendor-specific or non-standard error condition versus a standard numeric file status, as each type requires a different formatting approach."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00053",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File status code has been classified as vendor-specific or non-numeric (IO Status is non-numeric OR IO-STAT1 equals '9')",
+                "When": "The vendor-specific status formatting process is applied",
+                "Then": "The first character of the IO Status (IO-STAT1) must be placed in the first position of the 4-character display status field (IO-STATUS-04); the second character of the IO Status (IO-STAT2) must be converted through a binary representation (setting a two-byte binary field to zero, moving IO-STAT2 into the right byte, then moving the binary value to the status display sub-field IO-STATUS-0403) to produce the final 4-character formatted status code ready for display"
+            },
+            "Rule_Name": "Format Vendor-Specific or Non-Numeric File Status for Error Display",
+            "Rule_Description": "When the file status is identified as vendor-specific or non-numeric, it must be formatted using a binary conversion method to accurately represent the status code in a displayable 4-character format, preserving the full meaning of the vendor-specific status."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00054",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File status code has been classified as a standard numeric status (IO Status is fully numeric AND IO-STAT1 does not equal '9')",
+                "When": "The standard numeric status formatting process is applied",
+                "Then": "The 4-character display status field (IO-STATUS-04) must first be initialized to '0000', and then the 2-character IO Status value must be placed into positions 3 and 4 of the display field, resulting in a zero-padded 4-digit representation of the standard file status code"
+            },
+            "Rule_Name": "Format Standard Numeric File Status for Error Display",
+            "Rule_Description": "When the file status is identified as a standard numeric code, it must be formatted into a 4-character display field by padding with leading zeros and placing the 2-character status in the last two positions, producing a consistent 4-digit display format."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00055",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File status code has been formatted into the 4-character display field (IO-STATUS-04) using either the vendor-specific or standard numeric formatting method",
+                "When": "The final step of the error reporting process executes",
+                "Then": "The system must display the message 'FILE STATUS IS: NNNN' immediately followed by the 4-character formatted status code (IO-STATUS-04), providing the complete error status information before returning control to the calling file operation handler"
+            },
+            "Rule_Name": "Display Formatted File Status Error Message",
+            "Rule_Description": "After the file status code has been formatted (either as vendor-specific or standard numeric), the system must display the formatted status code with a standard label so that the exact failure status is visible and meaningful to the user or operator."
+        },
+        {
+            "Rule_Id": "R-CBACT02C-cbl-00056",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card file processing is in progress (either during open, read, or close operations) AND a critical file error has been detected that is not a normal end-of-file condition",
+                "When": "The file operation status is neither successful (status 00) nor end-of-file (status 10), indicating an unrecoverable file error has occurred",
+                "Then": "The program must: (1) Display the message 'ABENDING PROGRAM' to notify operators that the program is terminating abnormally, (2) Set the abnormal termination code to 999 to mark the program for abnormal end, and (3) Terminate the program immediately and abnormally \u2014 no further card file records are read or displayed, and normal end-of-program processing is bypassed"
+            },
+            "Rule_Name": "Abnormal Program Termination on Critical Card File Error",
+            "Rule_Description": "When a critical and unrecoverable error occurs during card file processing (any file operation failure that is neither a successful operation nor a normal end-of-file condition), the program must notify operators of the abnormal termination and immediately abort execution with a designated termination code."
+        }
+    ],
+    "description": "CBACT02C is a batch COBOL program within the CardDemo application that sequentially reads all records from an indexed card data file and displays each card record to the output. The program opens the card file, iterates through every record printing its contents, and closes the file upon completion. It is a standalone main/driver program with no external program calls other than an abend utility.\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: VSAM (Indexed)\n- **MQ Calls**: No\n- **Module Type**: Main/Driver module\n\n<br>\n\n### Key Functionalities:\n\n1: Program Initialization - Display a message indicating the start of the card data file reading process\n\n2: Card File Open - Open the card data file for sequential reading to prepare for processing all card records\n\n3: Sequential Card Record Read - Read the next card record sequentially from the card data file one record at a time\n\n4: End-of-File Detection - Detect when all card records have been read and signal the end of processing loop\n\n5: Card Record Display - Display each card record's details (card number and associated card data) to the output\n\n6: Card File Processing Loop - Continuously read and display all card records from the file until the end of file is reached\n\n7: Card File Close - Close the card data file after all records have been read and displayed\n\n8: Program Completion - Display a message indicating the successful end of the card data file reading and printing process\n\n9: Error Reporting - Display a meaningful error status message when a failure occurs during file open, read, or close operations\n\n10: Abnormal Program Termination - Terminate the program abnormally when a critical file error is encountered during card file processing\n\n"
+}

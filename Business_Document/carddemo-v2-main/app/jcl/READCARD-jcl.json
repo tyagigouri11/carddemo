@@ -1,0 +1,21 @@
+{
+    "created_on": "2026-11-05",
+    "name": "READCARD.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/READCARD.jcl",
+    "type": "jcl",
+    "description": "The READCARD job executes program CBACT02C to read and process credit card data stored in a VSAM file. The program accesses the card data file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) in shared mode, suggesting it performs read-only reporting or validation of credit card records without modifying the source data.Key Functionalities:\nReads credit card account records from the VSAM KSDS file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) in shared access mode, allowing concurrent use by other jobs\nProcesses and reports credit card data details, with output directed to the system output (SYSOUT) for display or printing\nProduces printed/logged output via SYSPRINT, likely containing processing results, record counts, or validation summaries of the card data",
+    "rules": [
+        {
+            "Rule_Id": "R-READCARD-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Credit Card Master File (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) is available and accessible in shared read-only mode, and the CBACT02C program is available in the application load library",
+                "When": "STEP05 of the READCARD job is executed, invoking program CBACT02C with the Credit Card Master File assigned to the CARDFILE input and both SYSOUT and SYSPRINT directed to the system print queue",
+                "Then": "The CBACT02C program reads all credit card account records from the Credit Card Master File without modifying any data, formats and prints each credit card account record to the system print queue (SYSPRINT), writes any runtime processing messages to the system output (SYSOUT), and completes processing after all records have been read \u2014 producing no permanent output data files"
+            },
+            "Rule_Name": "STEP05 - CBACT02C - Credit Card Account Data Reporting",
+            "Rule_Description": "This step invokes the Credit Card Account Data Reporting program (CBACT02C) to read all credit card account records from the Credit Card Master File and produce a printed report/listing of those records to the system print queue. The Credit Card Master File is accessed in shared read-only mode, ensuring no modifications are made to the source data. No permanent output files are created \u2014 all results are directed exclusively to the system print queue for business review or audit purposes.",
+            "Rule_Type": "Action Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444\n\n    A([Job Start\nCredit Card Data Report Job]):::start\n\n    STEP05[STEP05 - CBACT02C\nCredit Card Account Data Listing\n& Report Generation]:::process\n\n    VSAM[(AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS\nCredit Card Master VSAM Keyed Sequential File)]:::datasource\n\n    CARDFILE[(CARD-FILE\nCredit Card Sequential File Reference)]:::datasource\n\n    CARDFILEFILE[(CARDFILE-FILE\nCredit Card File Internal Reference)]:::datasource\n\n    PRINT[Print Queue - SYSOUT / SYSPRINT\nFormatted Credit Card Account Listing Report\nAll Card Records Printed for Audit & Review]:::process\n\n    COND{COND Check\nAny Prior Step\nFailed?}:::decision\n\n    SUCCESS([Job End\nCredit Card Account Report\nGenerated Successfully]):::success\n\n    ERROR([Job End\nStep Bypassed or\nAbnormal Termination]):::error\n\n    A --> COND\n    COND -->|No - Proceed Unconditionally| STEP05\n    COND -->|Yes - Step Bypassed| ERROR\n\n    VSAM -.->|Read All Credit Card\nAccount Records Sequentially| STEP05\n    CARDFILE -.->|Read Credit Card\nData Records| STEP05\n    CARDFILEFILE -.->|Read Credit Card\nFile Data| STEP05\n\n    STEP05 -->|Generate Formatted\nPrinted Report| PRINT\n    PRINT --> SUCCESS"
+}

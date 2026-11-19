@@ -1,0 +1,77 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TXT2PDF1.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TXT2PDF1**, is designed to convert a text file into a PDF document. It executes the TSO/E batch program **IKJEFT1B** to run a REXX or CLIST procedure called **TXT2PDF**, which reads an input text file (**AWS.M2.CARDDEMO.STATEMNT.PS**) and generates a corresponding PDF output file (**AWS.M2.CARDDEMO.STATEMNT.PS.PDF**). The business purpose of this job is to transform mainframe-generated card demo account statements from plain text format into a more universally readable and distributable PDF format.",
+      "parameters": [
+        {
+          "name": "ACCT",
+          "value": "T,TEST",
+          "description": "Accounting information for the job. 'T' is the account number and 'TEST' is the additional accounting subparameter, used for billing and resource tracking purposes."
+        },
+        {
+          "name": "PROGRAMMER",
+          "value": "TXT2PDF",
+          "description": "Programmer or job descriptor name associated with the job, used for identification purposes on job output listings and reports."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "X",
+          "description": "Specifies the output class for the job log and system messages. Class 'X' determines where the job's message output (JES job log) is routed, typically to a held output queue for review."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class that determines the initiator used to execute the job. Class 'A' controls job scheduling priority, resource allocation, and which initiator will pick up and run the job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. '&SYSUID' is a symbolic parameter that resolves to the user ID of the person who submitted the job, sending them a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "TXT2PDF",
+        "purpose": "Converts a text-based statement file to PDF format by invoking the TXT2PDF REXX exec via the TSO/E Terminal Monitor Program. The exec reads the input text dataset and writes the converted output as a PDF file.",
+        "programs": "IKJEFT1B (TXT2PDF)",
+        "inputs": "INDD: AWS.M2.CARDDEMO.STATEMNT.PS (input text file); SYSEXEC: AWS.M2.LBD.TXT2PDF.EXEC (REXX exec library); SYSTSIN: inline TSO commands (%TXT2PDF BROWSE Y IN DD:INDD OUT 'AWS.M2.CARDDEMO.STATEMNT.PS.PDF')",
+        "outputs": "AWS.M2.CARDDEMO.STATEMNT.PS.PDF (converted PDF file); SYSPRINT, SYSTSPRT (system output logs)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "TXT2PDF",
+        "type": "Dataset",
+        "objects": "AWS.M2.LBD.TXT2PDF.LOAD",
+        "operations": "READ",
+        "description": "STEPLIB load library providing the load modules for the TXT2PDF program execution"
+      },
+      {
+        "step": "TXT2PDF",
+        "type": "Dataset",
+        "objects": "AWS.M2.LBD.TXT2PDF.EXEC",
+        "operations": "READ",
+        "description": "SYSEXEC library containing the TXT2PDF REXX exec invoked via %TXT2PDF"
+      },
+      {
+        "step": "TXT2PDF",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.PS",
+        "operations": "READ",
+        "description": "Input text file (INDD) read by the TXT2PDF REXX exec as the source document for PDF conversion"
+      },
+      {
+        "step": "TXT2PDF",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.PS.PDF",
+        "operations": "WRITE",
+        "description": "Output PDF file written by the TXT2PDF REXX exec as the result of converting the input text file to PDF format"
+      }
+    ]
+  }
+}

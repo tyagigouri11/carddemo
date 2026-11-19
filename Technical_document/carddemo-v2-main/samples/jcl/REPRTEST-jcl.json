@@ -1,0 +1,71 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "REPRTEST.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, **REPRTEST**, is designed to back up transaction data from a VSAM KSDS (Key-Sequenced Data Set) dataset by invoking a REPRO procedure (REPROC). It reads transaction records from the source VSAM dataset (`AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS`) and writes them to a new generation of a Generation Data Group (GDG) backup dataset (`AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)`), converting the data to a fixed-block sequential format. This serves as a routine data protection mechanism for the CardDemo application, ensuring transaction records are preserved in a recoverable sequential backup.",
+      "parameters": [
+        {
+          "name": "JOB name",
+          "value": "REPRTEST",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, logging, and referencing the job in the JES spool and system messages."
+        },
+        {
+          "name": "ACCT (Accounting Information)",
+          "value": "'REPRO TEST JOB'",
+          "description": "The accounting information or job description string passed to the installation accounting routine. It is used for job identification, billing, and auditing purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. It determines scheduling priority and resource allocation by directing the job to a specific initiator class defined by the installation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listings, allocation/deallocation messages, and system messages. It controls where the job's sysout messages are routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the submitting user's ID, so that user receives a notification message when the job finishes, indicating success or failure."
+        },
+        {
+          "name": "JCLLIB ORDER",
+          "value": "'AWS.M2.CARDDEMO.PROC'",
+          "description": "Defines the private procedure library search order for the job. It instructs JES to search the specified partitioned dataset for in-stream or cataloged procedures before searching the system procedure libraries, allowing the job to use installation-specific or application-specific procedures."
+        }
+      ],
+      "procedures": [
+        "REPROC"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PRC001",
+        "purpose": "Copies the VSAM KSDS transaction dataset to a new generation of a sequential backup dataset using the IDCAMS REPRO command. This step creates a point-in-time backup of the transaction data in flat file format.",
+        "programs": "IDCAMS*",
+        "inputs": "FILEIN: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (VSAM KSDS, shared)",
+        "outputs": "FILEOUT: AWS.M2.CARDDEMO.TRANSACT.BKUP(+1) (new GDG generation, sequential, FB, LRECL=350, BLKSIZE=0, 1 CYL with 1 CYL secondary, cataloged on success/deleted on failure, SYSDA); SYSPRINT (utility messages to SYSOUT)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads from the VSAM KSDS dataset AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS as the input file (FILEIN)"
+      },
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO writes to a new generation of the GDG dataset AWS.M2.CARDDEMO.TRANSACT.BKUP(+1) as the output file (FILEOUT), creating and cataloging a new sequential backup with LRECL=350, RECFM=FB on SYSDA"
+      }
+    ]
+  }
+}

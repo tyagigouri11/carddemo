@@ -1,0 +1,164 @@
+{
+    "created_on": "2026-11-05",
+    "name": "compile_batch.jcl.template",
+    "file_path": "carddemo-v2-main/scripts/compile_batch.jcl.template",
+    "type": "jcl",
+    "description": "This JCL defines and executes a reusable procedure (BLDBAT) that compiles a COBOL source program named ZZZZZZZZ from the CardDemo application library, then prints the compilation listing, and finally link-edits the compiled output into an executable load module stored in the CardDemo load library.Key Functionalities:\nCompiles the COBOL source member ZZZZZZZZ from the CardDemo COBOL source library (AWS.M2.CARDDEMO.CBL) using the IBM Enterprise COBOL compiler (IGYCRCTL), referencing copybook members from AWS.M2.CARDDEMO.CPY\nSaves the compilation listing output to the CardDemo listing library (AWS.M2.CARDDEMO.LISTING) under member ZZZZZZZZ, then prints it to the system output using the IEBGENER utility\nLink-edits the compiled object code into an executable load module and stores it as member ZZZZZZZZ in the CardDemo load library (AWS.M2.CARDDEMO.LOADLIB), resolving external references from system and runtime libraries",
+    "rules": [
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "A CardDemo COBOL source program member exists in the source library AWS.M2.CARDDEMO.CBL, identified by the member name supplied via the symbolic parameter &MEM (set to ZZZZZZZZ in this execution)",
+                "When": "The COMPILE step is initiated for the specified member &MEM",
+                "Then": "The COBOL compiler must locate and read the source program member &MEM from AWS.M2.CARDDEMO.CBL as the primary input for compilation"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Identify Source Program for Compilation",
+            "Rule_Description": "The compilation process must identify and read the correct CardDemo COBOL source program member before compilation begins. The program member is dynamically identified by the symbolic parameter &MEM, making the build procedure reusable across all CardDemo programs.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The COBOL source program member &MEM contains one or more COPY statements referencing shared data definitions, and the CardDemo copybook library AWS.M2.CARDDEMO.CPY is available and accessible",
+                "When": "The COBOL compiler encounters a COPY statement within the source program during compilation",
+                "Then": "The compiler must resolve and include the referenced copybook definitions from AWS.M2.CARDDEMO.CPY into the compiled program, ensuring all shared data structures and layouts are correctly incorporated"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Resolve Shared Copybook Definitions",
+            "Rule_Description": "During compilation, all shared data structure definitions and common layouts referenced within the COBOL source program via COPY statements must be resolved from the CardDemo copybook library before the program can be successfully compiled.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The COMPILE step is initiated for a CardDemo COBOL source program member &MEM",
+                "When": "The COBOL compiler processes string literals within the source program",
+                "Then": "The compiler must treat the apostrophe character (') as the string delimiter for all string literals in the source program, as enforced by the APOST compiler option"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Apply Apostrophe as String Delimiter Standard",
+            "Rule_Description": "The CardDemo application enforces a coding standard that requires the apostrophe character to be used as the string delimiter in all COBOL source programs. This must be applied consistently during every compilation to ensure uniform interpretation of string literals across the application.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The COMPILE step is initiated for CardDemo COBOL source program member &MEM",
+                "When": "The COBOL compiler successfully processes the source program",
+                "Then": "The compiler must generate a full source listing with sequential line numbers applied to every line of the source code, as enforced by the LIST and NUMBER compiler options"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Generate Full Source Listing with Line Numbers",
+            "Rule_Description": "Every compilation of a CardDemo program must produce a complete source listing with line numbers to ensure full traceability of the source code. This supports auditability and debugging by providing a numbered record of every line of the compiled program.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The COMPILE step is initiated for CardDemo COBOL source program member &MEM",
+                "When": "The COBOL compiler successfully processes the source program and its data definitions",
+                "Then": "The compiler must generate a complete data map showing all data structures, their hierarchies, and memory layouts as part of the compilation output, as enforced by the MAP compiler option"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Generate Data Structure Map",
+            "Rule_Description": "Every compilation of a CardDemo program must produce a data map showing all data structures and their layouts. This provides developers and support teams with a detailed reference of how data is organized within the compiled program.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The COBOL compiler has completed processing of source program member &MEM and has produced a compilation report containing the source listing, data map, and any diagnostics",
+                "When": "The compilation step completes its processing",
+                "Then": "The complete compilation report must be permanently written and saved to AWS.M2.CARDDEMO.LISTING under member name &MEM, ensuring the listing is retained for future audit, review, and traceability purposes"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Archive Permanent Compilation Listing",
+            "Rule_Description": "The full compilation report \u2014 including the source listing, data map, diagnostics, warnings, and errors \u2014 must be permanently saved to the CardDemo listing library under the same member name as the source program. This ensures a persistent audit trail and allows future review without re-running the compilation.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The COBOL compiler has successfully compiled source program member &MEM from AWS.M2.CARDDEMO.CBL",
+                "When": "The compilation step completes processing",
+                "Then": "The compiler must produce a compiled object module stored in the temporary dataset &&LOADSET and pass it forward to the LKED (link-edit) step for further processing; the temporary object module must be automatically deleted once the LKED step has consumed it"
+            },
+            "Rule_Name": "COMPILE.BLDBAT - IGYCRCTL - Produce Compiled Object Module for Linking",
+            "Rule_Description": "Upon successful compilation, the compiler must produce an intermediate compiled object module and make it available to the subsequent linking step. This object module is a transient artifact that exists only for the duration of the build job and is automatically discarded after linking is complete.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "A compilation listing for the CardDemo program member (&MEM) has been saved to the CardDemo listing library (AWS.M2.CARDDEMO.LISTING) as a result of a prior compilation step",
+                "When": "The CBLPRINT step is executed using the IEBGENER copy utility with no filtering or transformation instructions applied (SYSIN is empty/DUMMY)",
+                "Then": "The complete and unmodified compilation listing for program member (&MEM) is copied in full from the CardDemo listing library and published directly to the system print spool, making the entire compilation report \u2014 including source code, data maps, diagnostics, warnings, and errors \u2014 immediately available for online viewing or printing by developers and support teams"
+            },
+            "Rule_Name": "STEP1.CBLPRINT - IEBGENER - Publish Compilation Listing to Print Spool",
+            "Rule_Description": "After the CardDemo COBOL program is compiled and its listing is saved to the listing library, this step retrieves the saved compilation listing for the specified program member and publishes it in full to the system print spool, making it immediately accessible for developer review without requiring direct library access.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "A compiled object module (&&LOADSET) has been produced by the COMPILE step for CardDemo program member &MEM, AND the following libraries are available and accessible: IBM system link library (SYS1.LINKLIB), Cryptographic Services library (CSF.SCSFMOD0), IBM Language Environment link library (CEE.SCEELKED), IBM Language Environment extended link library (CEE.SCEELKEX), and the CardDemo application load library (AWS.M2.CARDDEMO.LOADLIB)",
+                "When": "The Linkage Editor (HEWL) is invoked with LIST and XREF options to process the compiled object module by searching the library chain in strict order \u2014 first IBM system routines, then Cryptographic Services modules, then Language Environment runtime, then Language Environment extensions, and finally other CardDemo application modules \u2014 to resolve all external program references",
+                "Then": "A fully linked, production-ready executable load module is permanently stored in the CardDemo application load library (AWS.M2.CARDDEMO.LOADLIB) under member name &MEM, AND the temporary compiled object module (&&LOADSET) is automatically deleted after successful consumption, AND a detailed cross-reference report and module map are written to the system print spool for developer review"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Deploy Compiled Program to CardDemo Application Library",
+            "Rule_Description": "The Linkage Editor combines the compiled object module of the CardDemo program with all required system and application libraries to produce a final executable load module, which is permanently stored in the CardDemo application load library under the same member name as the source program.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo program member &MEM has been compiled and its object module is ready for linking, AND the program contains external references that must be resolved against multiple system and application libraries",
+                "When": "The Linkage Editor searches for external references to resolve them against the library chain",
+                "Then": "External references MUST be resolved in the following strict order: (1) IBM core system routines from SYS1.LINKLIB first, (2) Cryptographic Services modules from CSF.SCSFMOD0 second, (3) IBM Language Environment runtime routines from CEE.SCEELKED third, (4) IBM Language Environment extended runtime routines from CEE.SCEELKEX fourth, and (5) other CardDemo application load modules from AWS.M2.CARDDEMO.LOADLIB fifth \u2014 ensuring that system-level dependencies take precedence over application-level dependencies"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Enforce Library Resolution Search Order for CardDemo Programs",
+            "Rule_Description": "The Linkage Editor must resolve all external references in a strict, predefined library search sequence to ensure that system routines, cryptographic services, runtime environment, and CardDemo application modules are resolved in the correct priority order.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "A CardDemo COBOL program member &MEM is being linked into a deployable executable",
+                "When": "The Linkage Editor resolves external references during the link-edit process",
+                "Then": "The Cryptographic Services library (CSF.SCSFMOD0) MUST be included in the library search chain, ensuring that any cryptographic or security-related functions referenced by the CardDemo program are resolved and available in the final executable \u2014 confirming that all CardDemo programs are built with mandatory cryptographic capability"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Enforce Cryptographic Services Dependency for CardDemo Programs",
+            "Rule_Description": "Every CardDemo program built through this procedure must be linked against the Cryptographic Services library (CSF.SCSFMOD0), establishing a mandatory dependency that ensures all CardDemo executables have access to encryption and security functions required for handling sensitive card data.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The compiled object module (&&LOADSET) has been passed from the COMPILE step to the LKED step with a disposition of OLD (exclusive access)",
+                "When": "The Linkage Editor completes processing of the compiled object module",
+                "Then": "The compiled object module (&&LOADSET) MUST be automatically deleted after the LKED step completes \u2014 regardless of success or failure \u2014 ensuring that no intermediate compiled artifacts are retained after the link-edit process, and the only permanent output is the final executable stored in the CardDemo load library"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Enforce Single-Use and Automatic Cleanup of Compiled Object Module",
+            "Rule_Description": "The compiled object module (&&LOADSET) produced by the COMPILE step is a transient artifact that must be consumed exactly once by the Linkage Editor and automatically discarded after use, ensuring no intermediate build artifacts persist beyond the job execution.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "A CardDemo COBOL source program identified by member name &MEM has been compiled and its object module is ready for linking",
+                "When": "The Linkage Editor produces the final executable load module and writes it to the CardDemo application load library",
+                "Then": "The executable load module MUST be stored in AWS.M2.CARDDEMO.LOADLIB under the member name &MEM \u2014 the identical name used to identify the source program in the COMPILE step \u2014 ensuring that the source program name, compilation listing name, and deployed executable name are all consistent and traceable to each other"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Maintain Member Name Consistency Between Source and Executable",
+            "Rule_Description": "The final executable load module stored in the CardDemo application load library must use the exact same member name as the original COBOL source program, ensuring a direct and traceable one-to-one relationship between source programs and their deployed executables.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-compile_batch.jcl-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "A CardDemo program member &MEM is being linked and it contains references to other CardDemo application modules that have already been compiled and deployed to the CardDemo load library (AWS.M2.CARDDEMO.LOADLIB)",
+                "When": "The Linkage Editor searches the library chain to resolve all external program references",
+                "Then": "The CardDemo application load library (AWS.M2.CARDDEMO.LOADLIB) MUST be included as the fifth and final entry in the library search chain, allowing the program being built to successfully resolve calls to other CardDemo application modules \u2014 enabling inter-program communication and supporting the modular design of the CardDemo application"
+            },
+            "Rule_Name": "STEP1.BLDBAT - HEWL - Enable Inter-Program Calls Within CardDemo Application",
+            "Rule_Description": "The CardDemo application load library is included in the linker search chain, enabling the program being built to reference and call other already-deployed CardDemo application modules, supporting the modular architecture of the CardDemo application.",
+            "Rule_Type": "Authorization Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    START([Job Start\nCardDemo Program Build and Deploy\nProgram Member - &MEM]):::start\n\n    %% Job Steps\n    COMPILE[COMPILE - IGYCRCTL\nTranslate COBOL Source Program into\nIntermediate Compiled Object Module]:::process\n\n    CBLPRINT[CBLPRINT - IEBGENER\nPrint Compilation Listing Report\nto System Spool for Developer Review]:::process\n\n    LKED[LKED - HEWL\nLink Compiled Object Module with\nSystem and Application Libraries to\nProduce Final Executable Program]:::process\n\n    %% Datasources\n    DS1[(CardDemo COBOL Source Library\nAWS.M2.CARDDEMO.CBL)]:::datasource\n    DS2[(CardDemo Copybook Library\nAWS.M2.CARDDEMO.CPY)]:::datasource\n    DS3[(CardDemo Compiler Listing Library\nAWS.M2.CARDDEMO.LISTING)]:::datasource\n    DS4[(CardDemo Application Load Library\nAWS.M2.CARDDEMO.LOADLIB)]:::datasource\n    SPOOL[(System Print Spool\nSYSOUT)]:::datasource\n\n    END([Job End\nExecutable Program Successfully Built\nand Deployed to CardDemo Load Library]):::final\n\n    %% Main Flow\n    START --> COMPILE\n\n    %% COMPILE Step Datasource Interactions\n    DS1 -.->|Read COBOL Source Program for Member &MEM| COMPILE\n    DS2 -.->|Read Shared Copybook Definitions\nData Structures and Common Layouts| COMPILE\n    COMPILE -.->|Write Compilation Listing\nSource Map and Diagnostics| DS3\n    COMPILE -->|Pass Compiled Object Module\nto Linkage Editor| LKED\n\n    %% CBLPRINT Step\n    COMPILE --> CBLPRINT\n    DS3 -.->|Read Compilation Listing\nfor Member &MEM| CBLPRINT\n    CBLPRINT -.->|Print Full Compilation Report\nWarnings and Errors| SPOOL\n\n    %% LKED Step Datasource Interactions\n    CBLPRINT --> LKED\n    LKED -.->|Write Final Executable\nLoad Module for Member &MEM| DS4\n\n    LKED --> END"
+}

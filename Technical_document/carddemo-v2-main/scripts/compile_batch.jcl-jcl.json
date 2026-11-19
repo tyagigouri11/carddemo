@@ -1,0 +1,285 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "compile_batch.jcl.template",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named COMPILEC, is a batch COBOL compiler job designed to compile and link-edit COBOL source programs belonging to the AWS CardDemo mainframe application. It takes a specified COBOL source member (ZZZZZZZZ) from the source library, compiles it using the IBM Enterprise COBOL compiler (IGYCRCTL), and then link-edits the resulting object code into an executable load module stored in the application's load library. The job also captures and outputs the compiler listing, making it a complete build pipeline for producing deployable COBOL program modules for the CardDemo application.",
+      "parameters": [
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class that determines which initiator will process the job. Class A typically indicates a standard batch job class, affecting job scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log messages (JES message log). Class 0 determines where the system messages and job log will be routed for output."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including allocation/termination messages to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. A value of 0M means the job can use the maximum available region size, effectively removing memory constraints at the job level."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. Using &SYSUID substitutes the current submitting user's ID, so the submitter receives a notification message upon job completion or failure."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. A value of 1440 minutes (24 hours) effectively sets the maximum allowable time limit, preventing the job from being cancelled due to a time-out during long-running executions."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP1.COMPILE",
+        "purpose": "Compiles the COBOL source member specified by MEM=ZZZZZZZZ from the source library using the IBM Enterprise COBOL compiler (IGYCRCTL), producing an object deck and a compiler listing. Compiler options APOST, LIST, MAP, and NUMBER are applied.",
+        "programs": "IGYCRCTL*",
+        "inputs": "SYSIN: AWS.M2.CARDDEMO.CBL(ZZZZZZZZ) (COBOL source member), SYSLIB: AWS.M2.CARDDEMO.CPY (COBOL copybook library)",
+        "outputs": "SYSPRINT: AWS.M2.CARDDEMO.LISTING(ZZZZZZZZ) (compiler listing), SYSLIN: &&LOADSET (temporary object deck passed to linker); SYSUT1-SYSUT15, SYSMDECK (temporary work datasets)"
+      },
+      {
+        "step": "STEP1.CBLPRINT",
+        "purpose": "Copies the compiler listing for the compiled COBOL member to SYSOUT using IEBGENER, making the listing available in the job output for review.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.LISTING(ZZZZZZZZ) (compiler listing)",
+        "outputs": "SYSUT2: SYSOUT=* (compiler listing printed to job output), SYSPRINT: SYSOUT=* (utility messages)"
+      },
+      {
+        "step": "STEP1.LKED",
+        "purpose": "Link-edits (binds) the object deck produced by the COMPILE step into an executable load module using the IBM Binder (HEWL), storing the resulting load module in the application load library. Linker options LIST and XREF are applied.",
+        "programs": "HEWL*",
+        "inputs": "SYSLIN: &&LOADSET (object deck from COMPILE step), SYSLIB: SYS1.LINKLIB, CSF.SCSFMOD0, CEE.SCEELKED, CEE.SCEELKEX, AWS.M2.CARDDEMO.LOADLIB (link libraries for resolving external references)",
+        "outputs": "SYSLMOD: AWS.M2.CARDDEMO.LOADLIB(ZZZZZZZZ) (executable load module), SYSPRINT: SYSOUT=* (binder listing with LIST and XREF output), SYSUT1: temporary work dataset"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "IGY.SIGYCOMP.V63",
+        "operations": "READ",
+        "description": "STEPLIB: IBM Enterprise COBOL compiler load library read for program execution"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CBL(ZZZZZZZZ)",
+        "operations": "READ",
+        "description": "SYSIN: COBOL source member ZZZZZZZZ read as input to the compiler"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CPY",
+        "operations": "READ",
+        "description": "SYSLIB: COBOL copybook library read during compilation for COPY statements"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LISTING(ZZZZZZZZ)",
+        "operations": "WRITE",
+        "description": "SYSPRINT: Compiler listing output written to PDS member ZZZZZZZZ"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "WRITE",
+        "description": "SYSLIN: Compiled object deck written to temporary dataset &&LOADSET, passed to subsequent step"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT1: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT2 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT2: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT3 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT3: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT4 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT4: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT5 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT5: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT6 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT6: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT7 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT7: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT8 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT8: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT9 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT9: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT10 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT10: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT11 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT11: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT12 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT12: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT13 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT13: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT14 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT14: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT15 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT15: Compiler work dataset allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.COMPILE",
+        "type": "Dataset",
+        "objects": "SYSMDECK (temporary)",
+        "operations": "WRITE",
+        "description": "SYSMDECK: Compiler work dataset for modified source deck allocated on 3390 unit"
+      },
+      {
+        "step": "STEP1.CBLPRINT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LISTING(ZZZZZZZZ)",
+        "operations": "READ",
+        "description": "SYSUT1: IEBGENER reads the compiler listing PDS member ZZZZZZZZ as input for copy operation"
+      },
+      {
+        "step": "STEP1.CBLPRINT",
+        "type": "Dataset",
+        "objects": "SYSOUT=*",
+        "operations": "WRITE",
+        "description": "SYSUT2: IEBGENER copies the compiler listing to SYSOUT for display in job output"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "SYS1.LINKLIB",
+        "operations": "READ",
+        "description": "SYSLIB: System link library searched by binder for system modules"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "CSF.SCSFMOD0",
+        "operations": "READ",
+        "description": "SYSLIB: CSF library searched by binder for required modules"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKED",
+        "operations": "READ",
+        "description": "SYSLIB: Language Environment link library searched by binder for LE modules"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKEX",
+        "operations": "READ",
+        "description": "SYSLIB: Language Environment link library extension searched by binder for LE modules"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "SYSLIB: Application load library searched by binder for additional modules"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "READ",
+        "description": "SYSLIN: Temporary object deck passed from COMPILE step read as input to the binder, deleted after use"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB(ZZZZZZZZ)",
+        "operations": "WRITE",
+        "description": "SYSLMOD: Linked executable load module ZZZZZZZZ written to the application load library"
+      },
+      {
+        "step": "STEP1.LKED",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT1: Binder work dataset allocated on 3390 unit with BLKSIZE=1024"
+      }
+    ]
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBPAUP0C.cbl",
+        "type": "cobol"
+      },
+      "overview": "This program is part of the CardDemo Authorization Module, a batch processing system that manages credit card transaction authorization records stored in an IMS database. It operates in a financial services context where pending authorization messages accumulate over time and must be periodically purged to maintain database hygiene and accurate account authorization balances. The program solves the problem of stale pending authorization records by scanning all pending authorization summary and detail records, identifying those that have exceeded a configurable expiration threshold, and deleting them from the IMS database. It also updates running totals for approved and declined authorization counts and amounts, and removes orphaned summary records when all their child detail records have been purged.",
+      "key_features": [
+        {
+          "feature": "Expiry-Based Deletion",
+          "description": "Compares each pending authorization detail record's date against the current date and deletes records that have exceeded the configurable expiry threshold (default 5 days)"
+        },
+        {
+          "feature": "Hierarchical IMS Record Processing",
+          "description": "Navigates a parent-child IMS database structure, processing authorization summary (root) segments and their associated detail (child) segments in sequence"
+        },
+        {
+          "feature": "Authorization Balance Adjustment",
+          "description": "Decrements approved or declined authorization counts and amounts on the summary record as expired detail records are removed, keeping financial totals accurate"
+        },
+        {
+          "feature": "Orphan Summary Cleanup",
+          "description": "Deletes a parent authorization summary record when all its child detail records have been removed, preventing empty summary records from accumulating"
+        },
+        {
+          "feature": "IMS Checkpoint/Restart",
+          "description": "Takes periodic IMS checkpoints at a configurable frequency to enable restart recovery in case of failure, protecting work already completed"
+        },
+        {
+          "feature": "Configurable Runtime Parameters",
+          "description": "Accepts parameters via SYSIN for expiry days, checkpoint frequency, checkpoint display frequency, and debug mode, allowing operational flexibility without code changes"
+        },
+        {
+          "feature": "Audit Reporting",
+          "description": "Displays a summary report at program end showing total summary records read and deleted, and total detail records read and deleted"
+        },
+        {
+          "feature": "Error Handling and Controlled Abend",
+          "description": "Detects IMS status code errors on all database operations and performs a controlled abend with diagnostic messages and a return code of 16"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "SYSIN",
+        "type": "Read",
+        "description": "System input stream - provides runtime parameters including expiry days (P-EXPIRY-DAYS), checkpoint frequency (P-CHKP-FREQ), checkpoint display frequency (P-CHKP-DIS-FREQ), and debug flag (P-DEBUG-FLAG)"
+      },
+      {
+        "name": "PAUTSUM0 (IMS Segment via PSB PSBPAUTB)",
+        "type": "Read/Write",
+        "description": "IMS database segment for Pending Authorization Summary (root segment) - read sequentially to find all pending authorization summary records; deleted when all associated detail records have been removed (approved and declined counts both <= 0)"
+      },
+      {
+        "name": "PAUTDTL1 (IMS Segment via PSB PSBPAUTB)",
+        "type": "Read/Write",
+        "description": "IMS database segment for Pending Authorization Details (child segment under PAUTSUM0) - read sequentially under each summary record; individual detail records are deleted when they are determined to be expired based on the authorization date exceeding the configured expiry days threshold"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Accepts current date and Julian date from system, reads runtime parameters from SYSIN including expiry days threshold, checkpoint frequency, checkpoint display frequency, and debug flag. Defaults are applied if parameters are missing or non-numeric.",
+          "records": [
+            "CURRENT-DATE",
+            "CURRENT-YYDDD",
+            "P-EXPIRY-DAYS",
+            "P-CHKP-FREQ",
+            "P-CHKP-DIS-FREQ",
+            "P-DEBUG-FLAG",
+            "WS-EXPIRY-DAYS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Next Pending Authorization Summary",
+          "description": "Issues an IMS GN (Get Next) call against the PAUTSUM0 segment to sequentially retrieve the next root-level pending authorization summary record from the IMS database. Sets end-of-database flag when no more records exist. Increments summary read counter and captures current account ID.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PA-ACCT-ID",
+            "PA-APPROVED-AUTH-CNT",
+            "PA-APPROVED-AUTH-AMT",
+            "PA-DECLINED-AUTH-CNT",
+            "PA-DECLINED-AUTH-AMT",
+            "WS-NO-SUMRY-READ",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "WS-CURR-APP-ID",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Read Next Pending Authorization Detail",
+          "description": "Issues an IMS GNP (Get Next within Parent) call against the PAUTDTL1 segment to retrieve the next child detail record under the current summary parent. Sets NO-MORE-AUTHS flag when GE or GB status is returned, indicating no further child segments exist under the current parent.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PA-AUTH-DATE-9C",
+            "PA-AUTH-RESP-CODE",
+            "PA-APPROVED-AMT",
+            "PA-TRANSACTION-AMT",
+            "WS-NO-DTL-READ",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Check If Authorization Detail Is Expired",
+          "description": "Converts the stored authorization date using a complement calculation (99999 minus PA-AUTH-DATE-9C) to derive a comparable Julian date. Computes the difference between the current Julian date and the converted authorization date. If the difference meets or exceeds the configured expiry threshold, the record is flagged for deletion and the corresponding approved or declined counters and amounts on the parent summary are decremented based on the response code.",
+          "records": [
+            "WS-AUTH-DATE",
+            "WS-DAY-DIFF",
+            "CURRENT-YYDDD",
+            "WS-EXPIRY-DAYS",
+            "PA-AUTH-DATE-9C",
+            "PA-AUTH-RESP-CODE",
+            "PA-APPROVED-AUTH-CNT",
+            "PA-APPROVED-AUTH-AMT",
+            "PA-DECLINED-AUTH-CNT",
+            "PA-DECLINED-AUTH-AMT",
+            "PA-APPROVED-AMT",
+            "PA-TRANSACTION-AMT",
+            "WS-QUALIFY-DELETE-FLAG"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Delete Expired Authorization Detail",
+          "description": "Issues an IMS DLET call against the PAUTDTL1 segment to physically delete the expired child detail record from the IMS database. Increments the detail deleted counter on success. Triggers an abend on failure.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PA-ACCT-ID",
+            "WS-NO-DTL-DELETED",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Evaluate and Delete Authorization Summary if Empty",
+          "description": "After processing all child detail records for a given parent, checks whether both the approved authorization count and declined authorization count on the summary record are zero or less. If so, issues an IMS DLET call against the PAUTSUM0 segment to delete the now-empty parent summary record. Increments the summary deleted counter on success. Triggers an abend on failure.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PA-APPROVED-AUTH-CNT",
+            "PA-DECLINED-AUTH-CNT",
+            "PA-ACCT-ID",
+            "WS-NO-SUMRY-DELETED",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Take IMS Checkpoint",
+          "description": "Issues an IMS CHKP call with an incrementing checkpoint ID (prefixed 'RMAD') to commit processed work and establish a restart point. Checkpoint is taken after processing a configurable number of summary records (P-CHKP-FREQ) and unconditionally at end of program. Displays progress information at a configurable display frequency (P-CHKP-DIS-FREQ). Triggers an abend if the checkpoint call fails.",
+          "records": [
+            "WK-CHKPT-ID",
+            "WK-CHKPT-ID-CTR",
+            "WS-NO-CHKP",
+            "WS-NO-SUMRY-READ",
+            "WS-CURR-APP-ID",
+            "P-CHKP-DIS-FREQ",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Print Final Summary and Terminate",
+          "description": "Displays final processing statistics to SYSOUT including total summary records read, summary records deleted, detail records read, and detail records deleted. Issues GOBACK to return control to IMS.",
+          "records": [
+            "WS-NO-SUMRY-READ",
+            "WS-NO-SUMRY-DELETED",
+            "WS-NO-DTL-READ",
+            "WS-NO-DTL-DELETED"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Parent-Child IMS Segment Hierarchy",
+          "description": "PAUTDTL1 detail segments are hierarchically dependent on PAUTSUM0 summary segments. The GNP call in step 3 is only valid within the context of a successfully retrieved parent PAUTSUM0 segment. Deletion of the parent summary (step 6) can only occur after all child detail segments have been evaluated and eligible ones deleted, ensuring referential integrity within the IMS hierarchy."
+        },
+        {
+          "dependency": "Summary Counter State Before Parent Deletion",
+          "description": "The decision to delete a PAUTSUM0 summary record depends on in-memory counters PA-APPROVED-AUTH-CNT and PA-DECLINED-AUTH-CNT being decremented during step 4 as expired detail records are identified. These counters must accurately reflect the remaining non-expired authorizations before the deletion eligibility check in step 6 is evaluated."
+        },
+        {
+          "dependency": "Authorization Date Complement Encoding",
+          "description": "The expiry check in step 4 relies on PA-AUTH-DATE-9C being stored in a complement-encoded format (stored as 99999 minus the actual Julian date). The program reverses this encoding at runtime. Any records stored with a different date encoding convention would produce incorrect expiry calculations and potentially cause incorrect deletions or retention of expired records."
+        },
+        {
+          "dependency": "IMS PSB Scheduling and PCB Availability",
+          "description": "All IMS DL/I calls (GN, GNP, DLET, CHKP) depend on the PSB named PSBPAUTB being successfully scheduled by IMS before program execution. The PCB at offset position 2 (PAUT-PCB-NUM) must be available and authorized for both read and delete operations against the PAUTSUM0 and PAUTDTL1 segments."
+        },
+        {
+          "dependency": "SYSIN Parameter Availability",
+          "description": "The program reads runtime control parameters (expiry days, checkpoint frequency, checkpoint display frequency, debug flag) from SYSIN via an ACCEPT statement during initialization. If SYSIN is not provided or is malformed, default values are applied for most parameters, but the expiry days default of 5 may silently alter intended processing behavior."
+        },
+        {
+          "dependency": "Checkpoint Frequency Counter Reset",
+          "description": "The WS-AUTH-SMRY-PROC-CNT counter drives checkpoint frequency. It is incremented per summary record read and reset to zero after each checkpoint. If a checkpoint fails and triggers an abend, the counter state is lost, but IMS restart/backout mechanisms would restore the database to the last successful checkpoint."
+        },
+        {
+          "dependency": "Error Flag and End-of-Database Flag Mutual Exclusivity",
+          "description": "The main processing loop continues only while both ERR-FLG-OFF and NOT-END-OF-AUTHDB conditions are true. An abend routine (9999-ABEND) sets RETURN-CODE to 16 and issues GOBACK rather than setting ERR-FLG-ON, meaning error termination bypasses the final checkpoint and summary display."
+        },
+        {
+          "dependency": "Copybook Segment Layout Alignment",
+          "description": "The program depends on CIPAUSMY.cpy and CIPAUDTY.cpy copybooks to correctly define the field layouts for PENDING-AUTH-SUMMARY and PENDING-AUTH-DETAILS respectively. Fields such as PA-ACCT-ID, PA-AUTH-DATE-9C, PA-AUTH-RESP-CODE, PA-APPROVED-AUTH-CNT, PA-APPROVED-AUTH-AMT, PA-DECLINED-AUTH-CNT, PA-DECLINED-AUTH-AMT, PA-APPROVED-AMT, and PA-TRANSACTION-AMT must align exactly with the IMS segment definitions in the DBD."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM IMS (Information Management System)",
+          "type": "Hierarchical Database and Transaction Manager",
+          "purpose": "Provides the hierarchical database containing pending authorization summary (PAUTSUM0) and detail (PAUTDTL1) segments. The program uses DL/I calls (GN, GNP, DLET, CHKP) via PSB PSBPAUTB to sequentially read, evaluate, and delete expired authorization records, and to issue database checkpoints for restart/recovery support."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "Parameter Input Validation Errors",
+        "description": "Validates SYSIN parameters at initialization (1000-INITIALIZE): checks P-EXPIRY-DAYS for numeric value, defaulting to 5 if invalid; defaults P-CHKP-FREQ to 5 and P-CHKP-DIS-FREQ to 10 if spaces/zero/low-values; normalizes P-DEBUG-FLAG to 'N' if not 'Y'. No abend is triggered; silent defaults are applied instead."
+      },
+      {
+        "category": "IMS Database Read Errors (Summary Segment)",
+        "description": "In 2000-FIND-NEXT-AUTH-SUMMARY, DIBSTAT is evaluated after GN call: spaces indicates success, 'GB' sets END-OF-AUTHDB flag for normal end-of-database termination, any other status displays the DIBSTAT value and record count before invoking 9999-ABEND to terminate the program with return code 16."
+      },
+      {
+        "category": "IMS Database Read Errors (Detail Segment)",
+        "description": "In 3000-FIND-NEXT-AUTH-DTL, DIBSTAT is evaluated after GNP call: spaces indicates success, 'GE' or 'GB' both set NO-MORE-AUTHS flag for normal child-segment exhaustion, any other status displays DIBSTAT, parent account ID, and detail read count before invoking 9999-ABEND with return code 16."
+      },
+      {
+        "category": "IMS Database Delete Errors (Detail Segment)",
+        "description": "In 5000-DELETE-AUTH-DTL, DIBSTAT is checked after DLET call: spaces indicates successful deletion and increments counter, any non-space status displays DIBSTAT and account ID before invoking 9999-ABEND with return code 16. No retry logic is implemented."
+      },
+      {
+        "category": "IMS Database Delete Errors (Summary Segment)",
+        "description": "In 6000-DELETE-AUTH-SUMMARY, DIBSTAT is checked after DLET call: spaces indicates successful deletion and increments counter, any non-space status displays DIBSTAT and account ID before invoking 9999-ABEND with return code 16. No retry logic is implemented."
+      },
+      {
+        "category": "IMS Checkpoint Errors",
+        "description": "In 9000-TAKE-CHECKPOINT, DIBSTAT is checked after CHKP call: spaces indicates success with periodic display controlled by P-CHKP-DIS-FREQ counter, any non-space status displays DIBSTAT, record count, and current app ID before invoking 9999-ABEND with return code 16."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "9999-ABEND is a centralized termination routine used by all error paths. It displays 'CBPAUP0C ABENDING...', sets RETURN-CODE to 16, and issues GOBACK. There is no rollback, cleanup, or IMS ROLB call before termination; IMS restart/recovery relies on the last successful checkpoint taken via 9000-TAKE-CHECKPOINT."
+      },
+      {
+        "category": "Business Logic Validation (Expiry Check)",
+        "description": "In 4000-CHECK-IF-EXPIRED, date arithmetic determines if a detail record qualifies for deletion. No explicit error handling exists for invalid or unexpected date values; the logic silently sets QUALIFIED-FOR-DELETE or NOT-QUALIFIED-FOR-DELETE flags. Counter adjustments for approved/declined amounts are performed inline without overflow or underflow checks."
+      },
+      {
+        "category": "Error State Propagation via Flags",
+        "description": "WS-ERR-FLG (ERR-FLG-ON/ERR-FLG-OFF) is defined in working storage as a general error flag and is checked in the main processing loop to halt iteration. However, it is never explicitly set to 'Y' anywhere in the code; all fatal errors bypass it and go directly to 9999-ABEND, making the flag effectively unused."
+      }
+    ]
+  }
+}

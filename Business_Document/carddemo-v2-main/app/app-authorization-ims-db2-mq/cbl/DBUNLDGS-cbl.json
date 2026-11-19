@@ -1,0 +1,1538 @@
+{
+    "name": "DBUNLDGS.CBL",
+    "program_name": "DBUNLDGS.CBL",
+    "generated_at": "2026-11-05T08:06:13Z",
+    "overview": {
+        "total_key_functionalities": 13,
+        "total_rules": 58,
+        "main_flow_diagram": "flowchart TD\n    A([Program Start]):::start\n    B[1:Program Initialization\nDisplay start banner\nCapture current date and Julian date]:::process\n    C{More Pending Auth\nSummary Records?}:::decision\n    D[2:Read Pending Authorization\nSummary - Root Segment\nGet Next GN Call]:::process\n    PAUTSUM0[(PAUTSUM0\nPending Auth Summary\nIMS Segment)]:::datasource\n    E{3:Validate Account ID\nIs PA-ACCT-ID Numeric?}:::decision\n    F[4:Write Pending Auth Summary\nto Parent Output File\nInsert Root Segment]:::process\n    PASFLPCB[(PASFLPCB\nParent GSAM Output File\nIMS GSAM Dataset)]:::datasource\n    G[7:Increment Summary\nRecord Counter]:::process\n    H{More Child Detail\nRecords for Current Parent?}:::decision\n    I[5:Read Pending Authorization\nDetail - Child Segment\nGet Next Within Parent GNP Call]:::process\n    PAUTDTL1[(PAUTDTL1\nPending Auth Details\nIMS Segment)]:::datasource\n    J[6:Write Pending Auth Detail\nto Child Output File\nInsert Child Segment]:::process\n    PADFLPCB[(PADFLPCB\nChild GSAM Output File\nIMS GSAM Dataset)]:::datasource\n    K[7:Increment Detail\nRecord Counter]:::process\n    L{9:End of Child Segments?\nIMS Status GE?}:::decision\n    M[9:Set End-of-Child Flag\nMove to Next Root Segment]:::process\n    N{8:End of Auth Summary\nDatabase? IMS Status GB?}:::decision\n    O[8:Set End-of-Database Flag\nStop Further Reading]:::process\n    P[10:Close Output Files\nDisplay Completion Message]:::process\n    Q([Program End - Normal]):::final\n    ERR1[11:Abnormal Termination\nDisplay Error Message\nSet Return Code 16]:::error\n    ERR2[11:Abnormal Termination\nDisplay Error Message\nSet Return Code 16]:::error\n    ERR3[11:Abnormal Termination\nDisplay Error Message\nSet Return Code 16]:::error\n\n    A --> B\n    B --> C\n    C -->|Yes - Continue Processing| D\n    PAUTSUM0 -.->|Read Root Segment| D\n    D --> N\n    N -->|No - Records Available\nStatus Spaces| E\n    N -->|Yes - Status GB| O\n    O --> C\n    E -->|No - Not Numeric\nSkip Record| C\n    E -->|Yes - Numeric| F\n    F -->|Insert Record| PASFLPCB\n    F --> G\n    G --> H\n    H -->|Yes - Continue| I\n    PAUTDTL1 -.->|Read Child Segment| I\n    I --> L\n    L -->|No - Child Record Available\nStatus Spaces| J\n    J -->|Insert Record| PADFLPCB\n    J --> K\n    K --> H\n    L -->|Yes - Status GE| M\n    M --> C\n    C -->|No - End of Database| P\n    P --> Q\n    D -->|Critical IMS Failure| ERR1\n    I -->|Critical IMS Failure| ERR2\n    F -->|GSAM Insert Failure| ERR3\n    J -->|GSAM Insert Failure| ERR3\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Initialization and Start Banner Display",
+                "rule_description": "At program startup, the system captures the current calendar date and Julian date, and displays a start banner to confirm the program has begun execution.",
+                "sub_graph_node_text": "1:Program Initialization\nDisplay start banner\nCapture current date and Julian date",
+                "acceptance_criteria": {
+                    "Given": "The DBUNLDGS program has been invoked",
+                    "When": "The program begins execution",
+                    "Then": "The system must capture today's calendar date (CURRENT-DATE) and Julian date (CURRENT-YYDDD), display the program name 'DBUNLDGS', display a separator banner, and display today's calendar date as the processing date"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00002",
+                "rule_type": "Action Rules",
+                "rule_name": "Sequential Read of Pending Authorization Summary Records",
+                "rule_description": "The program sequentially retrieves each Pending Authorization Summary record (root/parent segment) from the IMS database one at a time using an unqualified Get Next call.",
+                "sub_graph_node_text": "2:Read Pending Authorization\nSummary - Root Segment\nGet Next GN Call",
+                "acceptance_criteria": {
+                    "Given": "The program is in the main processing loop and has not yet reached the end of the Pending Authorization Summary database",
+                    "When": "A Get Next (GN) call is issued against the PAUTBPCB database using ROOT-UNQUAL-SSA (unqualified segment search argument)",
+                    "Then": "The next available Pending Authorization Summary record (PENDING-AUTH-SUMMARY segment) is retrieved from the PAUTSUM0 IMS segment and made available for further processing"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00003",
+                "rule_type": "Validation Rules",
+                "rule_name": "Account ID Numeric Validation for Authorization Summary",
+                "rule_description": "Before writing a Pending Authorization Summary record to the output file, the Account ID must be validated to ensure it contains only numeric characters. Records with non-numeric Account IDs are silently skipped with no output written.",
+                "sub_graph_node_text": "3:Validate Account ID\nIs PA-ACCT-ID Numeric?",
+                "acceptance_criteria": {
+                    "Given": "A Pending Authorization Summary record has been successfully retrieved from the database",
+                    "When": "The Account ID (PA-ACCT-ID) extracted from the summary record is evaluated",
+                    "Then": "If PA-ACCT-ID is numeric, the record is eligible for output processing and child detail retrieval; if PA-ACCT-ID is NOT numeric, the record is skipped entirely \u2014 no parent record is written to the output file and no child detail records are read or written for that summary"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00004",
+                "rule_type": "Action Rules",
+                "rule_name": "Write Pending Authorization Summary to Parent Output File",
+                "rule_description": "Each valid Pending Authorization Summary record (with a numeric Account ID) is written to the dedicated parent GSAM output file (PASFLPCB) as a root segment insert.",
+                "sub_graph_node_text": "4:Write Pending Auth Summary\nto Parent Output File\nInsert Root Segment",
+                "acceptance_criteria": {
+                    "Given": "A Pending Authorization Summary record has been successfully retrieved and its Account ID (PA-ACCT-ID) has been confirmed as numeric",
+                    "When": "An Insert (ISRT) call is issued to write the PENDING-AUTH-SUMMARY record to the PASFLPCB GSAM parent output dataset",
+                    "Then": "The Pending Authorization Summary record is successfully written to the PASFLPCB parent GSAM output file; if the insert fails for any reason, the program must terminate abnormally with return code 16 and display the error status and key feedback area"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00005",
+                "rule_type": "Action Rules",
+                "rule_name": "Sequential Read of Pending Authorization Detail Records for Current Parent",
+                "rule_description": "For each valid parent Authorization Summary record, all associated child Authorization Detail records are retrieved sequentially using a Get Next within Parent call, ensuring only detail records belonging to the current parent are read.",
+                "sub_graph_node_text": "5:Read Pending Authorization\nDetail - Child Segment\nGet Next Within Parent GNP Call",
+                "acceptance_criteria": {
+                    "Given": "A valid Pending Authorization Summary (parent) record has been written to the output file and the child processing loop is active",
+                    "When": "A Get Next within Parent (GNP) call is issued against the PAUTBPCB database using CHILD-UNQUAL-SSA (unqualified segment search argument) to retrieve PENDING-AUTH-DETAILS segments",
+                    "Then": "The next available Pending Authorization Detail record (PAUTDTL1 IMS segment) belonging to the current parent is retrieved and made available for output writing; the retrieval is scoped strictly to child segments of the current parent summary record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00006",
+                "rule_type": "Action Rules",
+                "rule_name": "Write Pending Authorization Detail to Child Output File",
+                "rule_description": "Each successfully retrieved Pending Authorization Detail record is written to the dedicated child GSAM output file (PADFLPCB), maintaining separation between parent summary and child detail output.",
+                "sub_graph_node_text": "6:Write Pending Auth Detail\nto Child Output File\nInsert Child Segment",
+                "acceptance_criteria": {
+                    "Given": "A Pending Authorization Detail record has been successfully retrieved for the current parent summary",
+                    "When": "An Insert (ISRT) call is issued to write the PENDING-AUTH-DETAILS record to the PADFLPCB GSAM child output dataset",
+                    "Then": "The Pending Authorization Detail record is successfully written to the PADFLPCB child GSAM output file; if the insert fails for any reason, the program must terminate abnormally with return code 16 and display the error status and key feedback area"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00007",
+                "rule_type": "Computation Rules",
+                "rule_name": "Increment Summary and Detail Record Processing Counters",
+                "rule_description": "Each successfully read record \u2014 whether a parent Authorization Summary or a child Authorization Detail \u2014 is counted toward both the total records read counter and the total authorization summary processed counter.",
+                "sub_graph_node_text": "7:Increment Summary\nRecord Counter",
+                "acceptance_criteria": {
+                    "Given": "A Pending Authorization Summary or Pending Authorization Detail record has been successfully retrieved from the database (IMS status equals spaces)",
+                    "When": "The successful read is confirmed",
+                    "Then": "The total summary records read counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the authorization summary processed count (WS-AUTH-SMRY-PROC-CNT) must also be incremented by 1 \u2014 this applies to both parent summary reads and child detail reads"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00008",
+                "rule_type": "Decision Rules",
+                "rule_name": "End of Authorization Summary Database Detection",
+                "rule_description": "When the database signals that no more Pending Authorization Summary records exist, the program sets an end-of-database flag and stops further reading, transitioning to file closure.",
+                "sub_graph_node_text": "8:End of Auth Summary\nDatabase? IMS Status GB?",
+                "acceptance_criteria": {
+                    "Given": "A Get Next (GN) call has been issued to read the next Pending Authorization Summary record",
+                    "When": "The database returns a 'GB' (end-of-database) status on the PAUTBPCB PCB",
+                    "Then": "The end-of-authorization-database flag (END-OF-AUTHDB) must be set to TRUE, the root segment end flag (WS-END-OF-ROOT-SEG) must be set to 'Y', and the main processing loop must terminate \u2014 no further summary records are read"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00009",
+                "rule_type": "Decision Rules",
+                "rule_name": "End of Child Detail Segments Detection for Current Parent",
+                "rule_description": "When the database signals that no more child Authorization Detail records exist for the current parent summary, the child processing loop is terminated and processing advances to the next parent summary record.",
+                "sub_graph_node_text": "9:End of Child Segments?\nIMS Status GE?",
+                "acceptance_criteria": {
+                    "Given": "A Get Next within Parent (GNP) call has been issued to read the next Pending Authorization Detail record for the current parent",
+                    "When": "The database returns a 'GE' (no more segments within parent) status on the PAUTBPCB PCB",
+                    "Then": "The child segment end flag (WS-END-OF-CHILD-SEG) must be set to 'Y', a display message confirming the child segment end flag value must be shown, and the child detail processing loop must terminate \u2014 processing returns to read the next parent summary record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00010",
+                "rule_type": "Process Rules",
+                "rule_name": "Output File Closure and Completion Message",
+                "rule_description": "After all Pending Authorization Summary and Detail records have been processed, the program displays a completion message before ending normally.",
+                "sub_graph_node_text": "10:Close Output Files\nDisplay Completion Message",
+                "acceptance_criteria": {
+                    "Given": "All Pending Authorization Summary records have been processed and the end-of-database condition has been reached",
+                    "When": "The program exits the main processing loop",
+                    "Then": "The program must display the message 'CLOSING THE FILE' to confirm completion, and then terminate normally"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-DBUNLDGS-cbl-00011",
+                "rule_type": "Policy Rules",
+                "rule_name": "Abnormal Termination on Unexpected Database or File Error",
+                "rule_description": "If any unexpected error occurs while reading Authorization Summary records, reading Authorization Detail records, or writing to either output file, the program must terminate abnormally with a specific return code and display diagnostic information.",
+                "sub_graph_node_text": "11:Abnormal Termination\nDisplay Error Message\nSet Return Code 16",
+                "acceptance_criteria": {
+                    "Given": "The program has issued a database read call (GN for summary or GNP for detail) or a GSAM file write call (ISRT for parent or child)",
+                    "When": "The returned status is not a recognized expected status \u2014 specifically: not spaces (success) and not 'GB' (end-of-database) for summary reads; not spaces (success) and not 'GE' (end-of-children) for detail reads; not spaces (success) for GSAM write operations",
+                    "Then": "The program must display 'DBUNLDGS ABENDING...', display the specific error status code and the key feedback area (PAUT-KEYFB, PASFL-KEYFB, or PADFL-KEYFB as applicable) for diagnostic purposes, set the return code to 16, and terminate immediately without processing any further records"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "program-initialization",
+            "title": "Program Initialization",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Program Initialization])\n    B[Capture Current Calendar Date]\n    C[Capture Current Julian Date YYDDD]\n    D[Display Program Start Banner\\n'STARTING PROGRAM DBUNLDGS::']\n    E[Display Today's Date\\nto Processing Log]\n    F([Initialization Complete\\nProceed to Read Auth Summary Records])\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E\n    E --> F",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00012",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture Current Calendar Date at Program Start",
+                    "rule_description": "At program initialization, the system captures the current calendar date to establish the processing date context for the DBUNLDGS unload run.",
+                    "sub_graph_node_text": "Capture Current Calendar Date",
+                    "acceptance_criteria": {
+                        "Given": "The DBUNLDGS program has been invoked and is beginning its initialization phase",
+                        "When": "The program starts its initialization routine",
+                        "Then": "The current calendar date is captured and stored in CURRENT-DATE to serve as the processing date reference for the entire program run"
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00013",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture Current Julian Date at Program Start",
+                    "rule_description": "At program initialization, the system captures the current Julian date in YYDDD format to establish the processing day context for the DBUNLDGS unload run.",
+                    "sub_graph_node_text": "Capture Current Julian Date YYDDD",
+                    "acceptance_criteria": {
+                        "Given": "The DBUNLDGS program has been invoked and is beginning its initialization phase",
+                        "When": "The program starts its initialization routine immediately after capturing the calendar date",
+                        "Then": "The current Julian date in YYDDD format is captured and stored in CURRENT-YYDDD to serve as an additional processing date reference for the program run"
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00014",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Program Start Banner to Processing Log",
+                    "rule_description": "At the start of the DBUNLDGS program, a banner message is written to the processing log to mark the beginning of the authorization data unload process, providing a clear audit trail entry.",
+                    "sub_graph_node_text": "Display Program Start Banner\n'STARTING PROGRAM DBUNLDGS::'",
+                    "acceptance_criteria": {
+                        "Given": "The DBUNLDGS program has captured the current calendar date and Julian date",
+                        "When": "The program proceeds to log its start",
+                        "Then": "The processing log must display the message 'STARTING PROGRAM DBUNLDGS::' followed by a separator line '*-------------------------------------*' to clearly mark the start of the program execution in the log"
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00015",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Today's Date to Processing Log",
+                    "rule_description": "After displaying the program start banner, the system writes today's calendar date to the processing log so that the exact date of the authorization data unload run is permanently recorded for audit and traceability purposes.",
+                    "sub_graph_node_text": "Display Today's Date\nto Processing Log",
+                    "acceptance_criteria": {
+                        "Given": "The DBUNLDGS program has displayed the program start banner and the current calendar date has been captured in CURRENT-DATE",
+                        "When": "The program logs the processing date",
+                        "Then": "The processing log must display the label 'TODAYS DATE            :' followed by the value of CURRENT-DATE, and a blank line must be written after the date entry to visually separate the initialization log entries from subsequent processing messages"
+                    },
+                    "key_functionality_id": "program-initialization"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Initialization"
+        },
+        {
+            "id": "read-pending-authorization-summary-(root-segment)",
+            "title": "Read Pending Authorization Summary (Root Segment)",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Read Next Auth Summary])\n    B[Retrieve Next Pending Authorization\\nSummary Record from Database]\n    PAUTSUM0[(PAUTSUM0\\nPending Auth Summary\\nIMS Database)]\n    C{Was Record\\nSuccessfully Retrieved?}\n    D[Increment Summary\\nRecord Counters]\n    E{Is Account ID\\nNumeric?}\n    F[Proceed to Write Summary\\nRecord to Output File\\nand Read Child Detail Records]\n    G{Is This the Last\\nSummary Record in Database?}\n    H[Set End-of-Database Flag\\nNo More Summary Records\\nto Process]\n    I([End: Return to Main Process])\n    J[Display Error Details\\nTrigger Abnormal Termination\\nReturn Code 16]\n\n    A --> B\n    PAUTSUM0 -.->|Sequential Read| B\n    B --> C\n    C -->|Yes - Record Found| D\n    D --> E\n    E -->|Yes - Valid Account ID| F\n    E -->|No - Invalid Account ID\\nSkip Record| G\n    F --> G\n    C -->|No - Read Failed| G\n    G -->|Yes - End of Database| H\n    H --> I\n    G -->|No - Unexpected Error| J\n    J --> I",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00016",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Retrieval of Pending Authorization Summary Records",
+                    "rule_description": "The program sequentially retrieves the next available Pending Authorization Summary record from the IMS database (PAUTSUM0) using an unqualified Get-Next call, processing all records one at a time in database order.",
+                    "sub_graph_node_text": "Retrieve Next Pending Authorization Summary Record from Database",
+                    "acceptance_criteria": {
+                        "Given": "The DBUNLDGS program is actively processing Pending Authorization Summary records and has not yet reached the end of the database",
+                        "When": "The program requests the next Pending Authorization Summary record from the IMS database using a sequential unqualified Get-Next (GN) retrieval against the PAUTSUM0 root segment",
+                        "Then": "The next available Pending Authorization Summary record is retrieved from the database and made available for further processing, including counter updates and Account ID validation"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00017",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Increment Counters on Successful Summary Record Retrieval",
+                    "rule_description": "Each time a Pending Authorization Summary record is successfully retrieved from the database, two running counters are incremented to track the total number of summary records read and the total number of authorization summaries processed during the program run.",
+                    "sub_graph_node_text": "Increment Summary Record Counters",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary record has been successfully retrieved from the IMS database (retrieval status indicates success with no error condition)",
+                        "When": "The program confirms the record was retrieved without error",
+                        "Then": "The total summary records read counter (WS-NO-SUMRY-READ) is incremented by 1, AND the authorization summary processed count (WS-AUTH-SMRY-PROC-CNT) is incremented by 1, AND the retrieved record data is copied to the output record area for further processing"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00018",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Validate Account ID is Numeric Before Processing Summary Record",
+                    "rule_description": "Before a successfully retrieved Pending Authorization Summary record is written to the output file and its child detail records are processed, the Account ID field must be validated to ensure it contains only numeric characters. Records with non-numeric Account IDs are silently skipped \u2014 neither the summary nor any of its associated detail records are written to output.",
+                    "sub_graph_node_text": "Is Account ID Numeric?",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary record has been successfully retrieved and its counters have been incremented, AND the Account ID (PA-ACCT-ID) has been extracted from the summary record into the root segment key",
+                        "When": "The program evaluates whether the Account ID (PA-ACCT-ID) contains only numeric characters",
+                        "Then": "If the Account ID IS numeric: the program proceeds to write the summary record to the parent output file AND processes all associated child authorization detail records; If the Account ID is NOT numeric: the summary record is skipped entirely \u2014 it is not written to any output file and none of its associated child detail records are retrieved or written"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00019",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect End of Pending Authorization Summary Database",
+                    "rule_description": "When the database signals that there are no more Pending Authorization Summary records available to retrieve, the program recognizes this as the normal end-of-database condition and sets a flag to stop the main processing loop, allowing the program to proceed to file closure and termination.",
+                    "sub_graph_node_text": "Is This the Last Summary Record in Database? / Set End-of-Database Flag No More Summary Records to Process",
+                    "acceptance_criteria": {
+                        "Given": "The program has issued a sequential Get-Next request for the next Pending Authorization Summary record from the IMS database",
+                        "When": "The database returns an end-of-database signal (status 'GB'), indicating there are no more Pending Authorization Summary records to process",
+                        "Then": "The end-of-authorization-database flag (END-OF-AUTHDB) is set to TRUE, AND the end-of-root-segment flag (WS-END-OF-ROOT-SEG) is set to 'Y', which causes the main processing loop to terminate and the program to proceed to file closure"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00020",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Trigger Abnormal Termination on Unexpected Summary Read Error",
+                    "rule_description": "If the database returns any status other than a successful retrieval or a normal end-of-database condition when reading a Pending Authorization Summary record, the program treats this as an unrecoverable error, displays diagnostic information including the error status and key feedback area, and terminates abnormally.",
+                    "sub_graph_node_text": "Display Error Details Trigger Abnormal Termination Return Code 16",
+                    "acceptance_criteria": {
+                        "Given": "The program has issued a sequential Get-Next request for the next Pending Authorization Summary record from the IMS database",
+                        "When": "The database returns a status that is neither a successful retrieval (blank/spaces) nor a normal end-of-database condition ('GB'), indicating an unexpected error condition",
+                        "Then": "The program displays the message 'AUTH SUM GN FAILED :' along with the error status code, AND displays the message 'KEY FEEDBACK AREA :' along with the key feedback area (PAUT-KEYFB) for diagnostic purposes, AND the program terminates abnormally with a return code of 16"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00021",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Proceed to Write Summary and Process Child Detail Records for Valid Account",
+                    "rule_description": "When a Pending Authorization Summary record passes the numeric Account ID validation, the program is directed to write the summary record to the parent output file and subsequently retrieve and write all associated child Pending Authorization Detail records, preserving the parent-child relationship in the output.",
+                    "sub_graph_node_text": "Proceed to Write Summary Record to Output File and Read Child Detail Records",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary record has been successfully retrieved from the database AND its Account ID (PA-ACCT-ID) has been confirmed to be numeric",
+                        "When": "The Account ID numeric validation passes",
+                        "Then": "The program proceeds to invoke the parent segment write process (3100-INSERT-PARENT-SEG-GSAM) to write the summary record to the GSAM parent output file, AND then resets the child segment end flag (WS-END-OF-CHILD-SEG), AND then enters the child detail record processing loop to retrieve and write all associated Pending Authorization Detail records for this summary"
+                    },
+                    "key_functionality_id": "read-pending-authorization-summary-(root-segment)"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Read Pending Authorization Summary (Root Segment)"
+        },
+        {
+            "id": "validate-account-id",
+            "title": "Validate Account ID",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Pending Authorization\\nSummary Record Retrieved])\n    B{Is Account ID\\nPA-ACCT-ID\\nNumeric?}\n    C[Account ID is Valid\\nProceed with Processing\\nWrite Summary Record and\\nProcess Child Detail Records]\n    D[Account ID is Invalid\\nSkip Entire Record\\nBoth Summary and\\nAll Associated Details]\n    E([Move to Next\\nPending Authorization\\nSummary Record])\n\n    A --> B\n    B -->|Yes - Numeric\\nValid Account ID| C\n    B -->|No - Not Numeric\\nInvalid Account ID| D\n    C --> E\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00022",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Validate Account ID is Numeric Before Processing Authorization Summary",
+                    "rule_description": "When a Pending Authorization Summary record is retrieved from the database, the Account ID must be validated as numeric before the record and its associated child detail records are eligible for output processing. Records with non-numeric Account IDs are entirely skipped.",
+                    "sub_graph_node_text": "Is Account ID PA-ACCT-ID Numeric?",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary record has been successfully retrieved from the Pending Authorization database, and the record contains an Account ID (PA-ACCT-ID)",
+                        "When": "The Account ID (PA-ACCT-ID) value from the retrieved Pending Authorization Summary record is evaluated to determine whether it contains a valid numeric value",
+                        "Then": "If the Account ID is numeric, the Pending Authorization Summary record is considered valid and processing continues \u2014 the summary record is written to the parent output file and all associated Pending Authorization Detail records are retrieved and written to the child output file; If the Account ID is NOT numeric, the entire Pending Authorization Summary record is skipped without being written to any output file, and none of its associated Pending Authorization Detail records are retrieved or written, and processing moves directly to the next Pending Authorization Summary record"
+                    },
+                    "key_functionality_id": "validate-account-id"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Validate Account ID"
+        },
+        {
+            "id": "write-pending-authorization-summary-to-output-(parent-gsam)",
+            "title": "Write Pending Authorization Summary to Output (Parent GSAM)",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Write Pending Auth\\nSummary to Output])\n    B[Prepare Pending Authorization\\nSummary Record for Output\\nRoot Segment Data]\n    C[Insert Pending Authorization\\nSummary Record into\\nParent GSAM Output Dataset\\nPASFLPCB]\n    D{Was Record\\nSuccessfully Written?}\n    E([Output Write\\nSuccessful - Continue\\nto Child Records])\n    F[Display GSAM\\nWrite Failure Message\\nwith Error Details]\n    G([Abnormal Program\\nTermination\\nReturn Code 16])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes - Status Normal| E\n    D -->|No - Write Error| F\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00023",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Write Pending Authorization Summary Record to Parent Output Dataset",
+                    "rule_description": "When a valid Pending Authorization Summary record has been retrieved and its Account ID is confirmed as numeric, the system must insert the summary record into the Parent GSAM sequential output dataset to unload the root segment data for downstream consumption.",
+                    "sub_graph_node_text": "Insert Pending Authorization Summary Record into Parent GSAM Output Dataset PASFLPCB",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary record has been successfully retrieved from the authorization database and its Account ID has been validated as numeric",
+                        "When": "The system attempts to write the Pending Authorization Summary record as a root segment into the Parent GSAM sequential output dataset (PASFLPCB)",
+                        "Then": "The complete Pending Authorization Summary record is inserted into the Parent GSAM output dataset as a root/parent segment, and processing continues to retrieve and write the associated child Authorization Detail records"
+                    },
+                    "key_functionality_id": "write-pending-authorization-summary-to-output-(parent-gsam)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00024",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Successful Write of Pending Authorization Summary to Parent Output",
+                    "rule_description": "After attempting to write the Pending Authorization Summary record to the Parent GSAM output dataset, the system must verify whether the write operation completed successfully. A successful write is indicated by a normal (blank/spaces) status, allowing processing to continue to child detail records.",
+                    "sub_graph_node_text": "Was Record Successfully Written?",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to insert the Pending Authorization Summary record into the Parent GSAM sequential output dataset (PASFLPCB)",
+                        "When": "The system evaluates the write operation outcome status",
+                        "Then": "If the write status is normal (blank/spaces), the record is confirmed as successfully written and the program proceeds to process the associated Pending Authorization Detail (child) records for the same Account ID; if the write status is anything other than normal (blank/spaces), the write is considered failed and error handling is triggered"
+                    },
+                    "key_functionality_id": "write-pending-authorization-summary-to-output-(parent-gsam)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00025",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Handle Failure When Writing Pending Authorization Summary to Parent Output",
+                    "rule_description": "If the Pending Authorization Summary record cannot be successfully written to the Parent GSAM output dataset, the system must report the failure with diagnostic details and terminate the program abnormally to prevent incomplete or corrupt output data from being produced.",
+                    "sub_graph_node_text": "Display GSAM Write Failure Message with Error Details",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to insert the Pending Authorization Summary record into the Parent GSAM sequential output dataset (PASFLPCB) and the write operation has returned a non-normal (non-blank) status",
+                        "When": "The system detects that the Parent GSAM write status is not equal to spaces (indicating a write failure)",
+                        "Then": "The system displays a GSAM parent write failure message ('GSAM PARENT FAIL') along with the specific write failure status code and the Key Feedback Area details for diagnostic purposes, then terminates the program abnormally with a return code of 16, halting all further processing"
+                    },
+                    "key_functionality_id": "write-pending-authorization-summary-to-output-(parent-gsam)"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Write Pending Authorization Summary to Output (Parent GSAM)"
+        },
+        {
+            "id": "read-pending-authorization-detail-(child-segment)",
+            "title": "Read Pending Authorization Detail (Child Segment)",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Read Child Detail Records\\nfor Current Parent Summary])\n    B[Issue Get-Next-Within-Parent\\nGNP Call for Pending Auth\\nDetail Records]\n    C{Was Child Detail\\nRecord Found?\\nStatus = Spaces}\n    D[Capture Pending Auth\\nDetail Record Data]\n    E[6: Write Detail Record\\nto Child Output File]\n    F[Increment Detail\\nRecord Counter]\n    G{Are There More\\nChild Detail Records\\nfor This Parent?}\n    H{No More Child Records\\nfor Current Parent?\\nStatus = GE}\n    I[Set End-of-Child Flag\\nPrepare to Move to\\nNext Summary Record]\n    J([End: All Child Records\\nProcessed for Current Parent\\nReturn to Summary Loop])\n    K[11: Abnormal Termination\\nUnexpected Error Reading\\nChild Detail Records]\n\n    A --> B\n    B --> C\n    C -->|Yes - Child Record Available| D\n    D --> E\n    E --> F\n    F --> G\n    G -->|Yes - Continue Reading Children| B\n    C -->|No - Check Why| H\n    H -->|Yes - Status GE\\nNo More Children| I\n    I --> J\n    H -->|No - Unexpected\\nError Status| K",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00026",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Retrieval of Pending Authorization Detail Records for Current Parent",
+                    "rule_description": "For each Pending Authorization Summary (parent) record being processed, the program sequentially retrieves all associated Pending Authorization Detail (child) records one at a time, scoped strictly to the current parent summary record.",
+                    "sub_graph_node_text": "Issue Get-Next-Within-Parent GNP Call for Pending Auth Detail Records",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Summary (parent) record has been successfully read and validated, and the system is ready to retrieve its associated child detail records",
+                        "When": "The program issues a Get-Next-Within-Parent (GNP) retrieval call targeting Pending Authorization Detail records, using an unqualified segment search argument scoped to the current parent summary record",
+                        "Then": "The next available Pending Authorization Detail record belonging to the current parent summary is retrieved for processing; the retrieval is strictly bounded to the current parent and does not cross into detail records of another parent summary"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00027",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Capture Pending Authorization Detail Record Data on Successful Retrieval",
+                    "rule_description": "When a Pending Authorization Detail record is successfully retrieved, its data is captured into the child segment record area and the program flags that more authorization detail records are available for the current parent.",
+                    "sub_graph_node_text": "Capture Pending Auth Detail Record Data",
+                    "acceptance_criteria": {
+                        "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                        "When": "The retrieval is successful, indicated by a blank (spaces) read status, meaning a child detail record was found",
+                        "Then": "The retrieved Pending Authorization Detail record data is copied into the child segment record area (CHILD-SEG-REC), and the processing state is updated to indicate that more authorization detail records exist (MORE-AUTHS flag set to TRUE)"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00028",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Increment Detail Record Processing Counter on Successful Read",
+                    "rule_description": "Each time a Pending Authorization Detail record is successfully retrieved, two running counters are incremented to track the total number of records read and the total number of authorization records processed.",
+                    "sub_graph_node_text": "Increment Detail Record Counter",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been successfully retrieved with a blank (spaces) read status",
+                        "When": "The program processes the successfully retrieved child detail record",
+                        "Then": "The total summary records read counter (WS-NO-SUMRY-READ) is incremented by 1, and the total authorization summary processed counter (WS-AUTH-SMRY-PROC-CNT) is incremented by 1"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00029",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Write Pending Authorization Detail Record to Child Output File",
+                    "rule_description": "Each successfully retrieved Pending Authorization Detail record is written to the dedicated child GSAM output file. If the write operation fails for any reason, the program terminates abnormally.",
+                    "sub_graph_node_text": "6: Write Detail Record to Child Output File",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been successfully retrieved and its data has been captured into the child segment record area",
+                        "When": "The program attempts to insert the Pending Authorization Detail record into the child GSAM output file (PADFLPCB)",
+                        "Then": "If the write is successful (status is blank/spaces), the detail record is stored in the child output file and processing continues to the next child record; if the write fails (status is not blank/spaces), the program displays an error message identifying the failure and terminates abnormally with return code 16"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00030",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue Reading Child Detail Records Until All Are Processed",
+                    "rule_description": "After each Pending Authorization Detail record is successfully retrieved and written, the program loops back to retrieve the next child detail record for the same parent summary, continuing until all child records for the current parent have been processed.",
+                    "sub_graph_node_text": "Are There More Child Detail Records for This Parent?",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been successfully retrieved, captured, written to the child output file, and its counter incremented",
+                        "When": "The end-of-child-segment flag (WS-END-OF-CHILD-SEG) has not yet been set to 'Y'",
+                        "Then": "The program loops back and issues another Get-Next-Within-Parent (GNP) call to retrieve the next Pending Authorization Detail record for the same parent summary record"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00031",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect End of Child Detail Records for Current Parent Summary",
+                    "rule_description": "When there are no more Pending Authorization Detail records associated with the current parent summary record, the program detects this condition and prepares to move on to the next Pending Authorization Summary record.",
+                    "sub_graph_node_text": "No More Child Records for Current Parent? Status = GE",
+                    "acceptance_criteria": {
+                        "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                        "When": "The retrieval returns a 'no more segments' condition (Status = GE), indicating that all child detail records for the current parent have already been retrieved",
+                        "Then": "The end-of-child-segment flag (WS-END-OF-CHILD-SEG) is set to 'Y', which stops the child record retrieval loop and signals the program to return to the parent summary loop to process the next Pending Authorization Summary record"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00032",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Abnormal Termination on Unexpected Error Reading Child Detail Records",
+                    "rule_description": "If an unexpected error occurs while retrieving Pending Authorization Detail records (any condition other than successful retrieval or normal end-of-children), the program logs the error details and terminates abnormally to prevent incomplete or corrupt data from being written to the output files.",
+                    "sub_graph_node_text": "11: Abnormal Termination Unexpected Error Reading Child Detail Records",
+                    "acceptance_criteria": {
+                        "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                        "When": "The retrieval returns a status that is neither blank/spaces (successful read) nor 'GE' (no more children), indicating an unexpected error condition",
+                        "Then": "The program displays an error message identifying the GNP call failure along with the key feedback area details for diagnostic purposes, and then terminates abnormally with a return code of 16, stopping all further processing"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00033",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Reset Read Status After Each Child Detail Record Retrieval Attempt",
+                    "rule_description": "After each child detail record retrieval attempt is fully evaluated and acted upon, the read status is cleared so that it does not carry over and incorrectly influence the evaluation of the next retrieval attempt.",
+                    "sub_graph_node_text": "Issue Get-Next-Within-Parent GNP Call for Pending Auth Detail Records",
+                    "acceptance_criteria": {
+                        "Given": "A Get-Next-Within-Parent (GNP) call has been issued and all resulting conditions (success, end-of-children, or error) have been fully evaluated and acted upon for the current child detail record",
+                        "When": "The program completes processing of the current retrieval attempt outcome",
+                        "Then": "The read status indicator (PAUT-PCB-STATUS) is reset/cleared so that the next Get-Next-Within-Parent call starts with a clean status, preventing any prior status from affecting the next retrieval evaluation"
+                    },
+                    "key_functionality_id": "read-pending-authorization-detail-(child-segment)"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Read Pending Authorization Detail (Child Segment)"
+        },
+        {
+            "id": "write-pending-authorization-detail-to-output-(child-gsam)",
+            "title": "Write Pending Authorization Detail to Output (Child GSAM)",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Write Pending Auth\\nDetail to Child Output])\n    B[Prepare Pending Authorization\\nDetail Record for Output\\nMove Detail Data to Output Area]\n    C[Insert Pending Authorization\\nDetail Record into\\nChild GSAM Output Dataset\\nPADFLPCB]\n    PADFLPCB[(PADFLPCB\\nChild GSAM Output File\\nIMS GSAM Dataset)]\n    D{Was Record\\nSuccessfully Written?}\n    E[Record Successfully\\nUnloaded to Child\\nOutput Dataset]\n    F([End: Return to\\nRead Next Child Record])\n    G[11: Abnormal Termination\\nDisplay Error Message\\nSet Return Code 16\\nStop Processing]\n\n    A --> B\n    B --> C\n    C -->|Write Record| PADFLPCB\n    C --> D\n    D -->|Yes - Write Successful| E\n    E --> F\n    D -->|No - Write Failed| G",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00034",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Prepare Pending Authorization Detail Record for Child Output",
+                    "rule_description": "Before writing a Pending Authorization Detail record to the child output dataset, the retrieved detail data must be staged into the child segment output area to ensure the correct record content is written.",
+                    "sub_graph_node_text": "Prepare Pending Authorization Detail Record for Output - Move Detail Data to Output Area",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been successfully retrieved from the authorization database for the current parent Authorization Summary",
+                        "When": "The program prepares to write the detail record to the child output dataset",
+                        "Then": "The retrieved Pending Authorization Detail record data is moved into the child segment output record area (CHILD-SEG-REC) so that it is ready for insertion into the child GSAM output dataset"
+                    },
+                    "key_functionality_id": "write-pending-authorization-detail-to-output-(child-gsam)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00035",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Write Pending Authorization Detail Record to Child Output Dataset",
+                    "rule_description": "Each successfully retrieved Pending Authorization Detail record must be inserted into the child GSAM sequential output dataset (PADFLPCB) to unload the child segment data as part of the authorization database unload process.",
+                    "sub_graph_node_text": "Insert Pending Authorization Detail Record into Child GSAM Output Dataset PADFLPCB",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been prepared and staged in the child segment output area",
+                        "When": "The program executes the insert operation to write the Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                        "Then": "The Pending Authorization Detail record is inserted sequentially into the child GSAM output dataset (PADFLPCB), preserving the full detail data for the unload"
+                    },
+                    "key_functionality_id": "write-pending-authorization-detail-to-output-(child-gsam)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00036",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Confirm Successful Write of Pending Authorization Detail Record",
+                    "rule_description": "After attempting to write a Pending Authorization Detail record to the child output dataset, the program must confirm the write was successful before continuing to process the next child record.",
+                    "sub_graph_node_text": "Was Record Successfully Written? - Yes - Write Successful \u2192 Record Successfully Unloaded to Child Output Dataset",
+                    "acceptance_criteria": {
+                        "Given": "An insert operation has been executed to write a Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                        "When": "The write operation completes and the output dataset status indicates success (status is blank/spaces)",
+                        "Then": "The Pending Authorization Detail record is confirmed as successfully unloaded to the child output dataset, and the program returns to read the next Pending Authorization Detail record for the current parent"
+                    },
+                    "key_functionality_id": "write-pending-authorization-detail-to-output-(child-gsam)"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00037",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Abnormal Termination on Failed Write of Pending Authorization Detail Record",
+                    "rule_description": "If the write of a Pending Authorization Detail record to the child output dataset fails for any reason, the program must immediately stop all processing, display an error notification, and signal an abnormal termination with a failure return code of 16.",
+                    "sub_graph_node_text": "Was Record Successfully Written? - No - Write Failed \u2192 Abnormal Termination: Display Error Message, Set Return Code 16, Stop Processing",
+                    "acceptance_criteria": {
+                        "Given": "An insert operation has been executed to write a Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                        "When": "The write operation fails and the output dataset status is not blank (indicating an error condition)",
+                        "Then": "The program displays the error message 'GSAM PARENT FAIL :' along with the error status, displays the program-level abend message 'DBUNLDGS ABENDING ...', sets the process return code to 16 to signal abnormal termination, and immediately stops all further processing"
+                    },
+                    "key_functionality_id": "write-pending-authorization-detail-to-output-(child-gsam)"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Write Pending Authorization Detail to Output (Child GSAM)"
+        },
+        {
+            "id": "track-summary-and-detail-record-counts",
+            "title": "Track Summary and Detail Record Counts",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Record Successfully Retrieved])\n    B{What type of\\nrecord was retrieved?}\n    C[Increment Summary Record\\nRead Counter\\nWS-NO-SUMRY-READ + 1]\n    D[Increment Summary\\nProcessed Counter\\nWS-AUTH-SMRY-PROC-CNT + 1]\n    E[Increment Detail Record\\nRead Counter\\nWS-NO-SUMRY-READ + 1]\n    F[Increment Detail\\nProcessed Counter\\nWS-AUTH-SMRY-PROC-CNT + 1]\n    G([End: Counters Updated\\nContinue Processing])\n\n    A --> B\n    B -->|Pending Authorization\\nSummary Root Record| C\n    B -->|Pending Authorization\\nDetail Child Record| E\n    C --> D\n    D --> G\n    E --> F\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00038",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Increment Record Counters on Successful Retrieval of Pending Authorization Summary Record",
+                    "rule_description": "Each time a Pending Authorization Summary (root/parent) record is successfully retrieved from the database, two running counters must be incremented by 1: the total records read counter and the total authorization summary processed counter. This ensures accurate tracking of how many summary records have been read and processed during the program run.",
+                    "sub_graph_node_text": "Increment Summary Record Read Counter WS-NO-SUMRY-READ + 1 / Increment Summary Processed Counter WS-AUTH-SMRY-PROC-CNT + 1",
+                    "acceptance_criteria": {
+                        "Given": "The program is sequentially reading Pending Authorization Summary records from the authorization database, and a Summary record has been successfully retrieved without any error",
+                        "When": "A Pending Authorization Summary record is confirmed as successfully retrieved (no error condition is present)",
+                        "Then": "The Total Records Read Counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by 1, reflecting that one additional summary record has been read and is being processed"
+                    },
+                    "key_functionality_id": "track-summary-and-detail-record-counts"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00039",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Increment Record Counters on Successful Retrieval of Pending Authorization Detail Record",
+                    "rule_description": "Each time a Pending Authorization Detail (child) record is successfully retrieved from the database under its parent Summary record, the same two running counters must be incremented by 1: the total records read counter and the total authorization summary processed counter. This ensures that both parent and child records contribute equally to the overall processing counts.",
+                    "sub_graph_node_text": "Increment Detail Record Read Counter WS-NO-SUMRY-READ + 1 / Increment Detail Processed Counter WS-AUTH-SMRY-PROC-CNT + 1",
+                    "acceptance_criteria": {
+                        "Given": "The program is retrieving Pending Authorization Detail (child) records associated with a specific Pending Authorization Summary (parent) record, and a Detail record has been successfully retrieved without any error",
+                        "When": "A Pending Authorization Detail record is confirmed as successfully retrieved (no error condition is present)",
+                        "Then": "The Total Records Read Counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by 1, reflecting that one additional detail record has been read and processed"
+                    },
+                    "key_functionality_id": "track-summary-and-detail-record-counts"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00040",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Shared Counters Apply Uniformly Across Both Summary and Detail Record Types",
+                    "rule_description": "The program uses the same two counters \u2014 Total Records Read (WS-NO-SUMRY-READ) and Total Authorization Summary Processed (WS-AUTH-SMRY-PROC-CNT) \u2014 to track both Pending Authorization Summary records and Pending Authorization Detail records. There are no separate counters for each record type; every successfully retrieved record, regardless of whether it is a parent summary or a child detail, contributes to the same cumulative totals.",
+                    "sub_graph_node_text": "Track Summary and Detail Record Counts - Increment counters for the number of summary (root) records read and the number of detail (child) records read during processing.",
+                    "acceptance_criteria": {
+                        "Given": "The program is processing Pending Authorization records from the authorization database, which includes both Summary (parent) records and Detail (child) records",
+                        "When": "Any record \u2014 whether a Pending Authorization Summary record or a Pending Authorization Detail record \u2014 is successfully retrieved",
+                        "Then": "Both the Total Records Read Counter (WS-NO-SUMRY-READ) and the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) are incremented by 1 for each successful retrieval, regardless of the record type, so that the final counter values represent the combined total of all Summary and Detail records processed during the program run"
+                    },
+                    "key_functionality_id": "track-summary-and-detail-record-counts"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "increment-summary-record-read-counter-and-summary-processed-counter-using-shared-counters-ws",
+                    "title": "Increment Summary Record Read Counter and Summary Processed Counter using shared counters WS",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    A([Start: Root Segment\\nSuccessfully Retrieved])\n    B[Add 1 to\\nSummary Records Read Counter\\nWS-NO-SUMRY-READ]\n    C[Add 1 to\\nSummary Records Processed Counter\\nWS-AUTH-SMRY-PROC-CNT]\n    D([Continue to\\nAccount ID Validation])\n\n    A --> B\n    B --> C\n    C --> D",
+                    "rules": [
+                        {
+                            "rule_id": "R-DBUNLDGS-cbl-00055",
+                            "rule_type": "Computation Rules",
+                            "rule_name": "Increment Summary Records Read Counter on Successful Root Segment Retrieval",
+                            "rule_description": "Each time a Pending Authorization Summary root record is successfully retrieved from the database, the total count of summary records read is incremented by 1. This counter tracks the cumulative number of root-level authorization summary records that have been read during the current program execution.",
+                            "sub_graph_node_text": "Add 1 to Summary Records Read Counter WS-NO-SUMRY-READ",
+                            "acceptance_criteria": {
+                                "Given": "The program is sequentially reading Pending Authorization Summary root records from the authorization database",
+                                "When": "A Pending Authorization Summary root record is successfully retrieved without any errors",
+                                "Then": "The Summary Records Read Counter (WS-NO-SUMRY-READ) must be incremented by exactly 1 to reflect the newly read root record"
+                            },
+                            "key_functionality_id": "increment-summary-record-read-counter-and-summary-processed-counter-using-shared-counters-ws"
+                        },
+                        {
+                            "rule_id": "R-DBUNLDGS-cbl-00056",
+                            "rule_type": "Computation Rules",
+                            "rule_name": "Increment Summary Records Processed Counter on Successful Root Segment Retrieval",
+                            "rule_description": "Each time a Pending Authorization Summary root record is successfully retrieved from the database, the total count of authorization summary records processed is incremented by 1. This counter tracks the cumulative number of root-level authorization summary records that have been actively processed during the current program execution, and is shared with the child detail record processing to maintain an overall processing tally.",
+                            "sub_graph_node_text": "Add 1 to Summary Records Processed Counter WS-AUTH-SMRY-PROC-CNT",
+                            "acceptance_criteria": {
+                                "Given": "The program is sequentially reading Pending Authorization Summary root records from the authorization database",
+                                "When": "A Pending Authorization Summary root record is successfully retrieved without any errors",
+                                "Then": "The Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by exactly 1 to reflect the newly processed root record"
+                            },
+                            "key_functionality_id": "increment-summary-record-read-counter-and-summary-processed-counter-using-shared-counters-ws"
+                        }
+                    ],
+                    "sub_functionalities": []
+                },
+                {
+                    "id": "increment-detail-record-read-counter-and-detail-processed-counter-using-shared-counters-ws",
+                    "title": "Increment Detail Record Read Counter and Detail Processed Counter using shared counters WS",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    A([Child Detail Record\\nSuccessfully Retrieved])\n    B[Add 1 to Total Records Read Counter\\nWS-NO-SUMRY-READ]\n    C[Add 1 to Total Records Processed Counter\\nWS-AUTH-SMRY-PROC-CNT]\n    D([Proceed to Write\\nDetail Record to Output])\n\n    A --> B\n    B --> C\n    C --> D",
+                    "rules": [
+                        {
+                            "rule_id": "R-DBUNLDGS-cbl-00057",
+                            "rule_type": "Computation Rules",
+                            "rule_name": "Increment Total Records Read Counter on Successful Pending Authorization Detail Retrieval",
+                            "rule_description": "Each time a Pending Authorization Detail child record is successfully retrieved from the database, the shared total records read counter (WS-NO-SUMRY-READ) is incremented by 1. This counter tracks all successfully read records across both summary and detail record types.",
+                            "sub_graph_node_text": "Add 1 to Total Records Read Counter WS-NO-SUMRY-READ",
+                            "acceptance_criteria": {
+                                "Given": "The program is processing Pending Authorization Detail child records for a given Pending Authorization Summary parent record, and the shared total records read counter (WS-NO-SUMRY-READ) holds the current cumulative count of all records read so far (including any previously read summary and detail records)",
+                                "When": "A Pending Authorization Detail child record is successfully retrieved from the database without any retrieval error",
+                                "Then": "The total records read counter (WS-NO-SUMRY-READ) must be incremented by exactly 1, reflecting the addition of the newly retrieved Pending Authorization Detail record to the cumulative read count"
+                            },
+                            "key_functionality_id": "increment-detail-record-read-counter-and-detail-processed-counter-using-shared-counters-ws"
+                        },
+                        {
+                            "rule_id": "R-DBUNLDGS-cbl-00058",
+                            "rule_type": "Computation Rules",
+                            "rule_name": "Increment Total Records Processed Counter on Successful Pending Authorization Detail Retrieval",
+                            "rule_description": "Each time a Pending Authorization Detail child record is successfully retrieved from the database, the shared total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) is incremented by 1. This counter tracks all successfully processed authorization records across both summary and detail record types.",
+                            "sub_graph_node_text": "Add 1 to Total Records Processed Counter WS-AUTH-SMRY-PROC-CNT",
+                            "acceptance_criteria": {
+                                "Given": "The program is processing Pending Authorization Detail child records for a given Pending Authorization Summary parent record, and the shared total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) holds the current cumulative count of all authorization records processed so far (including any previously processed summary and detail records), and the total records read counter (WS-NO-SUMRY-READ) has already been incremented for this same successfully retrieved detail record",
+                                "When": "A Pending Authorization Detail child record is successfully retrieved from the database without any retrieval error",
+                                "Then": "The total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by exactly 1, reflecting the addition of the newly retrieved Pending Authorization Detail record to the cumulative processed count"
+                            },
+                            "key_functionality_id": "increment-detail-record-read-counter-and-detail-processed-counter-using-shared-counters-ws"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "Track Summary and Detail Record Counts"
+        },
+        {
+            "id": "detect-end-of-authorization-summary-database",
+            "title": "Detect End of Authorization Summary Database",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([After Reading Pending Auth\\nSummary Record])\n    B{Was IMS Status\\nReturned as GB?}\n    C[All Pending Authorization\\nSummary Records Have\\nBeen Processed]\n    D[Set End-of-Database\\nFlag to TRUE]\n    E[Set End-of-Root-Segment\\nFlag to Stop Further Reading]\n    F([Stop Reading Auth\\nSummary Records\\nProceed to Close Files])\n    G([Continue Processing\\nCurrent Record])\n\n    A --> B\n    B -->|Yes - Status GB\\nNo More Records| C\n    C --> D\n    D --> E\n    E --> F\n    B -->|No - Records Still\\nAvailable| G",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00041",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect End of Pending Authorization Summary Database",
+                    "rule_description": "After each attempt to read the next Pending Authorization Summary record, the program evaluates whether all records have been exhausted. When the database signals that no more Pending Authorization Summary root segment records exist, the program recognizes this as the end-of-database condition.",
+                    "sub_graph_node_text": "Was IMS Status Returned as GB?",
+                    "acceptance_criteria": {
+                        "Given": "The program has just attempted to read the next Pending Authorization Summary record from the authorization database",
+                        "When": "The database returns a 'No More Records' status (end-of-database signal) indicating that all Pending Authorization Summary root segments have been read",
+                        "Then": "The program identifies that all Pending Authorization Summary records have been fully processed and no further reading of summary records should occur"
+                    },
+                    "key_functionality_id": "detect-end-of-authorization-summary-database"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00042",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Set End-of-Authorization-Database Flag Upon Exhaustion of Summary Records",
+                    "rule_description": "When the end-of-database condition is detected after reading Pending Authorization Summary records, the program sets a dedicated end-of-authorization-database flag to TRUE to formally record that the authorization summary database has been fully traversed.",
+                    "sub_graph_node_text": "Set End-of-Database Flag to TRUE",
+                    "acceptance_criteria": {
+                        "Given": "The program has detected that no more Pending Authorization Summary root segment records exist in the authorization database",
+                        "When": "The end-of-database condition is confirmed",
+                        "Then": "The End-of-Authorization-Database flag (END-OF-AUTHDB) is set to TRUE, formally marking that the entire Pending Authorization Summary database has been processed"
+                    },
+                    "key_functionality_id": "detect-end-of-authorization-summary-database"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00043",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Set End-of-Root-Segment Flag to Halt Summary Record Reading Loop",
+                    "rule_description": "Alongside setting the end-of-database flag, the program sets a separate end-of-root-segment control flag to 'Y', which directly causes the main processing loop to terminate and prevents any further attempts to read Pending Authorization Summary records.",
+                    "sub_graph_node_text": "Set End-of-Root-Segment Flag to Stop Further Reading",
+                    "acceptance_criteria": {
+                        "Given": "The End-of-Authorization-Database flag has been set to TRUE after confirming no more Pending Authorization Summary records exist",
+                        "When": "The end-of-database condition is being handled",
+                        "Then": "The End-of-Root-Segment flag (WS-END-OF-ROOT-SEG) is set to 'Y', which stops the main Pending Authorization Summary processing loop and directs the program to proceed to the file closing step"
+                    },
+                    "key_functionality_id": "detect-end-of-authorization-summary-database"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00044",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Continue Processing When More Pending Authorization Summary Records Exist",
+                    "rule_description": "When the database read of a Pending Authorization Summary record is successful and no end-of-database condition is signaled, the program continues with processing the current record including its associated detail records.",
+                    "sub_graph_node_text": "Continue Processing Current Record",
+                    "acceptance_criteria": {
+                        "Given": "The program has just read a Pending Authorization Summary record from the authorization database",
+                        "When": "The database does not return an end-of-database signal, indicating the record was successfully retrieved and more records may still be available",
+                        "Then": "The program proceeds to process the current Pending Authorization Summary record, including validating its Account ID and extracting its associated Pending Authorization Detail child records"
+                    },
+                    "key_functionality_id": "detect-end-of-authorization-summary-database"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Detect End of Authorization Summary Database"
+        },
+        {
+            "id": "detect-end-of-child-segments-for-current-parent",
+            "title": "Detect End of Child Segments for Current Parent",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Check Child Segment Read Result])\n    B{Was a Child Detail\\nRecord Successfully Retrieved?\\nIMS Status = Spaces}\n    C[Process Retrieved\\nChild Detail Record]\n    D{Are There No More\\nChild Records for\\nThis Parent?\\nIMS Status = GE}\n    E[Set End-of-Child Flag = Y\\nNo More Detail Records\\nfor Current Parent]\n    F([Return to Parent Loop\\nMove to Next\\nSummary Record])\n    G([Continue Reading\\nNext Child Record])\n\n    A --> B\n    B -->|Yes - Child Record Found| C\n    C --> G\n    B -->|No - Child Record Not Found| D\n    D -->|Yes - Status GE\\nNo More Children| E\n    E --> F\n    D -->|No - Other Status| F",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00045",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Successful Retrieval and Processing of Pending Authorization Detail Record",
+                    "rule_description": "When a Pending Authorization Detail (child) record is successfully retrieved for the current parent Authorization Summary, the system marks that more authorization details exist, increments the processing counters, and writes the detail record to the GSAM child output file.",
+                    "sub_graph_node_text": "Process Retrieved Child Detail Record",
+                    "acceptance_criteria": {
+                        "Given": "The program is reading Pending Authorization Detail records for a current parent Pending Authorization Summary record, and a child detail record retrieval has been attempted",
+                        "When": "The child Pending Authorization Detail record is successfully retrieved from the database (read status indicates success with no errors)",
+                        "Then": "The system must: (1) Set the 'More Authorizations' indicator to TRUE signaling more child records exist, (2) Increment the total number of summary records read counter by 1, (3) Increment the authorization summary processed count by 1, (4) Copy the retrieved Pending Authorization Detail data into the child segment record, and (5) Write the child Pending Authorization Detail record to the GSAM child detail output file"
+                    },
+                    "key_functionality_id": "detect-end-of-child-segments-for-current-parent"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00046",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detection of No More Pending Authorization Detail Records for Current Parent",
+                    "rule_description": "When all Pending Authorization Detail records belonging to the current parent Authorization Summary have been processed, the system detects the end-of-children condition and sets a flag to stop reading child records and return to processing the next parent Authorization Summary.",
+                    "sub_graph_node_text": "Detect End of Child Segments for Current Parent - Identify when there are no more Pending Authorization Detail child segments for the current parent (IMS status 'GE') and set the end-of-child flag to move to the next root segment.",
+                    "acceptance_criteria": {
+                        "Given": "The program is iterating through Pending Authorization Detail (child) records for the current parent Pending Authorization Summary record",
+                        "When": "The database signals that there are no more Pending Authorization Detail child records available for the current parent Authorization Summary (end-of-children condition is reached)",
+                        "Then": "The system must: (1) Set the End-of-Child-Segment flag to 'Y', and (2) Display a message confirming the end-of-child condition with the flag value, so that the child record reading loop terminates and processing returns to retrieve the next parent Authorization Summary record"
+                    },
+                    "key_functionality_id": "detect-end-of-child-segments-for-current-parent"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00047",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Reset Child Record Read Status After Each Retrieval Attempt",
+                    "rule_description": "After each Pending Authorization Detail record retrieval attempt \u2014 whether successful or indicating end-of-children \u2014 the read status is cleared so that the next child record retrieval starts with a clean state, preventing carry-over of prior read results.",
+                    "sub_graph_node_text": "Continue Reading Next Child Record",
+                    "acceptance_criteria": {
+                        "Given": "The program has completed evaluating the result of a Pending Authorization Detail record retrieval attempt (either successfully retrieved or end-of-children detected)",
+                        "When": "The evaluation of the child record read result is complete for the current iteration",
+                        "Then": "The system must reset (clear) the Authorization database read status indicator to its initial empty state before the next child record retrieval is attempted, ensuring no prior read result influences the next iteration"
+                    },
+                    "key_functionality_id": "detect-end-of-child-segments-for-current-parent"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00048",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Write Pending Authorization Detail Record to Child Output File",
+                    "rule_description": "Each successfully retrieved Pending Authorization Detail record must be written to the dedicated GSAM child detail output file. If the write operation fails, the program must terminate abnormally to prevent incomplete or corrupt output data.",
+                    "sub_graph_node_text": "Process Retrieved Child Detail Record",
+                    "acceptance_criteria": {
+                        "Given": "A Pending Authorization Detail record has been successfully retrieved and copied into the child segment record",
+                        "When": "The system attempts to write the Pending Authorization Detail record to the GSAM child detail output file",
+                        "Then": "If the write is successful, processing continues to the next child record retrieval; if the write fails for any reason, the system must display an error message identifying the failure location and the key feedback area, and terminate the program abnormally with a return code of 16"
+                    },
+                    "key_functionality_id": "detect-end-of-child-segments-for-current-parent"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Detect End of Child Segments for Current Parent"
+        },
+        {
+            "id": "close-output-files-and-display-completion",
+            "title": "Close Output Files and Display Completion",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([All Pending Authorization\\nRecords Processed])\n    B[Display Closing\\nCompletion Message]\n    C([Program End])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00049",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Completion Message Upon Finishing All Record Processing",
+                    "rule_description": "Once all Pending Authorization Summary and Detail records have been fully processed and written to their respective output files, the program displays a closing completion message to indicate successful end of processing before terminating.",
+                    "sub_graph_node_text": "Display Closing Completion Message",
+                    "acceptance_criteria": {
+                        "Given": "All Pending Authorization Summary records and their associated Pending Authorization Detail records have been read from the database and written to the respective output files",
+                        "When": "The program has reached the end of the Pending Authorization database and the main processing loop has completed",
+                        "Then": "The program displays the message 'CLOSING THE FILE' to signal successful completion of all record processing, and the program ends normally"
+                    },
+                    "key_functionality_id": "close-output-files-and-display-completion"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Close Output Files and Display Completion"
+        },
+        {
+            "id": "abnormal-termination-handling",
+            "title": "Abnormal Termination Handling",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Abnormal Termination Triggered])\n\n    B{What Type of\\nFailure Occurred?}\n\n    C[Reading Pending Auth\\nSummary Record Failed\\nDisplay Auth Sum GN Failed\\nand Key Feedback Area]\n\n    D[Reading Pending Auth\\nDetail Record Failed\\nDisplay GNP Call Failed\\nand Key Feedback Area]\n\n    E[Writing Summary Record\\nto Parent Output Failed\\nDisplay GSAM Parent Fail\\nand Key Feedback Area]\n\n    F[Writing Detail Record\\nto Child Output Failed\\nDisplay GSAM Child Fail\\nand Key Feedback Area]\n\n    G[Display Program\\nAbnormal End Message\\nDBUNLDGS ABENDING]\n\n    H[Set Return Code to 16\\nto Signal Abnormal\\nProgram Termination]\n\n    I([Program Ends\\nAbnormally])\n\n    A --> B\n    B -->|Auth Summary\\nRead Failure| C\n    B -->|Auth Detail\\nRead Failure| D\n    B -->|Parent Output\\nWrite Failure| E\n    B -->|Child Output\\nWrite Failure| F\n    C --> G\n    D --> G\n    E --> G\n    F --> G\n    G --> H\n    H --> I",
+            "rules": [
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00050",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect and Report Pending Authorization Summary Read Failure",
+                    "rule_description": "When reading a Pending Authorization Summary record from the database returns an unexpected result (neither a successful read nor an end-of-database condition), the program must capture and display the failure status and the associated key feedback area before triggering abnormal termination.",
+                    "sub_graph_node_text": "Reading Pending Auth Summary Record Failed\nDisplay Auth Sum GN Failed\nand Key Feedback Area",
+                    "acceptance_criteria": {
+                        "Given": "The program is sequentially reading Pending Authorization Summary records from the database, and a read attempt has just been completed",
+                        "When": "The result of the read is neither a successful retrieval (blank status) nor an end-of-database indicator, meaning an unexpected failure has occurred while reading the Pending Authorization Summary record",
+                        "Then": "The program must display the message 'AUTH SUM GN FAILED' along with the specific failure status returned, and also display the 'KEY FEEDBACK AREA' along with the key feedback value to identify which record caused the failure, then invoke the abnormal termination process"
+                    },
+                    "key_functionality_id": "abnormal-termination-handling"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00051",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect and Report Pending Authorization Detail Read Failure",
+                    "rule_description": "When reading a Pending Authorization Detail (child) record under a parent Summary record returns an unexpected result (neither a successful read nor a no-more-children condition), the program must capture and display the failure status and key feedback area before triggering abnormal termination.",
+                    "sub_graph_node_text": "Reading Pending Auth Detail Record Failed\nDisplay GNP Call Failed\nand Key Feedback Area",
+                    "acceptance_criteria": {
+                        "Given": "The program is reading Pending Authorization Detail records associated with a specific Pending Authorization Summary record, and a read attempt has just been completed",
+                        "When": "The result of the read is neither a successful retrieval (blank status) nor a no-more-children indicator, meaning an unexpected failure has occurred while reading the Pending Authorization Detail record",
+                        "Then": "The program must display the message 'GNP CALL FAILED' along with the specific failure status returned, and also display the 'KFB AREA IN CHILD' along with the key feedback value to identify which child record caused the failure, then invoke the abnormal termination process"
+                    },
+                    "key_functionality_id": "abnormal-termination-handling"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00052",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect and Report Parent Summary Output Write Failure",
+                    "rule_description": "When writing a Pending Authorization Summary record to the parent output file returns an unsuccessful result, the program must capture and display the failure status and key feedback area before triggering abnormal termination.",
+                    "sub_graph_node_text": "Writing Summary Record to Parent Output Failed\nDisplay GSAM Parent Fail\nand Key Feedback Area",
+                    "acceptance_criteria": {
+                        "Given": "The program has validated that the Pending Authorization Summary record has a numeric Account ID and is attempting to write it to the parent output file",
+                        "When": "The write operation to the parent output file does not complete successfully (status is not blank), meaning the Summary record could not be stored in the output",
+                        "Then": "The program must display the message 'GSAM PARENT FAIL' along with the specific failure status returned, and also display the 'KFB AREA IN GSAM' along with the key feedback value to identify the record that failed to write, then invoke the abnormal termination process"
+                    },
+                    "key_functionality_id": "abnormal-termination-handling"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00053",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect and Report Child Detail Output Write Failure",
+                    "rule_description": "When writing a Pending Authorization Detail record to the child output file returns an unsuccessful result, the program must capture and display the failure status and key feedback area before triggering abnormal termination.",
+                    "sub_graph_node_text": "Writing Detail Record to Child Output Failed\nDisplay GSAM Child Fail\nand Key Feedback Area",
+                    "acceptance_criteria": {
+                        "Given": "The program has successfully read a Pending Authorization Detail record and is attempting to write it to the child output file",
+                        "When": "The write operation to the child output file does not complete successfully (status is not blank), meaning the Detail record could not be stored in the output",
+                        "Then": "The program must display the message 'GSAM PARENT FAIL' along with the specific failure status returned, and also display the 'KFB AREA IN GSAM' along with the key feedback value to identify the record that failed to write, then invoke the abnormal termination process"
+                    },
+                    "key_functionality_id": "abnormal-termination-handling"
+                },
+                {
+                    "rule_id": "R-DBUNLDGS-cbl-00054",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Signal Abnormal Program Termination with Return Code 16",
+                    "rule_description": "When any critical failure occurs during the processing of Pending Authorization Summary or Detail records \u2014 whether during reading from the database or writing to output files \u2014 the program must announce its abnormal end and communicate a failure signal of 16 to the calling environment before stopping.",
+                    "sub_graph_node_text": "Display Program Abnormal End Message DBUNLDGS ABENDING\nSet Return Code to 16 to Signal Abnormal Program Termination",
+                    "acceptance_criteria": {
+                        "Given": "A critical failure has been detected during any stage of processing \u2014 reading Pending Authorization Summary records, reading Pending Authorization Detail records, writing to the parent output file, or writing to the child output file \u2014 and the specific failure details have already been displayed",
+                        "When": "The abnormal termination process is invoked as a result of any of these critical failures",
+                        "Then": "The program must display the message 'DBUNLDGS ABENDING ...' to announce the abnormal end, set the program return code to 16 to signal a critical failure to the calling environment, and immediately stop all processing"
+                    },
+                    "key_functionality_id": "abnormal-termination-handling"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Abnormal Termination Handling"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program has been invoked",
+                "When": "The program begins execution",
+                "Then": "The system must capture today's calendar date (CURRENT-DATE) and Julian date (CURRENT-YYDDD), display the program name 'DBUNLDGS', display a separator banner, and display today's calendar date as the processing date"
+            },
+            "Rule_Name": "Program Initialization and Start Banner Display",
+            "Rule_Description": "At program startup, the system captures the current calendar date and Julian date, and displays a start banner to confirm the program has begun execution."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00002",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is in the main processing loop and has not yet reached the end of the Pending Authorization Summary database",
+                "When": "A Get Next (GN) call is issued against the PAUTBPCB database using ROOT-UNQUAL-SSA (unqualified segment search argument)",
+                "Then": "The next available Pending Authorization Summary record (PENDING-AUTH-SUMMARY segment) is retrieved from the PAUTSUM0 IMS segment and made available for further processing"
+            },
+            "Rule_Name": "Sequential Read of Pending Authorization Summary Records",
+            "Rule_Description": "The program sequentially retrieves each Pending Authorization Summary record (root/parent segment) from the IMS database one at a time using an unqualified Get Next call."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00003",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved from the database",
+                "When": "The Account ID (PA-ACCT-ID) extracted from the summary record is evaluated",
+                "Then": "If PA-ACCT-ID is numeric, the record is eligible for output processing and child detail retrieval; if PA-ACCT-ID is NOT numeric, the record is skipped entirely \u2014 no parent record is written to the output file and no child detail records are read or written for that summary"
+            },
+            "Rule_Name": "Account ID Numeric Validation for Authorization Summary",
+            "Rule_Description": "Before writing a Pending Authorization Summary record to the output file, the Account ID must be validated to ensure it contains only numeric characters. Records with non-numeric Account IDs are silently skipped with no output written."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00004",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved and its Account ID (PA-ACCT-ID) has been confirmed as numeric",
+                "When": "An Insert (ISRT) call is issued to write the PENDING-AUTH-SUMMARY record to the PASFLPCB GSAM parent output dataset",
+                "Then": "The Pending Authorization Summary record is successfully written to the PASFLPCB parent GSAM output file; if the insert fails for any reason, the program must terminate abnormally with return code 16 and display the error status and key feedback area"
+            },
+            "Rule_Name": "Write Pending Authorization Summary to Parent Output File",
+            "Rule_Description": "Each valid Pending Authorization Summary record (with a numeric Account ID) is written to the dedicated parent GSAM output file (PASFLPCB) as a root segment insert."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00005",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid Pending Authorization Summary (parent) record has been written to the output file and the child processing loop is active",
+                "When": "A Get Next within Parent (GNP) call is issued against the PAUTBPCB database using CHILD-UNQUAL-SSA (unqualified segment search argument) to retrieve PENDING-AUTH-DETAILS segments",
+                "Then": "The next available Pending Authorization Detail record (PAUTDTL1 IMS segment) belonging to the current parent is retrieved and made available for output writing; the retrieval is scoped strictly to child segments of the current parent summary record"
+            },
+            "Rule_Name": "Sequential Read of Pending Authorization Detail Records for Current Parent",
+            "Rule_Description": "For each valid parent Authorization Summary record, all associated child Authorization Detail records are retrieved sequentially using a Get Next within Parent call, ensuring only detail records belonging to the current parent are read."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00006",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved for the current parent summary",
+                "When": "An Insert (ISRT) call is issued to write the PENDING-AUTH-DETAILS record to the PADFLPCB GSAM child output dataset",
+                "Then": "The Pending Authorization Detail record is successfully written to the PADFLPCB child GSAM output file; if the insert fails for any reason, the program must terminate abnormally with return code 16 and display the error status and key feedback area"
+            },
+            "Rule_Name": "Write Pending Authorization Detail to Child Output File",
+            "Rule_Description": "Each successfully retrieved Pending Authorization Detail record is written to the dedicated child GSAM output file (PADFLPCB), maintaining separation between parent summary and child detail output."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00007",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary or Pending Authorization Detail record has been successfully retrieved from the database (IMS status equals spaces)",
+                "When": "The successful read is confirmed",
+                "Then": "The total summary records read counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the authorization summary processed count (WS-AUTH-SMRY-PROC-CNT) must also be incremented by 1 \u2014 this applies to both parent summary reads and child detail reads"
+            },
+            "Rule_Name": "Increment Summary and Detail Record Processing Counters",
+            "Rule_Description": "Each successfully read record \u2014 whether a parent Authorization Summary or a child Authorization Detail \u2014 is counted toward both the total records read counter and the total authorization summary processed counter."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00008",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get Next (GN) call has been issued to read the next Pending Authorization Summary record",
+                "When": "The database returns a 'GB' (end-of-database) status on the PAUTBPCB PCB",
+                "Then": "The end-of-authorization-database flag (END-OF-AUTHDB) must be set to TRUE, the root segment end flag (WS-END-OF-ROOT-SEG) must be set to 'Y', and the main processing loop must terminate \u2014 no further summary records are read"
+            },
+            "Rule_Name": "End of Authorization Summary Database Detection",
+            "Rule_Description": "When the database signals that no more Pending Authorization Summary records exist, the program sets an end-of-database flag and stops further reading, transitioning to file closure."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00009",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get Next within Parent (GNP) call has been issued to read the next Pending Authorization Detail record for the current parent",
+                "When": "The database returns a 'GE' (no more segments within parent) status on the PAUTBPCB PCB",
+                "Then": "The child segment end flag (WS-END-OF-CHILD-SEG) must be set to 'Y', a display message confirming the child segment end flag value must be shown, and the child detail processing loop must terminate \u2014 processing returns to read the next parent summary record"
+            },
+            "Rule_Name": "End of Child Detail Segments Detection for Current Parent",
+            "Rule_Description": "When the database signals that no more child Authorization Detail records exist for the current parent summary, the child processing loop is terminated and processing advances to the next parent summary record."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00010",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All Pending Authorization Summary records have been processed and the end-of-database condition has been reached",
+                "When": "The program exits the main processing loop",
+                "Then": "The program must display the message 'CLOSING THE FILE' to confirm completion, and then terminate normally"
+            },
+            "Rule_Name": "Output File Closure and Completion Message",
+            "Rule_Description": "After all Pending Authorization Summary and Detail records have been processed, the program displays a completion message before ending normally."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00011",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has issued a database read call (GN for summary or GNP for detail) or a GSAM file write call (ISRT for parent or child)",
+                "When": "The returned status is not a recognized expected status \u2014 specifically: not spaces (success) and not 'GB' (end-of-database) for summary reads; not spaces (success) and not 'GE' (end-of-children) for detail reads; not spaces (success) for GSAM write operations",
+                "Then": "The program must display 'DBUNLDGS ABENDING...', display the specific error status code and the key feedback area (PAUT-KEYFB, PASFL-KEYFB, or PADFL-KEYFB as applicable) for diagnostic purposes, set the return code to 16, and terminate immediately without processing any further records"
+            },
+            "Rule_Name": "Abnormal Termination on Unexpected Database or File Error",
+            "Rule_Description": "If any unexpected error occurs while reading Authorization Summary records, reading Authorization Detail records, or writing to either output file, the program must terminate abnormally with a specific return code and display diagnostic information."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00012",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program has been invoked and is beginning its initialization phase",
+                "When": "The program starts its initialization routine",
+                "Then": "The current calendar date is captured and stored in CURRENT-DATE to serve as the processing date reference for the entire program run"
+            },
+            "Rule_Name": "Capture Current Calendar Date at Program Start",
+            "Rule_Description": "At program initialization, the system captures the current calendar date to establish the processing date context for the DBUNLDGS unload run."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00013",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program has been invoked and is beginning its initialization phase",
+                "When": "The program starts its initialization routine immediately after capturing the calendar date",
+                "Then": "The current Julian date in YYDDD format is captured and stored in CURRENT-YYDDD to serve as an additional processing date reference for the program run"
+            },
+            "Rule_Name": "Capture Current Julian Date at Program Start",
+            "Rule_Description": "At program initialization, the system captures the current Julian date in YYDDD format to establish the processing day context for the DBUNLDGS unload run."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00014",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program has captured the current calendar date and Julian date",
+                "When": "The program proceeds to log its start",
+                "Then": "The processing log must display the message 'STARTING PROGRAM DBUNLDGS::' followed by a separator line '*-------------------------------------*' to clearly mark the start of the program execution in the log"
+            },
+            "Rule_Name": "Display Program Start Banner to Processing Log",
+            "Rule_Description": "At the start of the DBUNLDGS program, a banner message is written to the processing log to mark the beginning of the authorization data unload process, providing a clear audit trail entry."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00015",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program has displayed the program start banner and the current calendar date has been captured in CURRENT-DATE",
+                "When": "The program logs the processing date",
+                "Then": "The processing log must display the label 'TODAYS DATE            :' followed by the value of CURRENT-DATE, and a blank line must be written after the date entry to visually separate the initialization log entries from subsequent processing messages"
+            },
+            "Rule_Name": "Display Today's Date to Processing Log",
+            "Rule_Description": "After displaying the program start banner, the system writes today's calendar date to the processing log so that the exact date of the authorization data unload run is permanently recorded for audit and traceability purposes."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00016",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program is actively processing Pending Authorization Summary records and has not yet reached the end of the database",
+                "When": "The program requests the next Pending Authorization Summary record from the IMS database using a sequential unqualified Get-Next (GN) retrieval against the PAUTSUM0 root segment",
+                "Then": "The next available Pending Authorization Summary record is retrieved from the database and made available for further processing, including counter updates and Account ID validation"
+            },
+            "Rule_Name": "Sequential Retrieval of Pending Authorization Summary Records",
+            "Rule_Description": "The program sequentially retrieves the next available Pending Authorization Summary record from the IMS database (PAUTSUM0) using an unqualified Get-Next call, processing all records one at a time in database order."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00017",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved from the IMS database (retrieval status indicates success with no error condition)",
+                "When": "The program confirms the record was retrieved without error",
+                "Then": "The total summary records read counter (WS-NO-SUMRY-READ) is incremented by 1, AND the authorization summary processed count (WS-AUTH-SMRY-PROC-CNT) is incremented by 1, AND the retrieved record data is copied to the output record area for further processing"
+            },
+            "Rule_Name": "Increment Counters on Successful Summary Record Retrieval",
+            "Rule_Description": "Each time a Pending Authorization Summary record is successfully retrieved from the database, two running counters are incremented to track the total number of summary records read and the total number of authorization summaries processed during the program run."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00018",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved and its counters have been incremented, AND the Account ID (PA-ACCT-ID) has been extracted from the summary record into the root segment key",
+                "When": "The program evaluates whether the Account ID (PA-ACCT-ID) contains only numeric characters",
+                "Then": "If the Account ID IS numeric: the program proceeds to write the summary record to the parent output file AND processes all associated child authorization detail records; If the Account ID is NOT numeric: the summary record is skipped entirely \u2014 it is not written to any output file and none of its associated child detail records are retrieved or written"
+            },
+            "Rule_Name": "Validate Account ID is Numeric Before Processing Summary Record",
+            "Rule_Description": "Before a successfully retrieved Pending Authorization Summary record is written to the output file and its child detail records are processed, the Account ID field must be validated to ensure it contains only numeric characters. Records with non-numeric Account IDs are silently skipped \u2014 neither the summary nor any of its associated detail records are written to output."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00019",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has issued a sequential Get-Next request for the next Pending Authorization Summary record from the IMS database",
+                "When": "The database returns an end-of-database signal (status 'GB'), indicating there are no more Pending Authorization Summary records to process",
+                "Then": "The end-of-authorization-database flag (END-OF-AUTHDB) is set to TRUE, AND the end-of-root-segment flag (WS-END-OF-ROOT-SEG) is set to 'Y', which causes the main processing loop to terminate and the program to proceed to file closure"
+            },
+            "Rule_Name": "Detect End of Pending Authorization Summary Database",
+            "Rule_Description": "When the database signals that there are no more Pending Authorization Summary records available to retrieve, the program recognizes this as the normal end-of-database condition and sets a flag to stop the main processing loop, allowing the program to proceed to file closure and termination."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00020",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has issued a sequential Get-Next request for the next Pending Authorization Summary record from the IMS database",
+                "When": "The database returns a status that is neither a successful retrieval (blank/spaces) nor a normal end-of-database condition ('GB'), indicating an unexpected error condition",
+                "Then": "The program displays the message 'AUTH SUM GN FAILED :' along with the error status code, AND displays the message 'KEY FEEDBACK AREA :' along with the key feedback area (PAUT-KEYFB) for diagnostic purposes, AND the program terminates abnormally with a return code of 16"
+            },
+            "Rule_Name": "Trigger Abnormal Termination on Unexpected Summary Read Error",
+            "Rule_Description": "If the database returns any status other than a successful retrieval or a normal end-of-database condition when reading a Pending Authorization Summary record, the program treats this as an unrecoverable error, displays diagnostic information including the error status and key feedback area, and terminates abnormally."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00021",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved from the database AND its Account ID (PA-ACCT-ID) has been confirmed to be numeric",
+                "When": "The Account ID numeric validation passes",
+                "Then": "The program proceeds to invoke the parent segment write process (3100-INSERT-PARENT-SEG-GSAM) to write the summary record to the GSAM parent output file, AND then resets the child segment end flag (WS-END-OF-CHILD-SEG), AND then enters the child detail record processing loop to retrieve and write all associated Pending Authorization Detail records for this summary"
+            },
+            "Rule_Name": "Proceed to Write Summary and Process Child Detail Records for Valid Account",
+            "Rule_Description": "When a Pending Authorization Summary record passes the numeric Account ID validation, the program is directed to write the summary record to the parent output file and subsequently retrieve and write all associated child Pending Authorization Detail records, preserving the parent-child relationship in the output."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00022",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved from the Pending Authorization database, and the record contains an Account ID (PA-ACCT-ID)",
+                "When": "The Account ID (PA-ACCT-ID) value from the retrieved Pending Authorization Summary record is evaluated to determine whether it contains a valid numeric value",
+                "Then": "If the Account ID is numeric, the Pending Authorization Summary record is considered valid and processing continues \u2014 the summary record is written to the parent output file and all associated Pending Authorization Detail records are retrieved and written to the child output file; If the Account ID is NOT numeric, the entire Pending Authorization Summary record is skipped without being written to any output file, and none of its associated Pending Authorization Detail records are retrieved or written, and processing moves directly to the next Pending Authorization Summary record"
+            },
+            "Rule_Name": "Validate Account ID is Numeric Before Processing Authorization Summary",
+            "Rule_Description": "When a Pending Authorization Summary record is retrieved from the database, the Account ID must be validated as numeric before the record and its associated child detail records are eligible for output processing. Records with non-numeric Account IDs are entirely skipped."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00023",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary record has been successfully retrieved from the authorization database and its Account ID has been validated as numeric",
+                "When": "The system attempts to write the Pending Authorization Summary record as a root segment into the Parent GSAM sequential output dataset (PASFLPCB)",
+                "Then": "The complete Pending Authorization Summary record is inserted into the Parent GSAM output dataset as a root/parent segment, and processing continues to retrieve and write the associated child Authorization Detail records"
+            },
+            "Rule_Name": "Write Pending Authorization Summary Record to Parent Output Dataset",
+            "Rule_Description": "When a valid Pending Authorization Summary record has been retrieved and its Account ID is confirmed as numeric, the system must insert the summary record into the Parent GSAM sequential output dataset to unload the root segment data for downstream consumption."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00024",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to insert the Pending Authorization Summary record into the Parent GSAM sequential output dataset (PASFLPCB)",
+                "When": "The system evaluates the write operation outcome status",
+                "Then": "If the write status is normal (blank/spaces), the record is confirmed as successfully written and the program proceeds to process the associated Pending Authorization Detail (child) records for the same Account ID; if the write status is anything other than normal (blank/spaces), the write is considered failed and error handling is triggered"
+            },
+            "Rule_Name": "Validate Successful Write of Pending Authorization Summary to Parent Output",
+            "Rule_Description": "After attempting to write the Pending Authorization Summary record to the Parent GSAM output dataset, the system must verify whether the write operation completed successfully. A successful write is indicated by a normal (blank/spaces) status, allowing processing to continue to child detail records."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00025",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to insert the Pending Authorization Summary record into the Parent GSAM sequential output dataset (PASFLPCB) and the write operation has returned a non-normal (non-blank) status",
+                "When": "The system detects that the Parent GSAM write status is not equal to spaces (indicating a write failure)",
+                "Then": "The system displays a GSAM parent write failure message ('GSAM PARENT FAIL') along with the specific write failure status code and the Key Feedback Area details for diagnostic purposes, then terminates the program abnormally with a return code of 16, halting all further processing"
+            },
+            "Rule_Name": "Handle Failure When Writing Pending Authorization Summary to Parent Output",
+            "Rule_Description": "If the Pending Authorization Summary record cannot be successfully written to the Parent GSAM output dataset, the system must report the failure with diagnostic details and terminate the program abnormally to prevent incomplete or corrupt output data from being produced."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00026",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Summary (parent) record has been successfully read and validated, and the system is ready to retrieve its associated child detail records",
+                "When": "The program issues a Get-Next-Within-Parent (GNP) retrieval call targeting Pending Authorization Detail records, using an unqualified segment search argument scoped to the current parent summary record",
+                "Then": "The next available Pending Authorization Detail record belonging to the current parent summary is retrieved for processing; the retrieval is strictly bounded to the current parent and does not cross into detail records of another parent summary"
+            },
+            "Rule_Name": "Sequential Retrieval of Pending Authorization Detail Records for Current Parent",
+            "Rule_Description": "For each Pending Authorization Summary (parent) record being processed, the program sequentially retrieves all associated Pending Authorization Detail (child) records one at a time, scoped strictly to the current parent summary record."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00027",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                "When": "The retrieval is successful, indicated by a blank (spaces) read status, meaning a child detail record was found",
+                "Then": "The retrieved Pending Authorization Detail record data is copied into the child segment record area (CHILD-SEG-REC), and the processing state is updated to indicate that more authorization detail records exist (MORE-AUTHS flag set to TRUE)"
+            },
+            "Rule_Name": "Capture Pending Authorization Detail Record Data on Successful Retrieval",
+            "Rule_Description": "When a Pending Authorization Detail record is successfully retrieved, its data is captured into the child segment record area and the program flags that more authorization detail records are available for the current parent."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00028",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved with a blank (spaces) read status",
+                "When": "The program processes the successfully retrieved child detail record",
+                "Then": "The total summary records read counter (WS-NO-SUMRY-READ) is incremented by 1, and the total authorization summary processed counter (WS-AUTH-SMRY-PROC-CNT) is incremented by 1"
+            },
+            "Rule_Name": "Increment Detail Record Processing Counter on Successful Read",
+            "Rule_Description": "Each time a Pending Authorization Detail record is successfully retrieved, two running counters are incremented to track the total number of records read and the total number of authorization records processed."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00029",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved and its data has been captured into the child segment record area",
+                "When": "The program attempts to insert the Pending Authorization Detail record into the child GSAM output file (PADFLPCB)",
+                "Then": "If the write is successful (status is blank/spaces), the detail record is stored in the child output file and processing continues to the next child record; if the write fails (status is not blank/spaces), the program displays an error message identifying the failure and terminates abnormally with return code 16"
+            },
+            "Rule_Name": "Write Pending Authorization Detail Record to Child Output File",
+            "Rule_Description": "Each successfully retrieved Pending Authorization Detail record is written to the dedicated child GSAM output file. If the write operation fails for any reason, the program terminates abnormally."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00030",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved, captured, written to the child output file, and its counter incremented",
+                "When": "The end-of-child-segment flag (WS-END-OF-CHILD-SEG) has not yet been set to 'Y'",
+                "Then": "The program loops back and issues another Get-Next-Within-Parent (GNP) call to retrieve the next Pending Authorization Detail record for the same parent summary record"
+            },
+            "Rule_Name": "Continue Reading Child Detail Records Until All Are Processed",
+            "Rule_Description": "After each Pending Authorization Detail record is successfully retrieved and written, the program loops back to retrieve the next child detail record for the same parent summary, continuing until all child records for the current parent have been processed."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00031",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                "When": "The retrieval returns a 'no more segments' condition (Status = GE), indicating that all child detail records for the current parent have already been retrieved",
+                "Then": "The end-of-child-segment flag (WS-END-OF-CHILD-SEG) is set to 'Y', which stops the child record retrieval loop and signals the program to return to the parent summary loop to process the next Pending Authorization Summary record"
+            },
+            "Rule_Name": "Detect End of Child Detail Records for Current Parent Summary",
+            "Rule_Description": "When there are no more Pending Authorization Detail records associated with the current parent summary record, the program detects this condition and prepares to move on to the next Pending Authorization Summary record."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00032",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get-Next-Within-Parent (GNP) call has been issued for Pending Authorization Detail records under the current parent summary",
+                "When": "The retrieval returns a status that is neither blank/spaces (successful read) nor 'GE' (no more children), indicating an unexpected error condition",
+                "Then": "The program displays an error message identifying the GNP call failure along with the key feedback area details for diagnostic purposes, and then terminates abnormally with a return code of 16, stopping all further processing"
+            },
+            "Rule_Name": "Abnormal Termination on Unexpected Error Reading Child Detail Records",
+            "Rule_Description": "If an unexpected error occurs while retrieving Pending Authorization Detail records (any condition other than successful retrieval or normal end-of-children), the program logs the error details and terminates abnormally to prevent incomplete or corrupt data from being written to the output files."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00033",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Get-Next-Within-Parent (GNP) call has been issued and all resulting conditions (success, end-of-children, or error) have been fully evaluated and acted upon for the current child detail record",
+                "When": "The program completes processing of the current retrieval attempt outcome",
+                "Then": "The read status indicator (PAUT-PCB-STATUS) is reset/cleared so that the next Get-Next-Within-Parent call starts with a clean status, preventing any prior status from affecting the next retrieval evaluation"
+            },
+            "Rule_Name": "Reset Read Status After Each Child Detail Record Retrieval Attempt",
+            "Rule_Description": "After each child detail record retrieval attempt is fully evaluated and acted upon, the read status is cleared so that it does not carry over and incorrectly influence the evaluation of the next retrieval attempt."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00034",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved from the authorization database for the current parent Authorization Summary",
+                "When": "The program prepares to write the detail record to the child output dataset",
+                "Then": "The retrieved Pending Authorization Detail record data is moved into the child segment output record area (CHILD-SEG-REC) so that it is ready for insertion into the child GSAM output dataset"
+            },
+            "Rule_Name": "Prepare Pending Authorization Detail Record for Child Output",
+            "Rule_Description": "Before writing a Pending Authorization Detail record to the child output dataset, the retrieved detail data must be staged into the child segment output area to ensure the correct record content is written."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00035",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been prepared and staged in the child segment output area",
+                "When": "The program executes the insert operation to write the Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                "Then": "The Pending Authorization Detail record is inserted sequentially into the child GSAM output dataset (PADFLPCB), preserving the full detail data for the unload"
+            },
+            "Rule_Name": "Write Pending Authorization Detail Record to Child Output Dataset",
+            "Rule_Description": "Each successfully retrieved Pending Authorization Detail record must be inserted into the child GSAM sequential output dataset (PADFLPCB) to unload the child segment data as part of the authorization database unload process."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00036",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An insert operation has been executed to write a Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                "When": "The write operation completes and the output dataset status indicates success (status is blank/spaces)",
+                "Then": "The Pending Authorization Detail record is confirmed as successfully unloaded to the child output dataset, and the program returns to read the next Pending Authorization Detail record for the current parent"
+            },
+            "Rule_Name": "Confirm Successful Write of Pending Authorization Detail Record",
+            "Rule_Description": "After attempting to write a Pending Authorization Detail record to the child output dataset, the program must confirm the write was successful before continuing to process the next child record."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00037",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "An insert operation has been executed to write a Pending Authorization Detail record to the child GSAM output dataset (PADFLPCB)",
+                "When": "The write operation fails and the output dataset status is not blank (indicating an error condition)",
+                "Then": "The program displays the error message 'GSAM PARENT FAIL :' along with the error status, displays the program-level abend message 'DBUNLDGS ABENDING ...', sets the process return code to 16 to signal abnormal termination, and immediately stops all further processing"
+            },
+            "Rule_Name": "Abnormal Termination on Failed Write of Pending Authorization Detail Record",
+            "Rule_Description": "If the write of a Pending Authorization Detail record to the child output dataset fails for any reason, the program must immediately stop all processing, display an error notification, and signal an abnormal termination with a failure return code of 16."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00038",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is sequentially reading Pending Authorization Summary records from the authorization database, and a Summary record has been successfully retrieved without any error",
+                "When": "A Pending Authorization Summary record is confirmed as successfully retrieved (no error condition is present)",
+                "Then": "The Total Records Read Counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by 1, reflecting that one additional summary record has been read and is being processed"
+            },
+            "Rule_Name": "Increment Record Counters on Successful Retrieval of Pending Authorization Summary Record",
+            "Rule_Description": "Each time a Pending Authorization Summary (root/parent) record is successfully retrieved from the database, two running counters must be incremented by 1: the total records read counter and the total authorization summary processed counter. This ensures accurate tracking of how many summary records have been read and processed during the program run."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00039",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is retrieving Pending Authorization Detail (child) records associated with a specific Pending Authorization Summary (parent) record, and a Detail record has been successfully retrieved without any error",
+                "When": "A Pending Authorization Detail record is confirmed as successfully retrieved (no error condition is present)",
+                "Then": "The Total Records Read Counter (WS-NO-SUMRY-READ) must be incremented by 1, AND the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by 1, reflecting that one additional detail record has been read and processed"
+            },
+            "Rule_Name": "Increment Record Counters on Successful Retrieval of Pending Authorization Detail Record",
+            "Rule_Description": "Each time a Pending Authorization Detail (child) record is successfully retrieved from the database under its parent Summary record, the same two running counters must be incremented by 1: the total records read counter and the total authorization summary processed counter. This ensures that both parent and child records contribute equally to the overall processing counts."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00040",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is processing Pending Authorization records from the authorization database, which includes both Summary (parent) records and Detail (child) records",
+                "When": "Any record \u2014 whether a Pending Authorization Summary record or a Pending Authorization Detail record \u2014 is successfully retrieved",
+                "Then": "Both the Total Records Read Counter (WS-NO-SUMRY-READ) and the Total Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) are incremented by 1 for each successful retrieval, regardless of the record type, so that the final counter values represent the combined total of all Summary and Detail records processed during the program run"
+            },
+            "Rule_Name": "Shared Counters Apply Uniformly Across Both Summary and Detail Record Types",
+            "Rule_Description": "The program uses the same two counters \u2014 Total Records Read (WS-NO-SUMRY-READ) and Total Authorization Summary Processed (WS-AUTH-SMRY-PROC-CNT) \u2014 to track both Pending Authorization Summary records and Pending Authorization Detail records. There are no separate counters for each record type; every successfully retrieved record, regardless of whether it is a parent summary or a child detail, contributes to the same cumulative totals."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00041",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has just attempted to read the next Pending Authorization Summary record from the authorization database",
+                "When": "The database returns a 'No More Records' status (end-of-database signal) indicating that all Pending Authorization Summary root segments have been read",
+                "Then": "The program identifies that all Pending Authorization Summary records have been fully processed and no further reading of summary records should occur"
+            },
+            "Rule_Name": "Detect End of Pending Authorization Summary Database",
+            "Rule_Description": "After each attempt to read the next Pending Authorization Summary record, the program evaluates whether all records have been exhausted. When the database signals that no more Pending Authorization Summary root segment records exist, the program recognizes this as the end-of-database condition."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00042",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has detected that no more Pending Authorization Summary root segment records exist in the authorization database",
+                "When": "The end-of-database condition is confirmed",
+                "Then": "The End-of-Authorization-Database flag (END-OF-AUTHDB) is set to TRUE, formally marking that the entire Pending Authorization Summary database has been processed"
+            },
+            "Rule_Name": "Set End-of-Authorization-Database Flag Upon Exhaustion of Summary Records",
+            "Rule_Description": "When the end-of-database condition is detected after reading Pending Authorization Summary records, the program sets a dedicated end-of-authorization-database flag to TRUE to formally record that the authorization summary database has been fully traversed."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00043",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The End-of-Authorization-Database flag has been set to TRUE after confirming no more Pending Authorization Summary records exist",
+                "When": "The end-of-database condition is being handled",
+                "Then": "The End-of-Root-Segment flag (WS-END-OF-ROOT-SEG) is set to 'Y', which stops the main Pending Authorization Summary processing loop and directs the program to proceed to the file closing step"
+            },
+            "Rule_Name": "Set End-of-Root-Segment Flag to Halt Summary Record Reading Loop",
+            "Rule_Description": "Alongside setting the end-of-database flag, the program sets a separate end-of-root-segment control flag to 'Y', which directly causes the main processing loop to terminate and prevents any further attempts to read Pending Authorization Summary records."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00044",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has just read a Pending Authorization Summary record from the authorization database",
+                "When": "The database does not return an end-of-database signal, indicating the record was successfully retrieved and more records may still be available",
+                "Then": "The program proceeds to process the current Pending Authorization Summary record, including validating its Account ID and extracting its associated Pending Authorization Detail child records"
+            },
+            "Rule_Name": "Continue Processing When More Pending Authorization Summary Records Exist",
+            "Rule_Description": "When the database read of a Pending Authorization Summary record is successful and no end-of-database condition is signaled, the program continues with processing the current record including its associated detail records."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00045",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is reading Pending Authorization Detail records for a current parent Pending Authorization Summary record, and a child detail record retrieval has been attempted",
+                "When": "The child Pending Authorization Detail record is successfully retrieved from the database (read status indicates success with no errors)",
+                "Then": "The system must: (1) Set the 'More Authorizations' indicator to TRUE signaling more child records exist, (2) Increment the total number of summary records read counter by 1, (3) Increment the authorization summary processed count by 1, (4) Copy the retrieved Pending Authorization Detail data into the child segment record, and (5) Write the child Pending Authorization Detail record to the GSAM child detail output file"
+            },
+            "Rule_Name": "Successful Retrieval and Processing of Pending Authorization Detail Record",
+            "Rule_Description": "When a Pending Authorization Detail (child) record is successfully retrieved for the current parent Authorization Summary, the system marks that more authorization details exist, increments the processing counters, and writes the detail record to the GSAM child output file."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00046",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is iterating through Pending Authorization Detail (child) records for the current parent Pending Authorization Summary record",
+                "When": "The database signals that there are no more Pending Authorization Detail child records available for the current parent Authorization Summary (end-of-children condition is reached)",
+                "Then": "The system must: (1) Set the End-of-Child-Segment flag to 'Y', and (2) Display a message confirming the end-of-child condition with the flag value, so that the child record reading loop terminates and processing returns to retrieve the next parent Authorization Summary record"
+            },
+            "Rule_Name": "Detection of No More Pending Authorization Detail Records for Current Parent",
+            "Rule_Description": "When all Pending Authorization Detail records belonging to the current parent Authorization Summary have been processed, the system detects the end-of-children condition and sets a flag to stop reading child records and return to processing the next parent Authorization Summary."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00047",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has completed evaluating the result of a Pending Authorization Detail record retrieval attempt (either successfully retrieved or end-of-children detected)",
+                "When": "The evaluation of the child record read result is complete for the current iteration",
+                "Then": "The system must reset (clear) the Authorization database read status indicator to its initial empty state before the next child record retrieval is attempted, ensuring no prior read result influences the next iteration"
+            },
+            "Rule_Name": "Reset Child Record Read Status After Each Retrieval Attempt",
+            "Rule_Description": "After each Pending Authorization Detail record retrieval attempt \u2014 whether successful or indicating end-of-children \u2014 the read status is cleared so that the next child record retrieval starts with a clean state, preventing carry-over of prior read results."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00048",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Pending Authorization Detail record has been successfully retrieved and copied into the child segment record",
+                "When": "The system attempts to write the Pending Authorization Detail record to the GSAM child detail output file",
+                "Then": "If the write is successful, processing continues to the next child record retrieval; if the write fails for any reason, the system must display an error message identifying the failure location and the key feedback area, and terminate the program abnormally with a return code of 16"
+            },
+            "Rule_Name": "Write Pending Authorization Detail Record to Child Output File",
+            "Rule_Description": "Each successfully retrieved Pending Authorization Detail record must be written to the dedicated GSAM child detail output file. If the write operation fails, the program must terminate abnormally to prevent incomplete or corrupt output data."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00049",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All Pending Authorization Summary records and their associated Pending Authorization Detail records have been read from the database and written to the respective output files",
+                "When": "The program has reached the end of the Pending Authorization database and the main processing loop has completed",
+                "Then": "The program displays the message 'CLOSING THE FILE' to signal successful completion of all record processing, and the program ends normally"
+            },
+            "Rule_Name": "Display Completion Message Upon Finishing All Record Processing",
+            "Rule_Description": "Once all Pending Authorization Summary and Detail records have been fully processed and written to their respective output files, the program displays a closing completion message to indicate successful end of processing before terminating."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00050",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is sequentially reading Pending Authorization Summary records from the database, and a read attempt has just been completed",
+                "When": "The result of the read is neither a successful retrieval (blank status) nor an end-of-database indicator, meaning an unexpected failure has occurred while reading the Pending Authorization Summary record",
+                "Then": "The program must display the message 'AUTH SUM GN FAILED' along with the specific failure status returned, and also display the 'KEY FEEDBACK AREA' along with the key feedback value to identify which record caused the failure, then invoke the abnormal termination process"
+            },
+            "Rule_Name": "Detect and Report Pending Authorization Summary Read Failure",
+            "Rule_Description": "When reading a Pending Authorization Summary record from the database returns an unexpected result (neither a successful read nor an end-of-database condition), the program must capture and display the failure status and the associated key feedback area before triggering abnormal termination."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00051",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is reading Pending Authorization Detail records associated with a specific Pending Authorization Summary record, and a read attempt has just been completed",
+                "When": "The result of the read is neither a successful retrieval (blank status) nor a no-more-children indicator, meaning an unexpected failure has occurred while reading the Pending Authorization Detail record",
+                "Then": "The program must display the message 'GNP CALL FAILED' along with the specific failure status returned, and also display the 'KFB AREA IN CHILD' along with the key feedback value to identify which child record caused the failure, then invoke the abnormal termination process"
+            },
+            "Rule_Name": "Detect and Report Pending Authorization Detail Read Failure",
+            "Rule_Description": "When reading a Pending Authorization Detail (child) record under a parent Summary record returns an unexpected result (neither a successful read nor a no-more-children condition), the program must capture and display the failure status and key feedback area before triggering abnormal termination."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00052",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has validated that the Pending Authorization Summary record has a numeric Account ID and is attempting to write it to the parent output file",
+                "When": "The write operation to the parent output file does not complete successfully (status is not blank), meaning the Summary record could not be stored in the output",
+                "Then": "The program must display the message 'GSAM PARENT FAIL' along with the specific failure status returned, and also display the 'KFB AREA IN GSAM' along with the key feedback value to identify the record that failed to write, then invoke the abnormal termination process"
+            },
+            "Rule_Name": "Detect and Report Parent Summary Output Write Failure",
+            "Rule_Description": "When writing a Pending Authorization Summary record to the parent output file returns an unsuccessful result, the program must capture and display the failure status and key feedback area before triggering abnormal termination."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00053",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has successfully read a Pending Authorization Detail record and is attempting to write it to the child output file",
+                "When": "The write operation to the child output file does not complete successfully (status is not blank), meaning the Detail record could not be stored in the output",
+                "Then": "The program must display the message 'GSAM PARENT FAIL' along with the specific failure status returned, and also display the 'KFB AREA IN GSAM' along with the key feedback value to identify the record that failed to write, then invoke the abnormal termination process"
+            },
+            "Rule_Name": "Detect and Report Child Detail Output Write Failure",
+            "Rule_Description": "When writing a Pending Authorization Detail record to the child output file returns an unsuccessful result, the program must capture and display the failure status and key feedback area before triggering abnormal termination."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00054",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A critical failure has been detected during any stage of processing \u2014 reading Pending Authorization Summary records, reading Pending Authorization Detail records, writing to the parent output file, or writing to the child output file \u2014 and the specific failure details have already been displayed",
+                "When": "The abnormal termination process is invoked as a result of any of these critical failures",
+                "Then": "The program must display the message 'DBUNLDGS ABENDING ...' to announce the abnormal end, set the program return code to 16 to signal a critical failure to the calling environment, and immediately stop all processing"
+            },
+            "Rule_Name": "Signal Abnormal Program Termination with Return Code 16",
+            "Rule_Description": "When any critical failure occurs during the processing of Pending Authorization Summary or Detail records \u2014 whether during reading from the database or writing to output files \u2014 the program must announce its abnormal end and communicate a failure signal of 16 to the calling environment before stopping."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00055",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is sequentially reading Pending Authorization Summary root records from the authorization database",
+                "When": "A Pending Authorization Summary root record is successfully retrieved without any errors",
+                "Then": "The Summary Records Read Counter (WS-NO-SUMRY-READ) must be incremented by exactly 1 to reflect the newly read root record"
+            },
+            "Rule_Name": "Increment Summary Records Read Counter on Successful Root Segment Retrieval",
+            "Rule_Description": "Each time a Pending Authorization Summary root record is successfully retrieved from the database, the total count of summary records read is incremented by 1. This counter tracks the cumulative number of root-level authorization summary records that have been read during the current program execution."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00056",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is sequentially reading Pending Authorization Summary root records from the authorization database",
+                "When": "A Pending Authorization Summary root record is successfully retrieved without any errors",
+                "Then": "The Authorization Summary Processed Counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by exactly 1 to reflect the newly processed root record"
+            },
+            "Rule_Name": "Increment Summary Records Processed Counter on Successful Root Segment Retrieval",
+            "Rule_Description": "Each time a Pending Authorization Summary root record is successfully retrieved from the database, the total count of authorization summary records processed is incremented by 1. This counter tracks the cumulative number of root-level authorization summary records that have been actively processed during the current program execution, and is shared with the child detail record processing to maintain an overall processing tally."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00057",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is processing Pending Authorization Detail child records for a given Pending Authorization Summary parent record, and the shared total records read counter (WS-NO-SUMRY-READ) holds the current cumulative count of all records read so far (including any previously read summary and detail records)",
+                "When": "A Pending Authorization Detail child record is successfully retrieved from the database without any retrieval error",
+                "Then": "The total records read counter (WS-NO-SUMRY-READ) must be incremented by exactly 1, reflecting the addition of the newly retrieved Pending Authorization Detail record to the cumulative read count"
+            },
+            "Rule_Name": "Increment Total Records Read Counter on Successful Pending Authorization Detail Retrieval",
+            "Rule_Description": "Each time a Pending Authorization Detail child record is successfully retrieved from the database, the shared total records read counter (WS-NO-SUMRY-READ) is incremented by 1. This counter tracks all successfully read records across both summary and detail record types."
+        },
+        {
+            "Rule_Id": "R-DBUNLDGS-cbl-00058",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is processing Pending Authorization Detail child records for a given Pending Authorization Summary parent record, and the shared total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) holds the current cumulative count of all authorization records processed so far (including any previously processed summary and detail records), and the total records read counter (WS-NO-SUMRY-READ) has already been incremented for this same successfully retrieved detail record",
+                "When": "A Pending Authorization Detail child record is successfully retrieved from the database without any retrieval error",
+                "Then": "The total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) must be incremented by exactly 1, reflecting the addition of the newly retrieved Pending Authorization Detail record to the cumulative processed count"
+            },
+            "Rule_Name": "Increment Total Records Processed Counter on Successful Pending Authorization Detail Retrieval",
+            "Rule_Description": "Each time a Pending Authorization Detail child record is successfully retrieved from the database, the shared total authorization records processed counter (WS-AUTH-SMRY-PROC-CNT) is incremented by 1. This counter tracks all successfully processed authorization records across both summary and detail record types."
+        }
+    ],
+    "description": "DBUNLDGS is a batch IMS program that unloads Pending Authorization data from an IMS database by reading both the root (summary) and child (detail) segments, then writing them to GSAM output files for archival or downstream processing purposes. The program iterates through all Pending Authorization Summary root segments and their associated Detail child segments, inserting each into separate GSAM sequential output datasets. It is a Main/Driver program, as it contains the primary ENTRY point 'DLITCBL' and drives all processing logic directly.\n\n<br>\n\n- **Execution Environment**: Batch (IMS/DLI)\n- **Database Access**: IMS\n- **MQ Calls**: No\n- **Module Type**: Main module\n\n<br>\n\n### Key Functionalities:\n\n1: Program Initialization - Display program start banner and capture the current date and Julian date (YYDDD) to log processing context.\n\n2: Read Pending Authorization Summary (Root Segment) - Sequentially retrieve the next Pending Authorization Summary record (root segment PAUTSUM0) from the IMS database using an unqualified Get-Next (GN) call.\n\n3: Validate Account ID - Check that the Account ID (PA-ACCT-ID) retrieved from the Pending Authorization Summary is numeric before proceeding with further processing.\n\n4: Write Pending Authorization Summary to Output (Parent GSAM) - Insert the retrieved Pending Authorization Summary record into the parent GSAM sequential output dataset (PASFLPCB) to unload the root segment data.\n\n5: Read Pending Authorization Detail (Child Segment) - Sequentially retrieve all child Pending Authorization Detail records (child segment PAUTDTL1) associated with the current root segment using an unqualified Get-Next-within-Parent (GNP) call.\n\n6: Write Pending Authorization Detail to Output (Child GSAM) - Insert each retrieved Pending Authorization Detail record into the child GSAM sequential output dataset (PADFLPCB) to unload the child segment data.\n\n7: Track Summary and Detail Record Counts - Increment counters for the number of summary (root) records read and the number of detail (child) records read during processing.\n\n8: Detect End of Authorization Summary Database - Identify when all Pending Authorization Summary root segments have been processed (IMS status 'GB') and set the end-of-database flag to stop further reading.\n\n9: Detect End of Child Segments for Current Parent - Identify when there are no more Pending Authorization Detail child segments for the current parent (IMS status 'GE') and set the end-of-child flag to move to the next root segment.\n\n10: Close Output Files and Display Completion - Display a closing message upon completion of all record processing before the program ends.\n\n11: Abnormal Termination Handling - Display an error message and set a return code of 16 to signal abnormal program termination when a critical IMS database call fails.\n\n"
+}

@@ -1,0 +1,318 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COTRN01C.cbl",
+        "type": "cobol",
+        "transaction_id": "CT01"
+      },
+      "overview": "COTRN01C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program operates within the transaction inquiry workflow, allowing authorized users to look up and view detailed information about individual credit card transactions. The program serves as a read-only transaction viewer, enabling customer service or back-office staff to retrieve and display full transaction details from the TRANSACT file by entering a transaction ID, supporting research, dispute resolution, and audit activities.",
+      "key_features": [
+        {
+          "feature": "Transaction Lookup",
+          "description": "Retrieves a specific transaction record from the TRANSACT file using a user-supplied transaction ID as the key."
+        },
+        {
+          "feature": "Transaction Detail Display",
+          "description": "Presents comprehensive transaction information including transaction ID, card number, type, category, source, amount, description, origination/processing timestamps, and merchant details."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that the transaction ID field is not empty before attempting a file read, providing a clear error message if the field is blank."
+        },
+        {
+          "feature": "Error Handling",
+          "description": "Handles file read errors including 'not found' and unexpected CICS response codes, displaying appropriate messages to the user."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the calling program, PF4 to clear the current screen, and PF5 to navigate to the transaction list screen (COTRN00C)."
+        },
+        {
+          "feature": "Pre-populated Lookup",
+          "description": "Accepts a pre-selected transaction ID passed via the communication area from a prior screen, automatically performing the lookup on first entry."
+        },
+        {
+          "feature": "Dynamic Screen Header",
+          "description": "Populates the screen header with current date, time, program name, and transaction ID on every screen send for consistent user orientation."
+        },
+        {
+          "feature": "CICS Communication Area Management",
+          "description": "Maintains session state and navigation context across screen interactions using a shared COMMAREA, enabling seamless program-to-program transitions."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRANSACT",
+        "type": "Read",
+        "description": "Transaction file - reads a single transaction record by Transaction ID (TRAN-ID) to retrieve and display transaction details including card number, type code, category code, source, description, amount, merchant info, and timestamps"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Validation",
+          "description": "Program checks EIBCALEN to determine if a communication area exists. If zero, redirects to sign-on screen COSGN00C. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA for processing.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "First Entry Initialization",
+          "description": "On first entry (CDEMO-PGM-REENTER not set), sets re-entry flag, clears output map COTRN1AO, and checks if a transaction was pre-selected via CDEMO-CT01-TRN-SELECTED. If pre-selected, copies it to TRNIDINI and triggers PROCESS-ENTER-KEY automatically.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "CDEMO-CT01-TRN-SELECTED",
+            "TRNIDINI OF COTRN1AI",
+            "COTRN1AO"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive Screen Input",
+          "description": "On re-entry, receives the BMS map COTRN1A from mapset COTRN01 into COTRN1AI, capturing the transaction ID entered by the user. Response codes are stored in WS-RESP-CD and WS-REAS-CD.",
+          "records": [
+            "COTRN1AI",
+            "TRNIDINI OF COTRN1AI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Evaluation and Routing",
+          "description": "Evaluates EIBAID to determine user action: ENTER triggers transaction lookup, PF3 returns to previous or default menu screen, PF4 clears the screen, PF5 navigates to transaction list screen COTRN00C. Invalid keys set error flag and redisplay screen.",
+          "records": [
+            "EIBAID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Transaction ID Validation",
+          "description": "Validates that TRNIDINI is not spaces or low-values. If empty, sets error flag, populates error message, sets cursor to transaction ID field, and sends screen. If valid, clears all display fields and moves TRNIDINI to TRAN-ID for file read.",
+          "records": [
+            "TRNIDINI OF COTRN1AI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "TRAN-ID",
+            "TRNIDINL OF COTRN1AI"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read Transaction Record from TRANSACT File",
+          "description": "Issues a CICS READ with UPDATE against the TRANSACT dataset using TRAN-ID as the key. Reads the full TRAN-RECORD into working storage. Handles NOTFND and OTHER error conditions by setting error flag and displaying appropriate messages.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-RECORD",
+            "WS-TRANSACT-FILE",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Populate Screen Output Fields",
+          "description": "If no error, maps all transaction record fields to the output map COTRN1AI. Formats TRAN-AMT through WS-TRAN-AMT for display. Fields populated include transaction ID, card number, type code, category code, source, amount, description, timestamps, and merchant details.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-CARD-NUM",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-SOURCE",
+            "TRAN-AMT",
+            "WS-TRAN-AMT",
+            "TRAN-DESC",
+            "TRAN-ORIG-TS",
+            "TRAN-PROC-TS",
+            "TRAN-MERCHANT-ID",
+            "TRAN-MERCHANT-NAME",
+            "TRAN-MERCHANT-CITY",
+            "TRAN-MERCHANT-ZIP",
+            "COTRN1AI"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Populate Screen Header Information",
+          "description": "Retrieves current date and time using FUNCTION CURRENT-DATE. Formats and moves date components (MM, DD, YY) and time components (HH, MM, SS) to screen header fields. Also moves screen titles, transaction ID, and program name to header output fields.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "WS-CURDATE-MM-DD-YY",
+            "WS-CURTIME-HH-MM-SS",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "TRNNAMEO OF COTRN1AO",
+            "PGMNAMEO OF COTRN1AO",
+            "CURDATEO OF COTRN1AO",
+            "CURTIMEO OF COTRN1AO"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Send Transaction View Screen",
+          "description": "Sends the populated BMS map COTRN1A from mapset COTRN01 to the terminal using ERASE and CURSOR options. Error message from WS-MESSAGE is moved to ERRMSGO before sending.",
+          "records": [
+            "COTRN1AO",
+            "ERRMSGO OF COTRN1AO",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Return to CICS with Transaction ID",
+          "description": "Issues CICS RETURN with transaction ID CT01 and the updated CARDDEMO-COMMAREA, keeping the pseudo-conversational session alive for the next user interaction.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Transfer Control to Another Program",
+          "description": "When navigation keys (PF3, PF5) are pressed, sets CDEMO-FROM-TRANID and CDEMO-FROM-PROGRAM in COMMAREA, then issues CICS XCTL to transfer control to the target program (COMEN01C, COTRN00C, or COSGN00C).",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA Presence Required",
+          "description": "The program cannot function without a valid COMMAREA (EIBCALEN > 0). If absent, the user is immediately redirected to the sign-on screen, preventing any transaction lookup."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER State Flag",
+          "description": "The program's behavior on entry is entirely controlled by the CDEMO-PGM-REENTER flag in COMMAREA. First entry triggers initialization and optional auto-lookup; subsequent entries trigger screen receive and AID processing."
+        },
+        {
+          "dependency": "Pre-selected Transaction from Calling Program",
+          "description": "CDEMO-CT01-TRN-SELECTED in COMMAREA may be populated by a calling program (e.g., transaction list screen). If set, the program automatically performs a transaction lookup without waiting for user input, creating a dependency on the calling program's data."
+        },
+        {
+          "dependency": "TRAN-ID Must Exist in TRANSACT File",
+          "description": "The READ-TRANSACT-FILE paragraph depends on TRAN-ID matching an existing record in the TRANSACT VSAM dataset. A NOTFND response halts display and shows an error, making the entire screen population dependent on file record existence."
+        },
+        {
+          "dependency": "TRANSACT File Opened with UPDATE Intent",
+          "description": "The CICS READ is issued with the UPDATE option, which acquires a record-level lock on the transaction record. This lock is held until the task ends or a REWRITE/UNLOCK is issued, potentially blocking concurrent updates to the same transaction record by other tasks."
+        },
+        {
+          "dependency": "WS-ERR-FLG Controls Field Population",
+          "description": "All downstream processing after validation and file read is gated on ERR-FLG-OFF. If any prior step sets WS-ERR-FLG to 'Y', screen field population is skipped entirely, creating a strict sequential dependency between validation, file I/O, and display steps."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM for PF3 Navigation",
+          "description": "The PF3 return navigation depends on CDEMO-FROM-PROGRAM being populated in COMMAREA by the calling program. If absent or spaces, the program defaults to COMEN01C, making correct back-navigation dependent on the calling program setting this field."
+        },
+        {
+          "dependency": "BMS Map Copybook Field Alignment",
+          "description": "Screen input and output depend on COTRN01 copybook defining COTRN1AI and COTRN1AO map structures correctly. Any mismatch between the BMS mapset definition and the copybook would cause incorrect field mapping for all transaction display fields."
+        },
+        {
+          "dependency": "CVTRA05Y Record Layout Alignment with TRANSACT File",
+          "description": "The READ-TRANSACT-FILE paragraph reads directly into TRAN-RECORD as defined by CVTRA05Y. The physical VSAM record layout must exactly match this copybook structure for all field extractions (TRAN-AMT, TRAN-CARD-NUM, etc.) to be correct."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS Transaction Server",
+          "type": "Online Transaction Processing Middleware",
+          "purpose": "Manages the entire pseudo-conversational execution lifecycle including SEND/RECEIVE of BMS maps for terminal I/O, READ of the TRANSACT VSAM dataset, XCTL for program-to-program control transfer, and RETURN to maintain the conversational state across user interactions."
+        },
+        {
+          "system": "CICS BMS (Basic Mapping Support)",
+          "type": "Terminal Map Management",
+          "purpose": "Handles formatted screen presentation and input collection using mapset COTRN01 and map COTRN1A. BMS manages field-level attributes, cursor positioning, and data transfer between the 3270 terminal and the application program."
+        },
+        {
+          "system": "VSAM TRANSACT Dataset",
+          "type": "CICS-Managed File (VSAM KSDS)",
+          "purpose": "Stores transaction records keyed by TRAN-ID. The program reads individual transaction records by key to display full transaction details including amount, card number, merchant information, and processing timestamps."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        },
+        {
+          "name": "COTRN00C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates that the Transaction ID field is not empty or low-values before attempting a file read. When invalid, sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive message ('Tran ID can NOT be empty...'), positions the cursor on the offending field via TRNIDINL=-1, and redisplays the screen. Subsequent processing is gated by checking ERR-FLG-ON, preventing file reads when validation fails."
+      },
+      {
+        "category": "File Operation Errors",
+        "description": "After the CICS READ against the TRANSACT dataset, the RESP code is evaluated using DFHRESP conditions. NOTFND produces a user-friendly message ('Transaction ID NOT found...') with cursor repositioning and screen redisplay. Any other non-normal response triggers a DISPLAY of raw RESP/REAS codes to the system log for diagnostics, sets the error flag, shows 'Unable to lookup Transaction...' to the user, and redisplays the screen. Normal response allows processing to continue silently."
+      },
+      {
+        "category": "Navigation and Session Errors",
+        "description": "If EIBCALEN=0 (no commarea, unexpected entry point), the program immediately redirects to the sign-on program COSGN00C via RETURN-TO-PREV-SCREEN rather than attempting to process. If CDEMO-TO-PROGRAM is spaces or low-values during navigation, it defaults to COSGN00C as a safe fallback destination."
+      },
+      {
+        "category": "Invalid Key Errors",
+        "description": "Unrecognized AID keys (anything other than ENTER, PF3, PF4, PF5) are caught in the WHEN OTHER branch of the EIBAID EVALUATE. The error flag is set to 'Y' and the standard invalid key message (CCDA-MSG-INVALID-KEY from the CSMSG01Y copybook) is moved to WS-MESSAGE and displayed on screen, with no further processing attempted."
+      },
+      {
+        "category": "Error State Propagation",
+        "description": "A single WS-ERR-FLG ('Y'/'N') with 88-level conditions (ERR-FLG-ON/ERR-FLG-OFF) acts as a global error gate throughout the program. Once set, it prevents downstream processing blocks (file reads, data population) from executing via IF NOT ERR-FLG-ON guards. The flag is reset to 'N' at the start of each MAIN-PARA invocation, ensuring clean state per transaction cycle."
+      },
+      {
+        "category": "Screen Receive Errors",
+        "description": "The RECEIVE-TRNVIEW-SCREEN paragraph captures RESP and REAS codes into WS-RESP-CD and WS-REAS-CD, but does not explicitly evaluate them after the CICS RECEIVE. No error branching is implemented for map receive failures, representing a gap in error handling for BMS receive anomalies."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COTRN01",
+        "map_name": "COTRN1A",
+        "business_function": "Provides a read-only view interface for displaying detailed transaction information from the TRANSACT file. Users enter a Transaction ID to retrieve and display all associated transaction details including card number, type, category, source, amount, dates, description, and merchant information."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COTRN1A - View Transaction</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}.terminal{background-color:#000;width:80ch;padding:10px;border:1px solid #444;}.blue{color:#4444ff;}.yellow{color:#ffff00;}.green{color:#00ff00;}.turquoise{color:#00ffff;}.red{color:#ff0000;}.neutral{color:#ffffff;}.bright{font-weight:bold;}.input-field{background-color:#000;color:#00ff00;border:none;border-bottom:1px solid #00ff00;outline:none;font-family:'Courier New',Courier,monospace;font-size:inherit;}.row{white-space:pre;line-height:1.2;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CT01</span><span>                </span><span class='yellow'>CardDemo - View Transaction         </span><span>    </span><span class='blue'>Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COTRN01C</span><span>            </span><span class='yellow'>Credit Card Demo Application        </span><span>    </span><span class='blue'>Time: </span><span class='blue'>23:12:34</span></div><div class='row'>&nbsp;</div><div class='row'><span>                             </span><span class='neutral bright'>View Transaction</span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Enter Tran ID: </span><span class='green'><input class='input-field' type='text' size='16' maxlength='16' value='0001000000000001'></span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='neutral'>----------------------------------------------------------------------</span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Transaction ID: </span><span class='blue'>0001000000000001</span><span>      </span><span class='turquoise'>Card Number: </span><span class='blue'>4756250000000001</span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Type CD: </span><span class='blue'>PR</span><span>     </span><span class='turquoise'>Category CD: </span><span class='blue'>0010</span><span>     </span><span class='turquoise'>Source: </span><span class='blue'>ONLINE    </span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Description: </span><span class='blue'>ONLINE PURCHASE AT AMAZON.COM MARKETPLACE          </span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Amount: </span><span class='blue'>  +00125.99</span><span>   </span><span class='turquoise'>Orig Date: </span><span class='blue'>2022-07-15</span><span>    </span><span class='turquoise'>Proc Date: </span><span class='blue'>2022-07-16</span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Merchant ID: </span><span class='blue'>000000001</span><span>    </span><span class='turquoise'>Merchant Name: </span><span class='blue'>AMAZON.COM MARKETPLACE        </span></div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>Merchant City: </span><span class='blue'>SEATTLE                  </span><span>      </span><span class='turquoise'>Merchant Zip: </span><span class='blue'>98101     </span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='red bright'>                                                                              </span></div><div class='row'><span class='yellow'>ENTER=Fetch  F3=Back  F4=Clear  F5=Browse Tran.                </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Fetch transaction details using the entered Transaction ID from the TRANSACT file"
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen (calling program or COMEN01C menu if no calling program is set)"
+        },
+        {
+          "key": "F4",
+          "action": "Clear all fields on the current screen and reset to initial state"
+        },
+        {
+          "key": "F5",
+          "action": "Navigate to the Browse Transactions screen (COTRN00C)"
+        }
+      ]
+    }
+  }
+}

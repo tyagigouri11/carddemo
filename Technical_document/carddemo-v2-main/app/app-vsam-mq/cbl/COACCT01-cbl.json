@@ -1,0 +1,357 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COACCT01.cbl",
+        "type": "cobol",
+        "transaction_id": "CDRA"
+      },
+      "overview": "COACCT01 is a CICS-based COBOL program operating within a credit card account management system, serving as a middleware service that bridges MQ messaging infrastructure with core account data. It functions as a request-reply message processor, consuming account inquiry requests from an IBM MQ input queue and returning account details to a reply queue. The program solves the problem of asynchronous account lookup by listening for inbound inquiry messages containing an account ID, reading the corresponding account record from a VSAM file (ACCTDAT), and publishing formatted account information back to the requesting application via MQ.",
+      "key_features": [
+        {
+          "feature": "MQ Queue Initialization",
+          "description": "Opens three IBM MQ queues at startup: an input queue (dynamically retrieved via CICS RETRIEVE), a reply queue (CARD.DEMO.REPLY.ACCT), and an error queue (CARD.DEMO.ERROR) for routing responses and failures."
+        },
+        {
+          "feature": "Account Inquiry Processing",
+          "description": "Accepts messages with function code 'INQA' and a numeric account ID key, then performs a direct VSAM file read against the ACCTDAT dataset to retrieve the full account record."
+        },
+        {
+          "feature": "Formatted Reply Generation",
+          "description": "Constructs a labeled, human-readable reply message containing account ID, status, current balance, credit limit, cash limit, open/expiration/reissue dates, cycle credits/debits, and group ID before placing it on the reply queue."
+        },
+        {
+          "feature": "Request Validation",
+          "description": "Validates that the incoming message contains a recognized function code ('INQA') and a non-zero account key, returning a descriptive error message to the reply queue for invalid requests."
+        },
+        {
+          "feature": "Error Queue Routing",
+          "description": "Routes system-level errors (MQ failures, unexpected VSAM response codes) to a dedicated error queue with condition codes, reason codes, and descriptive error text for downstream monitoring."
+        },
+        {
+          "feature": "Message Loop with Syncpoint Control",
+          "description": "Continuously retrieves and processes messages from the input queue in a loop, issuing CICS SYNCPOINT between iterations to commit MQ transactions and ensure message integrity."
+        },
+        {
+          "feature": "Graceful Termination",
+          "description": "On completion or error, closes all open MQ queue handles in a controlled sequence before issuing a CICS RETURN, ensuring no resource leaks regardless of exit path."
+        },
+        {
+          "feature": "Not-Found Handling",
+          "description": "Detects DFHRESP(NOTFND) from the VSAM read and returns a user-friendly 'INVALID REQUEST PARAMETERS' message to the reply queue rather than treating it as a hard error."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "INPUT-QUEUE (dynamic name from CICS RETRIEVE/MQTM-QNAME)",
+        "type": "Read",
+        "description": "IBM MQ input queue - program retrieves incoming account inquiry request messages containing function code (WS-FUNC) and account key (WS-KEY)"
+      },
+      {
+        "name": "CARD.DEMO.REPLY.ACCT",
+        "type": "Write",
+        "description": "IBM MQ reply queue - program puts response messages containing account details (account ID, status, balances, dates, limits, group ID) back to the requester"
+      },
+      {
+        "name": "CARD.DEMO.ERROR",
+        "type": "Write",
+        "description": "IBM MQ error queue - program puts error messages containing MQ error details (condition code, reason code, queue name, error description) when processing failures occur"
+      },
+      {
+        "name": "ACCTDAT",
+        "type": "Read",
+        "description": "VSAM account master file (LIT-ACCTFILENAME='ACCTDAT') - read via CICS READ by account ID key to retrieve account record fields including balance, credit limit, cash limit, open date, expiration date, reissue date, cycle credits/debits, and group ID"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Initialize and Open Error Queue",
+          "description": "Program initializes working storage fields, clears queue names and message buffers, then opens the hardcoded MQ error queue 'CARD.DEMO.ERROR' for output processing.",
+          "records": [
+            "MQ-ERR-DISPLAY",
+            "ERROR-QUEUE-NAME",
+            "ERROR-QUEUE-HANDLE",
+            "QMGR-HANDLE-CONN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Retrieve Input Queue Name via CICS",
+          "description": "Issues a CICS RETRIEVE command to obtain the trigger monitor message (MQTM) that started the transaction. Extracts the input queue name from MQTM-QNAME and sets the hardcoded reply queue name 'CARD.DEMO.REPLY.ACCT'. On failure, logs error and terminates.",
+          "records": [
+            "MQTM",
+            "MQTM-QNAME",
+            "INPUT-QUEUE-NAME",
+            "REPLY-QUEUE-NAME",
+            "WS-CICS-RESP1-CD",
+            "WS-CICS-RESP2-CD"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Open Input MQ Queue",
+          "description": "Opens the dynamically retrieved input queue for shared GET processing with SAVE-ALL-CONTEXT and FAIL-IF-QUIESCING options. Stores the resulting object handle in INPUT-QUEUE-HANDLE and sets REPLY-QUEUE-OPEN flag.",
+          "records": [
+            "INPUT-QUEUE-NAME",
+            "INPUT-QUEUE-HANDLE",
+            "MQ-HOBJ",
+            "MQ-OPTIONS",
+            "MQOD-OBJECTNAME",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Open Output (Reply) MQ Queue",
+          "description": "Opens the reply queue 'CARD.DEMO.REPLY.ACCT' for PUT processing with PASS-ALL-CONTEXT and FAIL-IF-QUIESCING options. Stores the resulting object handle in OUTPUT-QUEUE-HANDLE and sets RESP-QUEUE-OPEN flag.",
+          "records": [
+            "REPLY-QUEUE-NAME",
+            "OUTPUT-QUEUE-HANDLE",
+            "MQ-HOBJ",
+            "MQ-OPTIONS",
+            "MQOD-OBJECTNAME",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Get Message from Input Queue",
+          "description": "Issues MQGET with a 5-second wait interval against the input queue using SYNCPOINT, FAIL-IF-QUIESCING, CONVERT, and WAIT options. On success, captures message ID, correlation ID, reply-to queue, and message buffer into REQUEST-MESSAGE and REQUEST-MSG-COPY. On MQRC-NO-MSG-AVAILABLE, sets NO-MORE-MSGS flag to end processing loop.",
+          "records": [
+            "MQ-BUFFER",
+            "MQ-BUFFER-LENGTH",
+            "MQ-DATA-LENGTH",
+            "MQ-MSG-ID",
+            "MQ-CORRELID",
+            "MQ-QUEUE-REPLY",
+            "REQUEST-MESSAGE",
+            "REQUEST-MSG-COPY",
+            "SAVE-CORELID",
+            "SAVE-REPLY2Q",
+            "SAVE-MSGID",
+            "MQ-MSG-COUNT",
+            "MQMD-MSGID",
+            "MQMD-CORRELID",
+            "MQMD-REPLYTOQ"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Validate Request Parameters",
+          "description": "Inspects the parsed request message fields WS-FUNC and WS-KEY from REQUEST-MSG-COPY. If function code is 'INQA' and account key is non-zero, proceeds to CICS file read. Otherwise, builds an invalid-parameters error string and routes to reply put.",
+          "records": [
+            "WS-FUNC",
+            "WS-KEY",
+            "WS-CARD-RID-ACCT-ID",
+            "WS-CARD-RID-ACCT-ID-X",
+            "REPLY-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Read Account Record from CICS File",
+          "description": "Issues a CICS READ against the VSAM file 'ACCTDAT ' using the account ID as the key (WS-CARD-RID-ACCT-ID-X). Reads the full ACCOUNT-RECORD as defined by copybook CVACT01Y.",
+          "records": [
+            "LIT-ACCTFILENAME",
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Map Account Data to Response Structure",
+          "description": "On a successful CICS READ (DFHRESP NORMAL), maps all relevant account fields from ACCOUNT-RECORD into the WS-ACCT-RESPONSE structure, including account ID, active status, current balance, credit limit, cash credit limit, open date, expiration date, reissue date, current cycle credit, current cycle debit, and group ID.",
+          "records": [
+            "ACCT-ID",
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-GROUP-ID",
+            "WS-ACCT-RESPONSE",
+            "REPLY-MESSAGE"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Handle Account Not Found",
+          "description": "On DFHRESP NOTFND from the CICS READ, constructs an error reply message string containing 'INVALID REQUEST PARAMETERS' along with the requested account ID and routes it to the reply put paragraph.",
+          "records": [
+            "WS-KEY",
+            "REPLY-MESSAGE"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Put Reply Message to Output Queue",
+          "description": "Places the REPLY-MESSAGE into MQ-BUFFER and issues MQPUT to the output queue handle using SYNCPOINT, DEFAULT-CONTEXT, and FAIL-IF-QUIESCING options. Restores original message ID and correlation ID into the message descriptor to correlate the reply with the original request.",
+          "records": [
+            "REPLY-MESSAGE",
+            "MQ-BUFFER",
+            "MQ-BUFFER-LENGTH",
+            "SAVE-MSGID",
+            "SAVE-CORELID",
+            "MQMD-MSGID",
+            "MQMD-CORRELID",
+            "MQMD-FORMAT",
+            "MQMD-CODEDCHARSETID",
+            "OUTPUT-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Issue CICS Syncpoint and Loop",
+          "description": "After processing each message, issues a CICS SYNCPOINT to commit the MQ unit of work, then re-invokes the GET-REQUEST paragraph to retrieve the next message. Loop continues until NO-MORE-MSGS is set.",
+          "records": [
+            "WS-MQ-MSG-FLAG",
+            "MQ-MSG-COUNT"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Error Handling - Put to Error Queue",
+          "description": "On any MQ or CICS processing error, formats the MQ-ERR-DISPLAY error details into ERROR-MESSAGE and issues MQPUT to the error queue handle (ERROR-QUEUE-HANDLE) using SYNCPOINT options. Logs condition and reason codes.",
+          "records": [
+            "MQ-ERR-DISPLAY",
+            "ERROR-MESSAGE",
+            "MQ-BUFFER",
+            "ERROR-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE",
+            "MQ-APPL-RETURN-MESSAGE",
+            "MQ-APPL-CONDITION-CODE",
+            "MQ-APPL-REASON-CODE",
+            "MQ-APPL-QUEUE-NAME"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Termination - Close All Queues and Return",
+          "description": "Checks open-status flags for each queue and conditionally issues MQCLOSE for the input queue, output queue, and error queue. Issues CICS RETURN to end the transaction and GOBACK.",
+          "records": [
+            "WS-REPLY-QUEUE-STS",
+            "WS-RESP-QUEUE-STS",
+            "WS-ERR-QUEUE-STS",
+            "INPUT-QUEUE-HANDLE",
+            "OUTPUT-QUEUE-HANDLE",
+            "ERROR-QUEUE-HANDLE",
+            "MQ-OPTIONS",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "CICS RETRIEVE must succeed before queue open",
+          "description": "The input queue name is dynamically obtained from the CICS trigger monitor message (MQTM) via CICS RETRIEVE. If this fails, the program cannot determine which MQ queue to read from and must terminate immediately. All subsequent MQ operations depend on this step."
+        },
+        {
+          "dependency": "Error queue must be opened before input/output queues",
+          "description": "The error queue 'CARD.DEMO.ERROR' is opened first in the control flow (2100-OPEN-ERROR-QUEUE). This ensures that any subsequent failures during input or output queue opens can be reported to the error queue. If the error queue open fails, only a DISPLAY is issued before termination."
+        },
+        {
+          "dependency": "Input queue open required before MQGET",
+          "description": "INPUT-QUEUE-HANDLE must be populated by 2300-OPEN-INPUT-QUEUE before 3000-GET-REQUEST can issue MQGET. The REPLY-QUEUE-OPEN flag (set during input queue open) is also used as the guard condition in 8000-TERMINATION to decide whether to close the input queue."
+        },
+        {
+          "dependency": "Output queue open required before MQPUT reply",
+          "description": "OUTPUT-QUEUE-HANDLE must be populated by 2400-OPEN-OUTPUT-QUEUE before 4100-PUT-REPLY can issue MQPUT. The RESP-QUEUE-OPEN flag controls conditional close in termination."
+        },
+        {
+          "dependency": "MQ message correlation ID preservation",
+          "description": "SAVE-CORELID, SAVE-MSGID, and SAVE-REPLY2Q are captured from the inbound MQGET message descriptor before processing. These are restored into MQMD-CORRELID and MQMD-MSGID during MQPUT in 4100-PUT-REPLY to ensure the reply is correctly correlated to the original request by the consuming application."
+        },
+        {
+          "dependency": "Request function code and key validation gate",
+          "description": "The CICS READ against ACCTDAT is only performed when WS-FUNC equals 'INQA' AND WS-KEY is greater than zero. Both fields are parsed from the inbound MQ message buffer via REQUEST-MSG-COPY. Invalid combinations bypass the file read and go directly to an error reply."
+        },
+        {
+          "dependency": "CICS SYNCPOINT scopes MQ unit of work",
+          "description": "MQGET uses MQGMO-SYNCPOINT and MQPUT uses MQPMO-SYNCPOINT, meaning both operations are within the same CICS unit of work. The CICS SYNCPOINT issued in 4000-MAIN-PROCESS commits the get and put together, ensuring transactional integrity between message consumption and reply production."
+        },
+        {
+          "dependency": "CVACT01Y copybook defines ACCOUNT-RECORD layout",
+          "description": "The CICS READ INTO(ACCOUNT-RECORD) and all subsequent field mappings (ACCT-ID, ACCT-ACTIVE-STATUS, ACCT-CURR-BAL, etc.) depend entirely on the data structure defined in the CVACT01Y copybook. Any mismatch between the copybook and the actual VSAM file layout would cause incorrect data mapping."
+        },
+        {
+          "dependency": "MQ copybooks define message descriptor and option structures",
+          "description": "CMQGMOV, CMQPMOV, CMQMDV, CMQODV, CMQV, and CMQTML copybooks define the IBM MQ API data structures (MQGMO, MQPMO, MQMD, MQOD, constants, and trigger message). All MQ API calls depend on these structures being correctly populated."
+        },
+        {
+          "dependency": "Queue handle state flags control termination cleanup",
+          "description": "WS-REPLY-QUEUE-STS (REPLY-QUEUE-OPEN), WS-RESP-QUEUE-STS (RESP-QUEUE-OPEN), and WS-ERR-QUEUE-STS (ERR-QUEUE-OPEN) are boolean flags that track whether each queue was successfully opened. The 8000-TERMINATION paragraph uses these flags to conditionally close only queues that were actually opened, preventing MQCLOSE errors on unopened handles."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM MQ (WebSphere MQ)",
+          "type": "Message-oriented middleware",
+          "purpose": "Provides the asynchronous messaging backbone for the program. The program reads account inquiry request messages from a dynamically determined input queue (obtained via CICS trigger), writes formatted account data reply messages to 'CARD.DEMO.REPLY.ACCT', and routes error details to 'CARD.DEMO.ERROR'. MQ API calls used: MQOPEN, MQGET, MQPUT, MQCLOSE."
+        },
+        {
+          "system": "IBM CICS",
+          "type": "Transaction processing monitor",
+          "purpose": "Hosts the program as a CICS transaction. CICS RETRIEVE is used to obtain the MQ trigger monitor message that initiated the transaction, providing the dynamic input queue name. CICS SYNCPOINT is used to commit MQ units of work after each message is processed. CICS READ is used to access the VSAM account file 'ACCTDAT'. CICS RETURN terminates the transaction."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "CICS Retrieve Errors",
+        "description": "Checks WS-CICS-RESP1-CD after EXEC CICS RETRIEVE. On failure, populates MQ-ERR-DISPLAY with operation name, response codes (formatted via STRING), then performs 9000-ERROR to route error to MQ error queue, followed by 8000-TERMINATION to close queues and exit."
+      },
+      {
+        "category": "MQ Queue Open Errors",
+        "description": "Uses EVALUATE on MQ-CONDITION-CODE after each MQOPEN call (input, output, error queues). On MQCC-OK, records handles and sets queue-open status flags (88-level conditions). On OTHER, captures condition/reason codes and queue name into MQ-ERR-DISPLAY, performs 9000-ERROR (except for error queue open failure which uses DISPLAY directly), then performs 8000-TERMINATION."
+      },
+      {
+        "category": "MQ Message Get Errors",
+        "description": "After MQGET, checks MQ-CONDITION-CODE. On MQCC-OK, processes the message. If MQ-REASON-CODE equals MQRC-NO-MSG-AVAILABLE, sets NO-MORE-MSGS flag to terminate the processing loop gracefully. For all other errors, captures condition/reason codes and queue name, performs 9000-ERROR to write to error queue, then performs 8000-TERMINATION."
+      },
+      {
+        "category": "MQ Message Put Errors (Reply)",
+        "description": "After MQPUT to the reply/output queue in 4100-PUT-REPLY, evaluates MQ-CONDITION-CODE. On MQCC-OK, records codes. On OTHER, populates MQ-ERR-DISPLAY with codes, queue name, and 'MQPUT ERR' message, performs 9000-ERROR to route to error queue, then performs 8000-TERMINATION."
+      },
+      {
+        "category": "MQ Message Put Errors (Error Queue)",
+        "description": "In 9000-ERROR, after MQPUT to the error queue, evaluates MQ-CONDITION-CODE. On failure (OTHER), captures codes and queue name, uses DISPLAY MQ-ERR-DISPLAY as a last-resort fallback (since the error queue itself failed), then performs 8000-TERMINATION. This is the deepest error fallback level."
+      },
+      {
+        "category": "CICS File Read Errors (Account File)",
+        "description": "After EXEC CICS READ on ACCTDAT, evaluates WS-RESP-CD. On DFHRESP(NORMAL), maps account fields to response structure and performs 4100-PUT-REPLY. On DFHRESP(NOTFND), constructs an informational message with the invalid account ID and performs 4100-PUT-REPLY to return a business-level error to the caller. On OTHER, captures RESP/RESP2 codes into MQ error display fields, performs 9000-ERROR, then 8000-TERMINATION."
+      },
+      {
+        "category": "Input Validation Errors (Request Parameters)",
+        "description": "Validates that WS-FUNC equals 'INQA' and WS-KEY is greater than zero before processing. If either condition fails, constructs a descriptive error string including the invalid function code and account key, then performs 4100-PUT-REPLY to return the validation error as a reply message to the requester rather than routing to the error queue."
+      },
+      {
+        "category": "MQ Queue Close Errors",
+        "description": "After each MQCLOSE call (5000, 5100, 5200 paragraphs), evaluates MQ-CONDITION-CODE. On OTHER, captures codes and queue name into MQ-ERR-DISPLAY. For input and output queue close failures, performs 8000-TERMINATION directly. For error queue close failure, performs 9000-ERROR first then 8000-TERMINATION. Note: recursive risk exists as 8000-TERMINATION calls the close routines."
+      },
+      {
+        "category": "Centralized Error Routing (9000-ERROR)",
+        "description": "Acts as a central error dispatcher. Formats MQ-ERR-DISPLAY into ERROR-MESSAGE, sets MQFMT-STRING format and MQPMO-SYNCPOINT options, and routes the error message to the dedicated ERROR-QUEUE-HANDLE via MQPUT. Ensures all application errors are persisted to the MQ error queue (CARD.DEMO.ERROR) for downstream monitoring and auditing."
+      },
+      {
+        "category": "Graceful Termination (8000-TERMINATION)",
+        "description": "Serves as the unified cleanup and exit handler. Conditionally closes input, output, and error queues only if their respective status flags (REPLY-QUEUE-OPEN, RESP-QUEUE-OPEN, ERR-QUEUE-OPEN) are set to TRUE, preventing redundant close attempts. Issues EXEC CICS RETURN followed by GOBACK to cleanly end the CICS transaction regardless of whether termination was triggered by error or normal end-of-messages."
+      }
+    ]
+  }
+}

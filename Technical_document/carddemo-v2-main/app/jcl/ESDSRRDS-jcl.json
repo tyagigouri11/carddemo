@@ -1,0 +1,161 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "ESDSRRDS.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **ESDSRRDS**, sets up the user security infrastructure for the CardDemo application by creating and populating two VSAM data stores. It first generates a flat file (PS) containing user credentials for 5 administrators and 5 regular users, then defines and loads both an Entry-Sequenced Data Set (ESDS) and a Relative Record Data Set (RRDS) VSAM cluster with that security data. The job effectively initializes the user authentication foundation for the CardDemo system, enabling role-based access control through pre-seeded admin and standard user accounts.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'DEF ESDS RRDS  '",
+          "description": "The JOB statement marks the beginning of a job and the value is the accounting information or job description string passed to the system for identification and billing purposes."
+        },
+        {
+          "name": "REGION",
+          "value": "8M",
+          "description": "Specifies the maximum amount of virtual storage (8 megabytes) available to all steps in the job. This limits memory usage across the entire job execution."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Assigns the job to input job class 'A', which determines the job's scheduling priority and the initiator that will process it, affecting when and how the job is selected for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class 'H' for the job's system messages (JES job log), determining where the job's log and system output messages are routed after job completion."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Instructs the system to send a notification message to the user whose ID is stored in the symbolic parameter &SYSUID (the submitting user) upon job completion or failure, informing them of the job's final status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PREDEL",
+        "purpose": "Pre-deletion step that deletes the temporary sequential file if it already exists, to ensure a clean environment before the job runs.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "AWS.M2.CARDDEMO.ESDSRRDS.PS (deleted if exists)"
+      },
+      {
+        "step": "STEP01",
+        "purpose": "Creates a new sequential flat file (PS) from in-stream data containing user security records for both admin and regular users, each with first name, last name, and password fields.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1 (in-stream data: 10 user security records with user ID, first name, last name, and password; LRECL=80, RECFM=FB)",
+        "outputs": "AWS.M2.CARDDEMO.ESDSRRDS.PS (new cataloged sequential PS dataset, LRECL=80, RECFM=FB, BLKSIZE=0, 10 primary tracks, 5 secondary tracks); SYSPRINT (utility messages)"
+      },
+      {
+        "step": "STEP02",
+        "purpose": "Deletes any pre-existing VSAM ESDS cluster for user security and defines a new VSAM Entry-Sequenced Data Set (ESDS) cluster to store user security records.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (IDCAMS control statements: DELETE and DEFINE CLUSTER commands)",
+        "outputs": "AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS (new VSAM ESDS cluster, RECORDSIZE(80,80), NONINDEXED, REUSE, TRACKS(45,15), FREESPACE(10,15), CISZ(8192)); AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS.DAT (data component); SYSPRINT (utility messages)"
+      },
+      {
+        "step": "STEP03",
+        "purpose": "Copies all user security records from the sequential flat file (PS) into the VSAM ESDS cluster using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "IN: AWS.M2.CARDDEMO.ESDSRRDS.PS (source sequential PS dataset, DISP=SHR); SYSIN (REPRO command)",
+        "outputs": "OUT: AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS (target VSAM ESDS dataset populated with user security records); SYSPRINT (utility messages)"
+      },
+      {
+        "step": "STEP04",
+        "purpose": "Deletes any pre-existing VSAM RRDS cluster for user security and defines a new VSAM Relative Record Data Set (RRDS) cluster to store user security records.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (IDCAMS control statements: DELETE and DEFINE CLUSTER commands)",
+        "outputs": "AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS (new VSAM RRDS cluster, RECORDSIZE(80,80), NUMBERED, REUSE, TRACKS(45,15), FREESPACE(10,15), CISZ(8192)); AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS.DAT (data component); SYSPRINT (utility messages)"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Copies all user security records from the sequential flat file (PS) into the VSAM RRDS cluster using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "IN: AWS.M2.CARDDEMO.ESDSRRDS.PS (source sequential PS dataset, DISP=SHR); SYSIN (REPRO command)",
+        "outputs": "OUT: AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS (target VSAM RRDS dataset populated with user security records); SYSPRINT (utility messages)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PREDEL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ESDSRRDS.PS",
+        "operations": "DELETE",
+        "description": "Pre-delete step using IEFBR14 to delete the sequential PS dataset if it exists. DISP=(MOD,DELETE,DELETE) causes deletion on normal and abnormal termination."
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSUT1 (in-stream data)",
+        "operations": "READ",
+        "description": "IEBGENER reads in-stream data containing 10 user security records (5 admin and 5 regular users), each 80 bytes, as the source for the copy operation."
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ESDSRRDS.PS",
+        "operations": "WRITE",
+        "description": "IEBGENER writes the in-stream user security data to a new sequential PS dataset with LRECL=80, RECFM=FB, allocated on SYSAD with 10 primary and 5 secondary tracks."
+      },
+      {
+        "step": "STEP02",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the existing VSAM ESDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS if it exists. MAXCC is reset to 0 to suppress non-zero return code if dataset does not exist."
+      },
+      {
+        "step": "STEP02",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS, AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS.DAT",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines a new VSAM ESDS (Entry-Sequenced Data Set) cluster with RECORDSIZE(80,80), REUSE, NONINDEXED, TRACKS(45,15), FREESPACE(10,15), CISZ(8192), and data component named AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS.DAT."
+      },
+      {
+        "step": "STEP03",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ESDSRRDS.PS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the sequential PS dataset containing user security records as input for the copy operation into the VSAM ESDS file."
+      },
+      {
+        "step": "STEP03",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO copies all records from the sequential PS dataset into the VSAM ESDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS."
+      },
+      {
+        "step": "STEP04",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the existing VSAM RRDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS if it exists. MAXCC is reset to 0 to suppress non-zero return code if dataset does not exist."
+      },
+      {
+        "step": "STEP04",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS, AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS.DAT",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines a new VSAM RRDS (Relative Record Data Set) cluster with RECORDSIZE(80,80), REUSE, NUMBERED, TRACKS(45,15), FREESPACE(10,15), CISZ(8192), and data component named AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS.DAT."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ESDSRRDS.PS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the sequential PS dataset containing user security records as input for the copy operation into the VSAM RRDS file."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO copies all records from the sequential PS dataset into the VSAM RRDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS."
+      }
+    ]
+  }
+}

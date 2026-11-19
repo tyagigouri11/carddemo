@@ -1,0 +1,230 @@
+{
+    "created_on": "2026-11-05",
+    "name": "DEFGDGD.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/DEFGDGD.jcl",
+    "type": "jcl",
+    "description": "This JCL job (DEFGDGD) sets up Generation Data Groups (GDGs) for backup purposes and creates initial backup copies of three critical CardDemo reference data files: Transaction Types, Transaction Categories, and Discount Groups. Each GDG is configured to retain up to 5 generations, ensuring a rolling backup history of these reference datasets.Key Functionalities:\nDefines a GDG base (AWS.M2.CARDDEMO.TRANTYPE.BKUP) with a limit of 5 generations to manage backup versions of the Transaction Type reference file, then copies the source file (AWS.M2.CARDDEMO.TRANTYPE.PS) into the first generation (+1) as a fixed-block sequential file with record length of 60 bytes and block size of 600 bytes.\nDefines a GDG base (AWS.M2.CARDDEMO.TRANCATG.PS.BKUP) with a limit of 5 generations to manage backup versions of the Transaction Category reference file, then copies the source file (AWS.M2.CARDDEMO.TRANCATG.PS) into the first generation (+1) as a fixed-block sequential file with record length of 60 bytes and block size of 600 bytes.\nDefines a GDG base (AWS.M2.CARDDEMO.DISCGRP.BKUP) with a limit of 5 generations to manage backup versions of the Discount Group reference file, then copies the source file (AWS.M2.CARDDEMO.DISCGRP.PS) into the first generation (+1) as a fixed-block sequential file with record length of 50 bytes and block size of 500 bytes.\nAll GDGs are defined with the SCRATCH option, meaning that when the generation limit of 5 is exceeded, the oldest generation is automatically deleted (scratched) from the catalog to make room for new backups.\nSteps STEP20, STEP30, STEP40, and STEP60 are conditionally executed only if the preceding step completed successfully (COND=(0,NE)), ensuring backup copies are only created if the GDG definition succeeded.",
+    "rules": [
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The system catalog does not yet have a versioned backup group registered under the name 'Transaction Type Backup' (AWS.M2.CARDDEMO.TRANTYPE.BKUP)",
+                "When": "The job step executes to define the versioned backup group for Transaction Type data",
+                "Then": "A new versioned backup group named AWS.M2.CARDDEMO.TRANTYPE.BKUP is registered in the system catalog, configured to retain a maximum of 5 backup versions, and set to automatically remove the oldest version when a new backup would exceed the 5-version limit"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Type Backup Version Group",
+            "Rule_Description": "Registers a versioned backup group for Transaction Type reference data in the system catalog, establishing the container that will hold all future backup copies with a rolling retention limit.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The versioned backup group AWS.M2.CARDDEMO.TRANTYPE.BKUP is being defined in the system catalog",
+                "When": "The maximum version limit is set to 5 for the Transaction Type backup group",
+                "Then": "The system enforces that no more than 5 backup versions of Transaction Type data can exist simultaneously, ensuring controlled storage usage and a predictable recovery window"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Maximum Backup Version Retention Limit for Transaction Type Data",
+            "Rule_Description": "Enforces a business retention policy that limits the number of historical backup copies of Transaction Type reference data to a maximum of 5 versions at any point in time.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The versioned backup group AWS.M2.CARDDEMO.TRANTYPE.BKUP already contains 5 backup versions (the maximum allowed)",
+                "When": "A new backup version of Transaction Type data is created and added to the group",
+                "Then": "The system automatically deletes the oldest existing backup version from the group, maintaining exactly 5 versions and ensuring the most recent 5 backups are always available for recovery"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Auto-Purge Oldest Transaction Type Backup When Retention Limit Is Reached",
+            "Rule_Description": "Defines the automatic cleanup behavior that removes the oldest backup version of Transaction Type data when a new backup is added and the 5-version retention limit has already been reached.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type backup job step is ready to execute",
+                "When": "Any prior job step has completed with a non-zero (error) return code",
+                "Then": "The Transaction Type backup step must be skipped entirely \u2014 no backup copy is created and no backup generation slot is consumed"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Conditional Execution of Transaction Type Backup",
+            "Rule_Description": "This rule governs whether the Transaction Type backup process should proceed based on the success of all prior job steps. The backup copy is only created when all preceding steps have completed without errors.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps have completed successfully with return code zero AND the Transaction Type backup step is authorized to execute",
+                "When": "The backup process initiates reading of the Transaction Type master reference data",
+                "Then": "The source file AWS.M2.CARDDEMO.TRANTYPE.PS must be opened in shared read mode, allowing other business processes to simultaneously access the same file without interruption"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Transaction Type Source Data Access for Backup",
+            "Rule_Description": "This rule defines how the Transaction Type master reference data is accessed during the backup process. The source file must be available in shared read mode to allow concurrent access by other business processes.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps have completed successfully AND the Transaction Type source file is accessible in shared read mode",
+                "When": "The backup copy process executes for the Transaction Type master reference data",
+                "Then": "Every record from the Transaction Type source file must be copied exactly as-is into the new backup generation \u2014 no data transformation, filtering, or record modification is applied to any record"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Exact Copy of Transaction Type Data with No Transformation",
+            "Rule_Description": "This rule defines that the Transaction Type backup must be a complete, unmodified copy of the source data. Every record from the source file must be replicated exactly as-is into the backup, with no filtering, reformatting, or data modification applied.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps have completed successfully AND the Transaction Type source data has been fully read without errors",
+                "When": "The backup copy is written to the Transaction Type backup group",
+                "Then": "A new backup generation must be created as the next sequential version (generation +1) in the AWS.M2.CARDDEMO.TRANTYPE.BKUP backup group, with each record stored at exactly 60 characters in fixed-length format AND the new backup version must be immediately registered in the system catalog to make it available for future retrieval or recovery AND any unused allocated storage space must be released back to the system after the backup is complete"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Transaction Type Backup Generation Creation and Catalog Registration",
+            "Rule_Description": "This rule governs the creation of a new Transaction Type backup version and its registration in the system catalog. The backup must be stored as the next available generation in the backup group with defined record structure, and must be immediately registered for future retrieval.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps (Transaction Type backup group setup and Transaction Type backup copy creation) have completed successfully with no errors",
+                "When": "The system registers a new versioned backup group named 'AWS.M2.CARDDEMO.TRANCATG.PS.BKUP' in the catalog for the Transaction Category reference data",
+                "Then": "1. A versioned backup group named 'AWS.M2.CARDDEMO.TRANCATG.PS.BKUP' is created and registered in the system catalog as the parent container for all future Transaction Category backup versions. 2. The backup group is configured to retain a maximum of 5 backup versions at any point in time. 3. When a new (6th) backup version is added, the oldest existing backup version is automatically removed from the system to maintain the 5-version limit. 4. If any prior step has failed, this step is skipped entirely and no backup group is created for Transaction Category data."
+            },
+            "Rule_Name": "STEP30 - IDCAMS - Register Versioned Backup Group for Transaction Category Data",
+            "Rule_Description": "This step conditionally registers a versioned backup group for the Transaction Category reference data in the system catalog. The backup group enforces a rolling retention policy of up to 5 historical backup versions, automatically removing the oldest version when the limit is exceeded.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The job has executed prior steps including Transaction Type backup group setup (STEP10) and Transaction Type backup copy creation (STEP20)",
+                "When": "The system evaluates whether all prior steps returned a successful completion status (return code equal to 0)",
+                "Then": "1. If ALL prior steps succeeded (return code = 0): The Transaction Category backup group registration step executes and the versioned backup container 'AWS.M2.CARDDEMO.TRANCATG.PS.BKUP' is created. 2. If ANY prior step failed (return code not equal to 0): This step is skipped entirely \u2014 no Transaction Category backup group is registered, and all subsequent dependent steps are also prevented from running."
+            },
+            "Rule_Name": "STEP30 - IDCAMS - Conditional Execution Based on Prior Step Success",
+            "Rule_Description": "This step enforces a chain dependency rule \u2014 the Transaction Category backup group registration is only attempted when all preceding steps in the job have completed without errors, ensuring no orphaned or incomplete backup structures are created.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "A versioned backup group 'AWS.M2.CARDDEMO.TRANCATG.PS.BKUP' has been successfully registered in the system catalog",
+                "When": "A new backup version of Transaction Category data is added to the backup group and the total number of stored versions reaches or exceeds 5",
+                "Then": "1. The backup group retains a maximum of 5 Transaction Category backup versions at all times. 2. When the 6th backup version is created, the oldest (earliest) backup version is automatically deleted from the system. 3. The 5 most recent backup versions of Transaction Category data are always preserved and available for recovery."
+            },
+            "Rule_Name": "STEP30 - IDCAMS - Rolling Retention Policy for Transaction Category Backups",
+            "Rule_Description": "The backup group for Transaction Category data enforces a rolling window retention policy, ensuring that no more than 5 historical backup versions are retained at any time, with automatic removal of the oldest version upon creation of a new one beyond the limit.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category backup copy step (STEP40) is about to be initiated",
+                "When": "Any one or more of the preceding job steps (STEP10, STEP20, STEP30) has completed with a non-zero return code indicating a failure",
+                "Then": "STEP40 must be skipped entirely \u2014 no backup copy of the Transaction Category data is created, and no new backup version is registered in the catalog"
+            },
+            "Rule_Name": "STEP40 - IEBGENER - Conditional Execution of Transaction Category Backup",
+            "Rule_Description": "This rule governs whether the Transaction Category backup step is allowed to execute based on the success of all preceding steps in the job.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "All preceding job steps have completed successfully with a return code of zero, AND the Transaction Category master data file (AWS.M2.CARDDEMO.TRANCATG.PS) is available for shared read access",
+                "When": "The Transaction Category backup copy step (STEP40) executes",
+                "Then": "Every record from the Transaction Category master data file must be copied exactly as-is into the new backup generation (AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1)) with no filtering, reformatting, or modification of any record content"
+            },
+            "Rule_Name": "STEP40 - IEBGENER - Exact Copy of Transaction Category Master Data",
+            "Rule_Description": "This rule defines how the Transaction Category master reference data is copied into a new backup version with no modifications or transformations applied to the data.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category backup copy step (STEP40) is executing and a new backup generation slot (+1) is being created under the backup group (AWS.M2.CARDDEMO.TRANCATG.PS.BKUP)",
+                "When": "The new backup version is successfully written",
+                "Then": "The new backup version must be: (1) created as a brand-new dataset and immediately registered in the system catalog for future retrieval, AND (2) structured with fixed-length records of exactly 60 characters each, AND (3) allocated with an initial storage space of 1 track with 1 track of expansion allowance, AND (4) any unused storage space must be automatically released back to the system upon completion of the copy"
+            },
+            "Rule_Name": "STEP40 - IEBGENER - Registration and Storage of New Transaction Category Backup Version",
+            "Rule_Description": "This rule defines the structural and storage requirements for the newly created Transaction Category backup version, including its record format, storage allocation, and catalog registration.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo Disclosure Group backup version group named 'AWS.M2.CARDDEMO.DISCGRP.BKUP' does not yet exist in the system catalog, and this step runs unconditionally regardless of any prior step outcomes",
+                "When": "The system registers the Disclosure Group backup version group with a maximum retention limit of 5 versions and automatic purge enabled",
+                "Then": "The versioned backup group 'AWS.M2.CARDDEMO.DISCGRP.BKUP' is successfully registered in the system catalog with the following policies enforced: (1) A maximum of 5 backup versions of the Disclosure Group data can exist at any time; (2) When a new 6th backup version is created, the oldest existing backup version is automatically and permanently removed from the system; (3) The backup group container is ready to accept new Disclosure Group backup copies in subsequent steps"
+            },
+            "Rule_Name": "STEP50 - IDCAMS - Register Disclosure Group Backup Version Group",
+            "Rule_Description": "Establishes a versioned backup group container for the Card Demo Disclosure Group reference data, defining the retention policy that allows up to 5 rolling backup versions with automatic removal of the oldest version when the limit is exceeded.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group backup version group 'AWS.M2.CARDDEMO.DISCGRP.BKUP' is being registered with a version limit of 5 and automatic purge (SCRATCH) enabled",
+                "When": "A new backup version of the Disclosure Group data is added and the total number of stored versions would exceed 5",
+                "Then": "The system automatically deletes the oldest backup version of the Disclosure Group data so that the total number of retained versions never exceeds 5, maintaining a rolling window of the 5 most recent backups"
+            },
+            "Rule_Name": "STEP50 - IDCAMS - Enforce Maximum 5 Backup Versions for Disclosure Group",
+            "Rule_Description": "Enforces a rolling retention policy that strictly limits the number of stored backup versions of the Disclosure Group reference data to 5, ensuring storage is managed automatically.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The job has reached STEP50 and this step is configured to run unconditionally, independent of the success or failure of all prior steps (Transaction Type and Transaction Category backup steps)",
+                "When": "STEP50 executes to register the Disclosure Group backup version group in the system catalog",
+                "Then": "The Disclosure Group backup version group container 'AWS.M2.CARDDEMO.DISCGRP.BKUP' is established and available in the system catalog, enabling the subsequent step (STEP60) to create and register a new Disclosure Group backup copy within this container \u2014 no Disclosure Group backup copy can be created without this container being registered first"
+            },
+            "Rule_Name": "STEP50 - IDCAMS - Initialize Disclosure Group Backup Container Before Backup Copy Creation",
+            "Rule_Description": "Ensures the Disclosure Group backup version group container is always initialized as a prerequisite process before any backup copy of the Disclosure Group data can be created in subsequent steps.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group backup copy step (STEP60) is about to be initiated",
+                "When": "Any one or more of the prior job steps (STEP10, STEP20, STEP30, STEP40, STEP50) have returned a non-zero (failure) result code",
+                "Then": "STEP60 must be skipped entirely and no Disclosure Group backup copy is created"
+            },
+            "Rule_Name": "STEP60 - IEBGENER - Conditional Execution of Disclosure Group Backup",
+            "Rule_Description": "This rule governs whether the Disclosure Group backup process is allowed to execute. The backup copy step only proceeds if all preceding job steps in the backup job have completed successfully, ensuring no partial or inconsistent backup state.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps have completed successfully and STEP60 is cleared to execute",
+                "When": "The Disclosure Group backup copy process is initiated",
+                "Then": "The system must read the Disclosure Group master reference data exclusively from the dataset 'AWS.M2.CARDDEMO.DISCGRP.PS' in shared read mode, ensuring no disruption to other business processes that may simultaneously access this file"
+            },
+            "Rule_Name": "STEP60 - IEBGENER - Disclosure Group Source Data Identification",
+            "Rule_Description": "This rule defines the authoritative source dataset that must be used as the input for creating the Disclosure Group backup copy.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group source data file 'AWS.M2.CARDDEMO.DISCGRP.PS' is being read for backup",
+                "When": "Each record from the source file is processed and written to the backup destination",
+                "Then": "Every record must be copied exactly as-is with no transformation, filtering, or modification applied, preserving full data integrity of the Disclosure Group reference data"
+            },
+            "Rule_Name": "STEP60 - IEBGENER - Disclosure Group Backup Data Integrity",
+            "Rule_Description": "This rule ensures that the Disclosure Group backup copy is an exact, unmodified replica of the source data. No data transformation, filtering, or record modification is permitted during the backup process.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DEFGDGD-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group source data has been successfully read and the backup version group 'AWS.M2.CARDDEMO.DISCGRP.BKUP' exists in the system catalog",
+                "When": "The backup copy process completes writing all Disclosure Group records to the new backup destination",
+                "Then": "A new backup version must be created as the next sequential generation (designated as +1) within the 'AWS.M2.CARDDEMO.DISCGRP.BKUP' backup group, each record must be stored as a fixed-length 50-character record, and the new backup version must be immediately registered in the system catalog to make it available for future retrieval or recovery; any unused allocated storage space must be released back to the system"
+            },
+            "Rule_Name": "STEP60 - IEBGENER - Disclosure Group Backup Version Creation and Catalog Registration",
+            "Rule_Description": "This rule governs the creation of a new versioned backup copy of the Disclosure Group data and its mandatory registration in the system catalog. The new backup must be created as the next sequential generation within the established backup group, with a fixed record structure of 50 characters per record.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    START([Job Start\nCard Demo Data Backup Job]):::start\n\n    STEP10[STEP10 - IDCAMS\nRegister Transaction Type Backup Version Group\nMax 5 Rolling Versions Retained\nOldest Auto-Purged Beyond Limit]:::process\n\n    D1{Prior Steps\nAll Successful?\nRC = 0}:::decision\n\n    STEP20[STEP20 - IEBGENER\nCreate New Transaction Type\nBackup Version - Full Copy\nNo Data Transformation]:::process\n    SKIP20[STEP20 Skipped\nDue to Prior Step Failure]:::error\n\n    D2{Prior Steps\nAll Successful?\nRC = 0}:::decision\n\n    STEP30[STEP30 - IDCAMS\nRegister Transaction Category Backup Version Group\nMax 5 Rolling Versions Retained\nOldest Auto-Purged Beyond Limit]:::process\n    SKIP30[STEP30 Skipped\nDue to Prior Step Failure]:::error\n\n    D3{Prior Steps\nAll Successful?\nRC = 0}:::decision\n\n    STEP40[STEP40 - IEBGENER\nCreate New Transaction Category\nBackup Version - Full Copy\nNo Data Transformation]:::process\n    SKIP40[STEP40 Skipped\nDue to Prior Step Failure]:::error\n\n    STEP50[STEP50 - IDCAMS\nRegister Disclosure Group Backup Version Group\nMax 5 Rolling Versions Retained\nOldest Auto-Purged Beyond Limit\nAlways Executes Unconditionally]:::process\n\n    D4{Prior Steps\nAll Successful?\nRC = 0}:::decision\n\n    STEP60[STEP60 - IEBGENER\nCreate New Disclosure Group\nBackup Version - Full Copy\nNo Data Transformation]:::process\n    SKIP60[STEP60 Skipped\nDue to Prior Step Failure]:::error\n\n    END([Job End\nCard Demo Backup Job Complete]):::final\n\n    TRANTYPE_SRC[(AWS.M2.CARDDEMO.TRANTYPE.PS\nTransaction Type Source Data\n60 Char Fixed Length Records)]:::datasource\n    TRANTYPE_BKP[(AWS.M2.CARDDEMO.TRANTYPE.BKUP - New Generation\nTransaction Type Backup\nLatest of Max 5 Versions)]:::datasource\n\n    TRANCATG_SRC[(AWS.M2.CARDDEMO.TRANCATG.PS\nTransaction Category Source Data\n60 Char Fixed Length Records)]:::datasource\n    TRANCATG_BKP[(AWS.M2.CARDDEMO.TRANCATG.PS.BKUP - New Generation\nTransaction Category Backup\nLatest of Max 5 Versions)]:::datasource\n\n    DISCGRP_SRC[(AWS.M2.CARDDEMO.DISCGRP.PS\nDisclosure Group Source Data\n50 Char Fixed Length Records)]:::datasource\n    DISCGRP_BKP[(AWS.M2.CARDDEMO.DISCGRP.BKUP - New Generation\nDisclosure Group Backup\nLatest of Max 5 Versions)]:::datasource\n\n    START --> STEP10\n    STEP10 --> D1\n    D1 -->|Yes - Proceed with Backup| STEP20\n    D1 -->|No - Skip Backup| SKIP20\n\n    TRANTYPE_SRC -.->|Read All Records - Shared Access| STEP20\n    STEP20 -.->|Write New Backup Version - Cataloged| TRANTYPE_BKP\n\n    STEP20 --> D2\n    SKIP20 --> D2\n\n    D2 -->|Yes - Proceed with Setup| STEP30\n    D2 -->|No - Skip Setup| SKIP30\n\n    STEP30 --> D3\n    SKIP30 --> D3\n\n    D3 -->|Yes - Proceed with Backup| STEP40\n    D3 -->|No - Skip Backup| SKIP40\n\n    TRANCATG_SRC -.->|Read All Records - Shared Access| STEP40\n    STEP40 -.->|Write New Backup Version - Cataloged| TRANCATG_BKP\n\n    STEP40 --> STEP50\n    SKIP40 --> STEP50\n\n    STEP50 --> D4\n\n    D4 -->|Yes - Proceed with Backup| STEP60\n    D4 -->|No - Skip Backup| SKIP60\n\n    DISCGRP_SRC -.->|Read All Records - Shared Access| STEP60\n    STEP60 -.->|Write New Backup Version - Cataloged| DISCGRP_BKP\n\n    STEP60 --> END\n    SKIP60 --> END"
+}

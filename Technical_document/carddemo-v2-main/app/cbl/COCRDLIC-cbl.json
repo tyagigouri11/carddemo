@@ -1,0 +1,433 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COCRDLIC.cbl",
+        "type": "cobol",
+        "transaction_id": "CCLI"
+      },
+      "overview": "COCRDLIC is a business logic component within a CICS-based credit card management application, operating as part of the card administration workflow. It serves as the credit card listing screen, enabling both administrative users and regular account holders to browse credit card records. The program retrieves and displays credit card records from the CARDDAT file, showing up to 7 cards per page, with filtering capabilities based on account ID or card number. It solves the need for a paginated, role-sensitive browsing interface that allows users to navigate card records and launch into detail view or update operations for a selected card.",
+      "key_features": [
+        {
+          "feature": "Paginated Card Listing",
+          "description": "Displays up to 7 credit card records per screen page, supporting forward (PF8) and backward (PF7) navigation through the full card dataset."
+        },
+        {
+          "feature": "Account and Card Filtering",
+          "description": "Allows users to filter displayed records by an 11-digit account ID or a 16-digit card number, narrowing results to relevant cards."
+        },
+        {
+          "feature": "Role-Sensitive Display",
+          "description": "Supports showing all cards for admin users or restricting the list to cards associated with a specific account when accessed by a non-admin user."
+        },
+        {
+          "feature": "Row Selection for Detail or Update",
+          "description": "Users can type 'S' to view card details or 'U' to update a card on any displayed row, transferring control to the card detail (COCRDSLC) or card update (COCRDUPC) program respectively."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates account ID and card number filter inputs for numeric format and correct length, displaying appropriate error messages and highlighting invalid fields in red."
+        },
+        {
+          "feature": "COMMAREA State Management",
+          "description": "Maintains pagination state (first/last card keys, current page number, next-page indicator) across CICS pseudo-conversational returns using a structured COMMAREA."
+        },
+        {
+          "feature": "Bidirectional File Browse",
+          "description": "Implements both forward (READNEXT) and backward (READPREV) VSAM file browsing against the CARDDAT dataset to support page-up and page-down navigation."
+        },
+        {
+          "feature": "Menu Navigation",
+          "description": "Provides PF3 exit functionality that transfers control back to the main menu program (COMEN01C), preserving application navigation flow."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDAT",
+        "type": "Read",
+        "description": "Credit card master file - browsed forward and backward to retrieve card records including card number, account ID, and active status for display in the list screen"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Initializes working storage, sets transaction ID, clears error messages, and determines if this is a fresh start or a return from another program by checking EIBCALEN and COMMAREA content.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "WS-TRANID"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "COMMAREA Restoration",
+          "description": "If EIBCALEN > 0, restores the shared CARDDEMO-COMMAREA and program-specific WS-THIS-PROGCOMMAREA from DFHCOMMAREA. If first entry, initializes both areas and sets default pagination state.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "WS-CA-SCREEN-NUM",
+            "WS-CA-FIRST-CARDKEY",
+            "WS-CA-LAST-CARDKEY"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Context Reset on Menu Entry",
+          "description": "If entering from a different program (not COCRDLIC itself), resets pagination context, clears program COMMAREA, and sets first-page indicators to ensure a clean listing state.",
+          "records": [
+            "CDEMO-PGM-ENTER",
+            "CDEMO-FROM-PROGRAM",
+            "WS-CA-SCREEN-NUM",
+            "WS-CA-FIRST-CARD-NUM",
+            "WS-CA-LAST-PAGE-DISPLAYED"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "PF Key Mapping",
+          "description": "Calls CSSTRPFY copybook routine to remap and store the current PF key pressed by the user into a normalized CCARD-AID indicator for subsequent processing logic.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK07",
+            "CCARD-AID-PFK08",
+            "WS-PFK-FLAG"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Screen Input Reception",
+          "description": "If returning from this same program (EIBCALEN > 0 and FROM-PROGRAM = COCRDLIC), receives the BMS map CCRDLIAI to capture user-entered account ID filter, card number filter, and row selection codes.",
+          "records": [
+            "CCRDLIAI",
+            "CC-ACCT-ID",
+            "CC-CARD-NUM",
+            "WS-EDIT-SELECT(1-7)",
+            "ACCTSIDI",
+            "CARDSIDI",
+            "CRDSEL1I-CRDSEL7I"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Input Validation - Account Filter",
+          "description": "Validates the account ID filter field: checks for blank/zero (sets filter-blank flag), checks for non-numeric input (sets INPUT-ERROR and protects selection rows), and moves valid value to CDEMO-ACCT-ID.",
+          "records": [
+            "CC-ACCT-ID",
+            "CC-ACCT-ID-N",
+            "CDEMO-ACCT-ID",
+            "FLG-ACCTFILTER-BLANK",
+            "FLG-ACCTFILTER-ISVALID",
+            "FLG-ACCTFILTER-NOT-OK",
+            "WS-ERROR-MSG"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Input Validation - Card Number Filter",
+          "description": "Validates the card number filter field: checks for blank/zero (sets filter-blank flag), checks for non-numeric input (sets INPUT-ERROR), and moves valid numeric value to CDEMO-CARD-NUM.",
+          "records": [
+            "CC-CARD-NUM",
+            "CC-CARD-NUM-N",
+            "CDEMO-CARD-NUM",
+            "FLG-CARDFILTER-BLANK",
+            "FLG-CARDFILTER-ISVALID",
+            "FLG-CARDFILTER-NOT-OK",
+            "WS-ERROR-MSG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Input Validation - Row Selection Array",
+          "description": "Validates the 7-element selection array for valid action codes (S=view, U=update). Detects multiple simultaneous selections, invalid codes, and sets I-SELECTED to the chosen row index. Sets INPUT-ERROR if violations found.",
+          "records": [
+            "WS-EDIT-SELECT(1-7)",
+            "WS-EDIT-SELECT-FLAGS",
+            "WS-EDIT-SELECT-ERROR-FLAGS",
+            "I-SELECTED",
+            "WS-ROW-CRDSELECT-ERROR(1-7)",
+            "WS-EDIT-SELECT-COUNTER"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Navigation Decision - PF3 Exit to Menu",
+          "description": "If PF3 is pressed and the calling program is COCRDLIC, updates COMMAREA navigation fields and transfers control to the main menu program COMEN01C via CICS XCTL.",
+          "records": [
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "CCARD-NEXT-MAPSET",
+            "CCARD-NEXT-MAP",
+            "LIT-MENUPGM",
+            "LIT-MENUMAPSET"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Forward Page Read (PF8 / Enter / Default)",
+          "description": "Initiates a CICS STARTBR on CARDDAT file using WS-CARD-RID-CARDNUM as the key with GTEQ positioning. Reads up to 7 records forward via READNEXT, applies account/card filters, populates WS-SCREEN-ROWS array, and tracks first/last card keys for pagination.",
+          "records": [
+            "WS-CARD-RID-CARDNUM",
+            "CARD-RECORD",
+            "CARD-NUM",
+            "CARD-ACCT-ID",
+            "CARD-ACTIVE-STATUS",
+            "WS-ROW-CARD-NUM(1-7)",
+            "WS-ROW-ACCTNO(1-7)",
+            "WS-ROW-CARD-STATUS(1-7)",
+            "WS-CA-FIRST-CARD-NUM",
+            "WS-CA-LAST-CARD-NUM",
+            "WS-SCRN-COUNTER"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Backward Page Read (PF7)",
+          "description": "Initiates a CICS STARTBR on CARDDAT file, then uses READPREV to navigate backwards from the current first card key. Fills the 7-row screen array in reverse order, applying filters, and updates first card key for the previous page.",
+          "records": [
+            "WS-CARD-RID-CARDNUM",
+            "WS-CA-FIRST-CARDKEY",
+            "WS-CA-LAST-CARDKEY",
+            "CARD-RECORD",
+            "CARD-NUM",
+            "CARD-ACCT-ID",
+            "CARD-ACTIVE-STATUS",
+            "WS-CA-FIRST-CARD-NUM",
+            "WS-CA-FIRST-CARD-ACCT-ID"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Record Filtering",
+          "description": "For each record read from CARDDAT, checks if account filter is active and matches CARD-ACCT-ID, and if card filter is active and matches CARD-NUM. Sets WS-EXCLUDE-THIS-RECORD or WS-DONOT-EXCLUDE-THIS-RECORD accordingly.",
+          "records": [
+            "CARD-ACCT-ID",
+            "CARD-NUM",
+            "CC-ACCT-ID",
+            "CC-CARD-NUM-N",
+            "FLG-ACCTFILTER-ISVALID",
+            "FLG-CARDFILTER-ISVALID",
+            "WS-FILTER-RECORD-FLAG"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Next-Page Existence Check",
+          "description": "After filling 7 screen rows, performs an additional READNEXT to determine if more records exist beyond the current page. Sets CA-NEXT-PAGE-EXISTS or CA-NEXT-PAGE-NOT-EXISTS and updates WS-CA-LAST-CARD-NUM accordingly.",
+          "records": [
+            "WS-CA-LAST-CARD-NUM",
+            "WS-CA-LAST-CARD-ACCT-ID",
+            "CA-NEXT-PAGE-EXISTS",
+            "CA-NEXT-PAGE-NOT-EXISTS",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Screen Preparation and Send",
+          "description": "Initializes the output map CCRDLIAO with titles, date/time, page number, and populates 7 card rows from WS-SCREEN-ROWS. Sets field attributes (protected/unprotected, color) based on validation state, sets messages, and sends the BMS map to the terminal.",
+          "records": [
+            "CCRDLIAO",
+            "CCRDLIAI",
+            "TITLE01O",
+            "TITLE02O",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "PAGENOO",
+            "ACCTNO1O-ACCTNO7O",
+            "CRDNUM1O-CRDNUM7O",
+            "CRDSTS1O-CRDSTS7O",
+            "CRDSEL1O-CRDSEL7O",
+            "ERRMSGO",
+            "INFOMSGO"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Transfer to Card Detail View",
+          "description": "When Enter is pressed with 'S' selected on a row, copies selected row's account and card number to COMMAREA and transfers control to COCRDSLC (card detail program) via CICS XCTL.",
+          "records": [
+            "WS-ROW-ACCTNO(I-SELECTED)",
+            "WS-ROW-CARD-NUM(I-SELECTED)",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CCARD-NEXT-PROG",
+            "LIT-CARDDTLPGM",
+            "LIT-CARDDTLMAPSET",
+            "LIT-CARDDTLMAP"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Transfer to Card Update Program",
+          "description": "When Enter is pressed with 'U' selected on a row, copies selected row's account and card number to COMMAREA and transfers control to COCRDUPC (card update program) via CICS XCTL.",
+          "records": [
+            "WS-ROW-ACCTNO(I-SELECTED)",
+            "WS-ROW-CARD-NUM(I-SELECTED)",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CCARD-NEXT-PROG",
+            "LIT-CARDUPDPGM",
+            "LIT-CARDUPDMAPSET",
+            "LIT-CARDUPDMAP"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "COMMAREA Serialization and CICS Return",
+          "description": "Serializes CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA into WS-COMMAREA buffer and issues CICS RETURN with TRANSID CCLI and the combined COMMAREA to maintain state across pseudo-conversational interactions.",
+          "records": [
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "LIT-THISTRANID",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-LAST-MAP"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN-driven initialization",
+          "description": "The entire program flow branches on EIBCALEN=0 to determine first-time entry vs. return. If zero, all COMMAREA structures are initialized fresh; if non-zero, prior state is restored. Incorrect EIBCALEN handling would corrupt pagination state."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM identity check",
+          "description": "Screen input reception (2000-RECEIVE-MAP) is only performed when CDEMO-FROM-PROGRAM equals LIT-THISPGM ('COCRDLIC'). This prevents stale or mismatched map data from being processed when entering from an external program."
+        },
+        {
+          "dependency": "Input validation state before file read",
+          "description": "The 9000-READ-FORWARD browse is only initiated when both FLG-ACCTFILTER-NOT-OK and FLG-CARDFILTER-NOT-OK are false. File browsing is suppressed if input validation fails, preventing reads with invalid filter keys."
+        },
+        {
+          "dependency": "WS-CARD-RID-CARDNUM positioning key",
+          "description": "The STARTBR key (WS-CARD-RID-CARDNUM) must be correctly populated from WS-CA-FIRST-CARD-NUM or WS-CA-LAST-CARD-NUM before initiating forward or backward browse. Incorrect key values result in wrong page positioning."
+        },
+        {
+          "dependency": "WS-CA-SCREEN-NUM pagination counter",
+          "description": "Screen number is incremented on PF8 (page down) and decremented on PF7 (page up). The CA-FIRST-PAGE condition (value=1) gates PF7 behavior. Incorrect counter state causes wrong page navigation or prevents backward paging."
+        },
+        {
+          "dependency": "WS-CA-FIRST-CARDKEY and WS-CA-LAST-CARDKEY for backward read",
+          "description": "The backward read (9100-READ-BACKWARDS) copies WS-CA-FIRST-CARDKEY to WS-CA-LAST-CARDKEY as the starting browse position. These keys must be accurately maintained from the previous forward read to correctly retrieve the prior page."
+        },
+        {
+          "dependency": "CA-NEXT-PAGE-EXISTS flag for PF8 gating",
+          "description": "PF8 page-down navigation is only effective when CA-NEXT-PAGE-EXISTS is set. This flag is determined by an extra READNEXT after filling the screen. If not set correctly, users cannot page forward even when more records exist."
+        },
+        {
+          "dependency": "I-SELECTED index validity for XCTL transfer",
+          "description": "XCTL transfers to COCRDSLC or COCRDUPC depend on I-SELECTED containing a valid row index (1-7) with a corresponding non-empty WS-EACH-CARD entry. An uninitialized or zero I-SELECTED would cause incorrect data to be passed to the target program."
+        },
+        {
+          "dependency": "WS-SCRN-COUNTER bounds for screen array population",
+          "description": "WS-SCRN-COUNTER controls which element of WS-SCREEN-ROWS is populated during forward read and which element is written during backward read. It must not exceed WS-MAX-SCREEN-LINES (7) to prevent array overflow."
+        },
+        {
+          "dependency": "COMMAREA length offset arithmetic",
+          "description": "WS-THIS-PROGCOMMAREA is stored at offset LENGTH OF CARDDEMO-COMMAREA + 1 within WS-COMMAREA. Both the store and restore operations must use identical offset calculations; any mismatch corrupts pagination keys across pseudo-conversational cycles."
+        },
+        {
+          "dependency": "FLG-PROTECT-SELECT-ROWS state for attribute setting",
+          "description": "When FLG-PROTECT-SELECT-ROWS-YES is set (due to input errors), all selection fields are rendered as protected (DFHBMPRF/DFHBMPRO) in 1250-SETUP-ARRAY-ATTRIBS. This flag must be set before screen send to prevent user interaction with invalid rows."
+        },
+        {
+          "dependency": "CARDDAT file browse session lifecycle",
+          "description": "Each call to 9000-READ-FORWARD or 9100-READ-BACKWARDS opens a browse with STARTBR and must close it with ENDBR. The browse session is not shared across CICS pseudo-conversational returns, so a new STARTBR is required on every program invocation."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction processing monitor",
+          "purpose": "Provides pseudo-conversational transaction management via EXEC CICS RETURN with TRANSID/COMMAREA, BMS map send/receive (SEND MAP, RECEIVE MAP), program transfer (XCTL), and VSAM file browsing (STARTBR, READNEXT, READPREV, ENDBR) for the CARDDAT dataset."
+        },
+        {
+          "system": "IBM BMS (Basic Mapping Support)",
+          "type": "Terminal I/O mapping facility",
+          "purpose": "Manages formatted 3270 terminal screen interactions using mapset COCRDLI and map CCRDLIA (CCRDLIAO/CCRDLIAI) to send credit card list screens to and receive user input from the terminal."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COCRDSLC.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COCRDUPC.cbl",
+          "purpose": "This program is part of a credit card management system operating within a CICS mainframe environment, serving as the business logic layer for card account maintenance workflows. It sits between the card listing screen (COCRDLIC) and the underlying card data files, enabling authorized users to locate and modify credit card details. The program (COCRDUPC, transaction ID 'CCUP') accepts user input to retrieve a specific credit card record by account and card number, presents the current card details for editing, validates all proposed changes, and upon user confirmation, commits the updates to the card master file (CARDDAT). It solves the problem of controlled, validated updates to sensitive credit card data by enforcing a multi-step review-and-confirm workflow before any changes are persisted."
+        },
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validated in paragraphs 2210-EDIT-ACCOUNT, 2220-EDIT-CARD, and 2250-EDIT-ARRAY. Account ID must be numeric 11-digit; card number must be numeric 16-digit. Blank/zero values are treated as no-filter (valid). Invalid inputs set INPUT-ERROR flag, FLG-ACCTFILTER-NOT-OK or FLG-CARDFILTER-NOT-OK flags, and populate WS-ERROR-MSG with descriptive text. Screen fields are highlighted in red (DFHRED) and cursor is repositioned to the offending field via length field set to -1. Select array errors (multiple selections or invalid action codes) set per-row error flags (WS-ROW-CRDSELECT-ERROR) and display WS-MORE-THAN-1-ACTION or WS-INVALID-ACTION-CODE messages. When input errors exist, select rows are protected (FLG-PROTECT-SELECT-ROWS-YES) to prevent action on invalid data."
+      },
+      {
+        "category": "File Browse Operation Errors (STARTBR/READNEXT/READPREV)",
+        "description": "CICS RESP codes are captured in WS-RESP-CD and WS-REAS-CD for all file operations. In 9000-READ-FORWARD and 9100-READ-BACKWARDS, EVALUATE on WS-RESP-CD handles: DFHRESP(NORMAL) and DFHRESP(DUPREC) as successful reads; DFHRESP(ENDFILE) sets CA-NEXT-PAGE-NOT-EXISTS, sets WS-NO-RECORDS-FOUND if on first page with zero records, and sets READ-LOOP-EXIT to terminate the read loop; any OTHER response sets READ-LOOP-EXIT, populates the structured WS-FILE-ERROR-MESSAGE with operation name ('READ'), file name (LIT-CARD-FILE), RESP and RESP2 codes, and moves it to WS-ERROR-MSG for display. ENDBR is always executed after the loop regardless of errors. STARTBR response codes are captured but not explicitly evaluated, representing a gap in error handling."
+      },
+      {
+        "category": "Pagination Boundary Errors",
+        "description": "Handled in 1400-SETUP-MESSAGE and the main EVALUATE block. Attempting PF7 (page up) on the first page sets WS-ERROR-MSG to 'NO PREVIOUS PAGES TO DISPLAY'. Attempting PF8 (page down) when CA-NEXT-PAGE-NOT-EXISTS and CA-LAST-PAGE-SHOWN sets WS-ERROR-MSG to 'NO MORE PAGES TO DISPLAY'. When the last page is reached for the first time (CA-LAST-PAGE-NOT-SHOWN), an informational message is shown and CA-LAST-PAGE-SHOWN is set. These are soft boundary conditions communicated via the screen error message field rather than aborting the transaction."
+      },
+      {
+        "category": "Invalid PF Key Errors",
+        "description": "Handled in the main 0000-MAIN paragraph. Only PF03, PF07, PF08, and ENTER are recognized as valid keys. Any other attention identifier sets PFK-INVALID to TRUE, which then forces CCARD-AID-ENTER to TRUE, effectively treating unrecognized keys as an Enter press and defaulting to a forward read/display operation. No explicit error message is shown to the user for invalid PF keys."
+      },
+      {
+        "category": "CICS SEND MAP Errors",
+        "description": "In 1500-SEND-SCREEN, the CICS SEND MAP command captures the response in WS-RESP-CD via the RESP option, but there is no subsequent evaluation or handling of that response code. Errors during screen send are silently ignored, representing a gap in error handling."
+      },
+      {
+        "category": "No Records Found Condition",
+        "description": "Detected in 9000-READ-FORWARD when DFHRESP(ENDFILE) is received on the first page (WS-CA-SCREEN-NUM = 1) with zero records read (WS-SCRN-COUNTER = 0). Sets WS-NO-RECORDS-FOUND condition (88-level on WS-ERROR-MSG) to display 'NO RECORDS FOUND FOR THIS SEARCH CONDITION' to the user. This is treated as an informational condition rather than a hard error."
+      },
+      {
+        "category": "COMMAREA / Context Initialization Errors",
+        "description": "Handled defensively rather than as explicit errors. If EIBCALEN = 0 (no commarea passed), all commarea structures are initialized to defaults and the program sets up a fresh context. If the calling program is not the current program (fresh entry from menu), WS-THIS-PROGCOMMAREA is re-initialized to prevent stale context. No error is raised; the program gracefully defaults to a clean first-page state."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COCRDLI",
+        "map_name": "CCRDLIA",
+        "business_function": "Provides a paginated list interface for Credit Cards. Displays up to 7 credit card records per page showing Account Number, Card Number, and Active Status. Supports optional filtering by Account Number (11 digits) and Card Number (16 digits). Admin users can view all cards; non-admin users see only cards associated with their account. Users can select a record for detail view (S) or update (U), and navigate pages forward/backward."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COCRDLI - Card Listing Screen</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ff00;width:80ch;font-size:15px;line-height:1.5;padding:8px;border:1px solid #444;white-space:pre;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .green{color:#00ff00;} .red{color:#ff5555;} .white{color:#ffffff;} .neutral{color:#aaaaaa;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .field-input{background:#000;color:#00ff00;text-decoration:underline;border:none;outline:none;font-family:'Courier New',Courier,monospace;font-size:15px;} .field-prot{color:#aaaaaa;} .row-data{color:#00ffff;}</style></head><body><div class='terminal'><span class='blue'>Tran: </span><span class='blue'>CCLI</span>                <span class='yellow'>Credit Card Demo Application     </span>       <span class='blue'>Date: </span><span class='blue'>07/19/22</span>\n<span class='blue'>Prog: </span><span class='blue'>COCRDLIC</span>            <span class='yellow'>CardDemo - AWS COBOL Demo App    </span>       <span class='blue'>Time: </span><span class='blue'>23:12:33</span>\n\n                              <span class='neutral'>List Credit Cards</span>                    <span class='neutral'>Page </span><span class='neutral'>  1</span>\n\n                     <span class='turquoise'>Account Number    :</span> <span class='green underline'>00000001001</span>\n                     <span class='turquoise'>Credit Card Number:</span> <span class='green underline'>0000000000000000</span>\n\n         <span class='neutral'>Select    </span><span class='neutral'>Account Number</span>       <span class='neutral'> Card Number </span>              <span class='neutral'>Active </span>\n         <span class='neutral'>------</span>   <span class='neutral'>---------------</span>      <span class='neutral'>---------------</span>          <span class='neutral'>--------</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001001</span>         <span class='row-data'>4000002000000001</span>         <span class='row-data'>Y</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001001</span>         <span class='row-data'>4000002000000002</span>         <span class='row-data'>Y</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001002</span>         <span class='row-data'>4000003000000001</span>         <span class='row-data'>Y</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001002</span>         <span class='row-data'>4000003000000002</span>         <span class='row-data'>N</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001003</span>         <span class='row-data'>4000004000000001</span>         <span class='row-data'>Y</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001003</span>         <span class='row-data'>4000004000000002</span>         <span class='row-data'>Y</span>\n         <span class='field-prot underline'> </span>  <span class='row-data'>00000001004</span>         <span class='row-data'>4000005000000001</span>         <span class='row-data'>Y</span>\n\n\n\n                   <span class='neutral'>TYPE S FOR DETAIL, U TO UPDATE ANY RECORD</span>\n\n\n\n<span class='red bright'>                                                                              </span>\n<span class='turquoise'>  F3=Exit F7=Backward  F8=Forward</span>\n</div></body></html>",
+      "pf_keys": [
+        {
+          "key": "F3",
+          "action": "Exit - returns to the main menu program (COMEN01C), transferring control via XCTL"
+        },
+        {
+          "key": "F7",
+          "action": "Page Backward - navigates to the previous page of credit card records using READPREV browse; if already on the first page, displays message 'NO PREVIOUS PAGES TO DISPLAY'"
+        },
+        {
+          "key": "F8",
+          "action": "Page Forward - navigates to the next page of credit card records using READNEXT browse; if no more pages exist, displays message 'NO MORE PAGES TO DISPLAY'"
+        },
+        {
+          "key": "Enter",
+          "action": "Confirm selection - if 'S' entered in a Select field, transfers to Card Detail program (COCRDSLC/CCDL); if 'U' entered, transfers to Card Update program (COCRDUPC/CCUP); also re-reads and refreshes the current page if no selection is made"
+        }
+      ]
+    }
+  }
+}

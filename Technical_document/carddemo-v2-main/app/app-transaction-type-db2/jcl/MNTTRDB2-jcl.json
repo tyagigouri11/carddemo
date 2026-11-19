@@ -1,0 +1,91 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "MNTTRDB2.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, **MNTTRDB2**, is designed to perform batch maintenance operations on a DB2 transaction table within the CardDemo application. It reads an input file (INPFILE) containing records that specify whether to Add, Delete, or Update transaction type entries, each consisting of a numeric transaction type code and a description. The job executes the COBOL program **COBTUPDT** under DB2 (system DAZ1) using the CARDDEMO plan, enabling controlled bulk management of transaction reference data without requiring online or manual intervention.",
+      "parameters": [
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class for scheduling and routing the job to an appropriate initiator. Class A determines the job's priority and resource allocation within the job queue."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Defines the output class for the job's message log (JES job log). Class H determines where the system messages and job log are routed for output disposition."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of messages printed in the job log. The first value (1) specifies that all JCL statements including cataloged procedures are printed. The second value (1) specifies that all allocation and termination messages are printed, even if the job abends."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. Using the symbolic parameter &SYSUID automatically resolves to the submitting user's ID, sending a notification message when the job finishes."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Sets the maximum CPU time limit for the entire job in minutes. A value of 1440 represents 24 hours, effectively allowing the job to run without a CPU time restriction, preventing premature cancellation for long-running batch processes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP1",
+        "purpose": "Executes the customer application program COBTUPDT under DB2 to maintain the DB2 transaction table by processing an input file and performing batch insert, update, or delete operations on transaction records based on action codes in the input.",
+        "programs": "IKJEFT01 (COBTUPDT)",
+        "inputs": "INPFILE (DSN=INPFILE) - input file containing transaction records with action codes (A=Add, D=Delete, U=Update), transaction type (columns 2-3), and transaction description (columns 4-53); DBRMLIB (DSN=AWS.M2.CARDDEMO.DBRMLIB) - DB2 DBRM library for plan CARDDEMO",
+        "outputs": "SYSTSPRT - system print output (SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.SDSNEXIT",
+        "operations": "READ",
+        "description": "STEPLIB load library providing DB2 exit routines, read during program load"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "STEPLIB load library providing DB2 system modules, read during program load"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB load library providing COBTUPDT executable load module, read during program load"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DBRMLIB",
+        "operations": "READ",
+        "description": "DBRMLIB library providing the DBRM for COBTUPDT used by DB2 plan CARDDEMO during bind/execution"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "INPFILE",
+        "operations": "READ",
+        "description": "Input file read by COBTUPDT containing transaction records with action codes (A=Add, D=Delete, U=Update), transaction type in columns 2-3, and transaction description in columns 4-53"
+      },
+      {
+        "step": "STEP1",
+        "type": "DB2",
+        "objects": "TRANSACTION TYPE TABLE",
+        "operations": "INSERT, UPDATE, DELETE",
+        "description": "COBTUPDT runs under DB2 subsystem DAZ1 with plan CARDDEMO, reading INPFILE records and performing INSERT for A records, UPDATE for U records, and DELETE for D records on the DB2 transaction table; comment records (asterisk in column 1) are skipped"
+      }
+    ]
+  }
+}

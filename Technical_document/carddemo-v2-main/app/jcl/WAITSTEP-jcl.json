@@ -1,0 +1,70 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "WAITSTEP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **WAITSTEP**, is designed to introduce a deliberate time delay in a batch processing workflow. It executes the program **COBSWAIT**, passing a value of **3600 centiseconds (36 seconds)** as input to control the wait duration. The job is typically used to pause job stream execution, allowing dependent processes, resources, or system conditions to reach a ready state before subsequent jobs proceed.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "WAITSTEP",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'WAIT STEP'",
+          "description": "Accounting information associated with the job, used for billing or tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class, which determines the job entry subsystem (JES) queue where the job is placed for execution. Class A typically indicates a standard batch job class."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages. Class 0 determines where the job's message output (JCL listing, allocation/termination messages) is directed."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification upon job completion."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "WAIT",
+        "purpose": "Executes the COBSWAIT program to introduce a timed delay of 36 seconds (3600 centiseconds) into the job stream. This is a wait utility used to pause job execution for a specified duration provided via SYSIN.",
+        "programs": "COBSWAIT",
+        "inputs": "SYSIN (inline value: 00003600, representing 3600 centiseconds = 36 seconds wait duration)",
+        "outputs": "SYSOUT (program output messages)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "WAIT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB DD loads the COBSWAIT program from the customer application load library AWS.M2.CARDDEMO.LOADLIB"
+      },
+      {
+        "step": "WAIT",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSOUT DD directs program output messages to the system output class"
+      },
+      {
+        "step": "WAIT",
+        "type": "Dataset",
+        "objects": "SYSIN",
+        "operations": "READ",
+        "description": "SYSIN DD provides inline input data (value 00003600 in centiseconds, equating to 36 seconds) to the COBSWAIT program as its wait duration parameter"
+      }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+    "created_on": "2026-11-05",
+    "name": "COMBTRAN.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/COMBTRAN.jcl",
+    "type": "jcl",
+    "description": "This JCL job (COMBTRAN) combines two transaction sources \u2014 a backup transaction file and a system transaction file \u2014 into a single unified dataset by sorting them by Transaction ID, and then loads the combined result into a VSAM KSDS file used for card transaction processing.Key Functionalities:\nMerges two transaction generation data group (GDG) files \u2014 the current backup transaction file (AWS.M2.CARDDEMO.TRANSACT.BKUP generation 0) and the current system transaction file (AWS.M2.CARDDEMO.SYSTRAN generation 0) \u2014 into one combined dataset.\nSorts the merged transactions in ascending order by Transaction ID (TRAN-ID), a 16-character alphanumeric field starting at position 1, ensuring a consistent and ordered transaction sequence.\nWrites the sorted, combined transactions to a new GDG generation (+1) of AWS.M2.CARDDEMO.TRANSACT.COMBINED, creating a new cataloged sequential dataset on disk.\nReproduces (loads) the newly created combined transaction GDG file into the VSAM KSDS file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS), making the consolidated transactions available for downstream card transaction processing.",
+    "rules": [
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Backup File (current generation) and the System Transaction File (current generation) both exist and are accessible for reading",
+                "When": "The transaction consolidation job is initiated",
+                "Then": "All transaction records from both the Transaction Backup File and the System Transaction File are combined into a single unified pool of records for further processing"
+            },
+            "Rule_Name": "STEP05R - SORT - Merge Transaction Records from Multiple Sources",
+            "Rule_Description": "All transaction records from the Transaction Backup File and the System Transaction File are merged together into a single unified pool of transaction data as the first step of consolidation.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records exist in the combined input pool from both the Transaction Backup File and the System Transaction File",
+                "When": "Transaction records are being processed for sorting and consolidation",
+                "Then": "Each transaction record must be identified by its Transaction ID (TRAN-ID), which is a 16-character text field located at the beginning (position 1 through 16) of every transaction record"
+            },
+            "Rule_Name": "STEP05R - SORT - Transaction ID as the Unique Transaction Identifier",
+            "Rule_Description": "The Transaction ID (TRAN-ID) is defined as the unique identifier for every transaction record, occupying the first 16 characters of each record.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records from both the Transaction Backup File and the System Transaction File have been merged into a single pool",
+                "When": "The combined pool of transaction records is processed for output",
+                "Then": "All transaction records must be arranged in ascending order (A to Z, 0 to 9) based on their 16-character Transaction ID (TRAN-ID), so that the resulting Combined Transaction File is fully ordered by Transaction ID"
+            },
+            "Rule_Name": "STEP05R - SORT - Sort All Transactions in Ascending Order by Transaction ID",
+            "Rule_Description": "All merged transaction records from both sources must be sorted in ascending order using the Transaction ID as the sort key, ensuring a consistent and ordered sequence in the output.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The merge and sort of all transaction records from both source files has completed successfully",
+                "When": "The sorted and combined transaction records are written to the output file",
+                "Then": "A new generation of the Combined Transaction File must be created and permanently saved, while all previously existing generations of the Combined Transaction File are retained and remain accessible for historical reference and audit"
+            },
+            "Rule_Name": "STEP05R - SORT - Create New Generation of Combined Transaction File",
+            "Rule_Description": "Upon successful completion of the merge and sort process, a new generation of the Combined Transaction File is permanently saved, preserving all prior generations for historical and audit purposes.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A new generation of the Combined Transaction File has been initiated during the merge and sort process",
+                "When": "The merge and sort process fails or terminates abnormally before successful completion",
+                "Then": "The newly created generation of the Combined Transaction File must be automatically deleted and must not be retained or cataloged, ensuring that no partial or incomplete transaction data exists in the Combined Transaction File"
+            },
+            "Rule_Name": "STEP05R - SORT - Discard Incomplete Combined Transaction File on Failure",
+            "Rule_Description": "If the merge and sort process fails for any reason, the newly created generation of the Combined Transaction File must be automatically discarded to prevent any incomplete or partial transaction data from being retained.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-COMBTRAN-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "A newly created Combined Transaction File (AWS.M2.CARDDEMO.TRANSACT.COMBINED, latest generation +1) exists and contains all merged and sorted transaction records from both the Transaction Backup File and the System Transaction File, AND the Transaction VSAM KSDS (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) is available and accessible as the target indexed transaction store",
+                "When": "The IDCAMS REPRO utility is executed to copy all records from the Combined Transaction File (TRANSACT) into the Transaction VSAM KSDS (TRANVSAM) without any filtering, selection, or transformation \u2014 every record in the source file is transferred as-is to the target VSAM store",
+                "Then": "All transaction records from the Combined Transaction File are successfully loaded into the Transaction VSAM KSDS, so that the VSAM store now reflects the most current, complete, and ordered set of all transactions from both source systems, making every transaction immediately available for fast, key-based retrieval by downstream applications using the Transaction ID (TRAN-ID) as the key"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Load Combined Transactions into VSAM Transaction Store",
+            "Rule_Description": "This step refreshes the Transaction VSAM KSDS (Key-Sequenced Data Set), which serves as the live indexed transaction repository, by loading all consolidated and sorted transaction records from the newly created Combined Transaction File. Every record is transferred completely without filtering or transformation.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444\n\n    A([\ud83d\ude80 JOB START\nTransaction Consolidation & VSAM Load]):::start\n\n    BKUP[(Transaction Backup File\nAWS.M2.CARDDEMO.TRANSACT.BKUP)]:::datasource\n    SYSTRAN[(System Transaction File\nAWS.M2.CARDDEMO.SYSTRAN)]:::datasource\n\n    STEP05R[STEP05R - SORT Utility\nMerge Both Transaction Sources &\nSort All Records by Transaction ID in Ascending Order]:::process\n\n    D1{STEP05R\nCompleted\nSuccessfully?}:::decision\n\n    TRANSACT_FILE[(TRANSACT-FILE\nAWS.M2.CARDDEMO.TRANSACT.COMBINED\nNew Generation of Combined Transaction File)]:::datasource\n\n    STEP10[STEP10 - IDCAMS Utility\nLoad All Consolidated Transaction Records\ninto VSAM Indexed Transaction Store]:::process\n\n    D2{STEP10\nCompleted\nSuccessfully?}:::decision\n\n    VSAM[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\nTransaction VSAM KSDS\nIndexed Transaction Repository)]:::datasource\n\n    SUCCESS([\u2705 JOB COMPLETED SUCCESSFULLY\nTransaction VSAM KSDS Refreshed\nwith Latest Consolidated Transactions]):::success\n    ERROR1([\u274c JOB FAILED AT STEP05R\nTransaction Merge & Sort Failed\nCombined Transaction File Not Created]):::error\n    ERROR2([\u274c JOB FAILED AT STEP10\nVSAM Load Failed\nTransaction VSAM KSDS May Be Incomplete]):::error\n\n    A --> STEP05R\n    BKUP -.->|Read Backed-Up\nTransaction Records| STEP05R\n    SYSTRAN -.->|Read System-Level\nTransaction Records| STEP05R\n    STEP05R -.->|Write Merged & Sorted\nTransaction Records\nNew Generation Created| TRANSACT_FILE\n    STEP05R --> D1\n    D1 -->|Yes - RC = 0| STEP10\n    D1 -->|No - RC > 0| ERROR1\n    TRANSACT_FILE -.->|Read All Consolidated\nTransaction Records\nSequentially| STEP10\n    STEP10 -.->|Load All Transactions\ninto Indexed VSAM Store\nfor Fast Key-Based Access| VSAM\n    STEP10 --> D2\n    D2 -->|Yes - RC = 0| SUCCESS\n    D2 -->|No - RC > 0| ERROR2"
+}

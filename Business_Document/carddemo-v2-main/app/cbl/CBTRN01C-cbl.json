@@ -1,0 +1,1759 @@
+{
+    "name": "CBTRN01C.cbl",
+    "program_name": "CBTRN01C.cbl",
+    "generated_at": "2026-11-05T08:40:03Z",
+    "overview": {
+        "total_key_functionalities": 11,
+        "total_rules": 68,
+        "main_flow_diagram": "flowchart TD\n    A([Program Start\nCBTRN01C]):::start\n\n    subgraph INIT[_1: Program Initialization_]\n        B[Open Daily Transaction File]:::process\n        C[Open Customer File]:::process\n        D[Open Card Cross-Reference File]:::process\n        E[Open Card File]:::process\n        F[Open Account File]:::process\n        G[Open Transaction File]:::process\n    end\n\n    H{End of Daily\nTransaction File?}:::decision\n\n    subgraph READ[_2: Daily Transaction Record Reading_]\n        I[Read Next Daily Transaction Record]:::process\n    end\n\n    J{Record\nSuccessfully Read?}:::decision\n\n    subgraph DISPLAY[_3: Transaction Display_]\n        K[Display Transaction Record Details]:::process\n    end\n\n    subgraph XREF[_4: Card Number Cross-Reference Lookup_]\n        L[Lookup Card Number in\nCross-Reference File]:::process\n    end\n\n    M{Card Number\nFound in XREF?}:::decision\n\n    subgraph SKIP[_8: Transaction Skipping_]\n        N[Log: Card Could Not Be Verified\nSkip Transaction ID]:::process\n    end\n\n    subgraph ACCT[_6: Account Record Retrieval_]\n        O[Retrieve Account Details\nUsing Account ID]:::process\n    end\n\n    P{Account\nFound?}:::decision\n\n    subgraph ACCTVAL[_7: Account Validation_]\n        Q[Display: Account Not Found]:::process\n    end\n\n    R[Account Retrieved Successfully]:::process\n\n    subgraph CLOSE[_10: Program Finalization_]\n        S[Close Daily Transaction File]:::process\n        T[Close Customer File]:::process\n        U[Close Card Cross-Reference File]:::process\n        V[Close Card File]:::process\n        W[Close Account File]:::process\n        X[Close Transaction File]:::process\n    end\n\n    Z([Program End\nCBTRN01C]):::final\n\n    DALYTRAN_FILE[(Daily Transaction File\nDALYTRAN-FILE\nSequential)]:::datasource\n    XREF_FILE[(Card Cross-Reference File\nXREF-FILE\nVSAM KSDS)]:::datasource\n    ACCOUNT_FILE[(Account File\nACCOUNT-FILE\nVSAM KSDS)]:::datasource\n    CUSTOMER_FILE[(Customer File\nCUSTOMER-FILE\nVSAM KSDS)]:::datasource\n    CARD_FILE[(Card File\nCARD-FILE\nVSAM KSDS)]:::datasource\n    TRANSACT_FILE[(Transaction File\nTRANSACT-FILE\nVSAM KSDS)]:::datasource\n\n    A --> INIT\n    INIT --> H\n\n    DALYTRAN_FILE -.->|Open File| B\n    CUSTOMER_FILE -.->|Open File| C\n    XREF_FILE -.->|Open File| D\n    CARD_FILE -.->|Open File| E\n    ACCOUNT_FILE -.->|Open File| F\n    TRANSACT_FILE -.->|Open File| G\n\n    H -->|No - Continue Processing| I\n    DALYTRAN_FILE -.->|Sequential Read| I\n    I --> J\n\n    J -->|9: End-of-File Detected| H2{End of File?}:::decision\n    H2 -->|Yes - Stop Loop| CLOSE\n    H2 -->|No - Record Read| K\n\n    K --> L\n    XREF_FILE -.->|Keyed Read by Card Number| L\n    L --> M\n\n    M -->|No - Card Not Found\n5: Card Number Validation Failed| N\n    N --> H\n\n    M -->|Yes - Card Verified| O\n    ACCOUNT_FILE -.->|Keyed Read by Account ID| O\n    O --> P\n\n    P -->|No - Account Not Found| Q\n    Q --> H\n\n    P -->|Yes - Account Found| R\n    R --> H\n\n    H -->|Yes - All Records Processed| CLOSE\n\n    DALYTRAN_FILE -.->|Close File| S\n    CUSTOMER_FILE -.->|Close File| T\n    XREF_FILE -.->|Close File| U\n    CARD_FILE -.->|Close File| V\n    ACCOUNT_FILE -.->|Close File| W\n    TRANSACT_FILE -.->|Close File| X\n\n    CLOSE --> Z\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-CBTRN01C-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Sequential Processing of All Daily Transactions",
+                "rule_description": "The program reads all daily transaction records one at a time from the Daily Transaction File in sequential order, continuing until all records have been processed.",
+                "sub_graph_node_text": "_2: Daily Transaction Record Reading_",
+                "acceptance_criteria": {
+                    "Given": "The Daily Transaction File (DALYTRAN-FILE) is open and contains one or more transaction records, and the end-of-file indicator is set to 'N'",
+                    "When": "The program requests the next sequential record from the Daily Transaction File",
+                    "Then": "The next Daily Transaction Record is read into memory, including the Card Number (DALYTRAN-CARD-NUM) and Transaction ID (DALYTRAN-ID), and processing continues for that record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "End-of-File Detection on Daily Transaction File",
+                "rule_description": "When the Daily Transaction File has no more records to process, the program detects the end-of-file condition and stops the transaction processing loop.",
+                "sub_graph_node_text": "_9: End-of-File Detected_",
+                "acceptance_criteria": {
+                    "Given": "The program is reading records sequentially from the Daily Transaction File",
+                    "When": "A read attempt returns an end-of-file condition (file status '10')",
+                    "Then": "The end-of-daily-transaction-file indicator is set to 'Y', the processing loop terminates, and the program proceeds to close all files"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00003",
+                "rule_type": "Process Rules",
+                "rule_name": "Display of Each Transaction Record Upon Successful Read",
+                "rule_description": "Each successfully read daily transaction record is displayed in full before any validation is performed, providing a log of all transactions encountered.",
+                "sub_graph_node_text": "_3: Transaction Display_",
+                "acceptance_criteria": {
+                    "Given": "A daily transaction record has been successfully read from the Daily Transaction File and the end-of-file indicator remains 'N'",
+                    "When": "The record is confirmed as a valid read (not end-of-file)",
+                    "Then": "The full contents of the Daily Transaction Record (DALYTRAN-RECORD) are displayed, including all transaction details"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00004",
+                "rule_type": "Validation Rules",
+                "rule_name": "Card Number Verification via Cross-Reference File",
+                "rule_description": "Every transaction's card number must be verified by performing a keyed lookup in the Card Cross-Reference File to confirm the card is known and to retrieve the associated Account ID and Customer ID.",
+                "sub_graph_node_text": "_4: Card Number Cross-Reference Lookup_",
+                "acceptance_criteria": {
+                    "Given": "A daily transaction record has been read and its Card Number (DALYTRAN-CARD-NUM) is available",
+                    "When": "The Card Number is used as the key to look up a matching record in the Card Cross-Reference File (XREF-FILE)",
+                    "Then": "If found, the Cross-Reference record is retrieved containing the Card Number (XREF-CARD-NUM), Account ID (XREF-ACCT-ID), and Customer ID (XREF-CUST-ID), and these details are displayed; the cross-reference read status is set to success (0)"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00005",
+                "rule_type": "Decision Rules",
+                "rule_name": "Transaction Skipped When Card Number Cannot Be Verified",
+                "rule_description": "If a transaction's card number is not found in the Card Cross-Reference File, the transaction cannot be validated and must be skipped entirely, with a warning logged identifying the unverifiable card and the skipped transaction.",
+                "sub_graph_node_text": "_8: Transaction Skipping_",
+                "acceptance_criteria": {
+                    "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and Transaction ID (DALYTRAN-ID)",
+                    "When": "The Card Number lookup in the Cross-Reference File returns an invalid key (card number not found), setting the cross-reference read status to a non-zero value (4)",
+                    "Then": "A warning message is logged stating 'CARD NUMBER [DALYTRAN-CARD-NUM] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[DALYTRAN-ID]', the transaction is not processed further, and the program moves on to the next transaction record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00006",
+                "rule_type": "Action Rules",
+                "rule_name": "Account Record Retrieval Using Account ID from Cross-Reference",
+                "rule_description": "When a card number is successfully verified through the Cross-Reference File, the associated Account ID is used to retrieve the full account record from the Account File.",
+                "sub_graph_node_text": "_6: Account Record Retrieval_",
+                "acceptance_criteria": {
+                    "Given": "The Card Number has been successfully verified in the Cross-Reference File and the Account ID (XREF-ACCT-ID) has been retrieved",
+                    "When": "The Account ID is used as the key to perform a keyed lookup in the Account File (ACCOUNT-FILE)",
+                    "Then": "If the account exists, the full Account Record is retrieved and a success message 'SUCCESSFUL READ OF ACCOUNT FILE' is displayed; the account read status is set to success (0)"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00007",
+                "rule_type": "Validation Rules",
+                "rule_name": "Account Not Found Warning After Verified Card Lookup",
+                "rule_description": "If the Account ID retrieved from the Cross-Reference File does not correspond to any existing account in the Account File, a warning is issued identifying the missing account.",
+                "sub_graph_node_text": "_7: Account Validation_",
+                "acceptance_criteria": {
+                    "Given": "The card number was successfully verified in the Cross-Reference File and an Account ID (ACCT-ID) was retrieved",
+                    "When": "The keyed lookup of the Account ID in the Account File returns an invalid key (account not found), setting the account read status to a non-zero value (4)",
+                    "Then": "A warning message 'ACCOUNT [ACCT-ID] NOT FOUND' is displayed, and the program continues to process the next transaction record without further processing of the current transaction"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00008",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Initialization - Open All Required Files",
+                "rule_description": "Before any transaction processing begins, all six required files must be successfully opened: Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File.",
+                "sub_graph_node_text": "_1: Program Initialization_",
+                "acceptance_criteria": {
+                    "Given": "The program CBTRN01C is starting execution",
+                    "When": "The program initializes and attempts to open all required files in sequence: Daily Transaction File (DALYTRAN-FILE), Customer File (CUSTOMER-FILE), Card Cross-Reference File (XREF-FILE), Card File (CARD-FILE), Account File (ACCOUNT-FILE), and Transaction File (TRANSACT-FILE)",
+                    "Then": "All six files are successfully opened and available for processing; if any file fails to open, the program halts immediately with an error message identifying the specific file that could not be opened"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBTRN01C-cbl-00009",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Finalization - Close All Files After Processing",
+                "rule_description": "After all daily transaction records have been processed (end-of-file reached), all six files must be properly closed in sequence before the program ends.",
+                "sub_graph_node_text": "_10: Program Finalization_",
+                "acceptance_criteria": {
+                    "Given": "The end-of-file condition has been detected on the Daily Transaction File and the processing loop has ended",
+                    "When": "The program proceeds to finalize by closing all files in sequence: Daily Transaction File (DALYTRAN-FILE), Customer File (CUSTOMER-FILE), Card Cross-Reference File (XREF-FILE), Card File (CARD-FILE), Account File (ACCOUNT-FILE), and Transaction File (TRANSACT-FILE)",
+                    "Then": "All six files are successfully closed; if any file fails to close, an error message identifying the specific file is displayed, and the program halts; upon successful closure of all files, the program ends normally"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "program-initialization",
+            "title": "Program Initialization",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Program Initialization\\nStart])\n\n    B[Open Daily Transaction File]\n    B_OK{Opened\\nSuccessfully?}\n\n    C[Open Customer File]\n    C_OK{Opened\\nSuccessfully?}\n\n    D[Open Card Cross-Reference File]\n    D_OK{Opened\\nSuccessfully?}\n\n    E[Open Card File]\n    E_OK{Opened\\nSuccessfully?}\n\n    F[Open Account File]\n    F_OK{Opened\\nSuccessfully?}\n\n    G[Open Transaction File]\n    G_OK{Opened\\nSuccessfully?}\n\n    STOP([Program Cannot Continue\\nInitialization Failed])\n    END([All Files Opened Successfully\\nReady to Process Transactions])\n\n    A --> B\n    B --> B_OK\n    B_OK -->|Yes| C\n    B_OK -->|No - Daily Transaction\\nFile Unavailable| STOP\n\n    C --> C_OK\n    C_OK -->|Yes| D\n    C_OK -->|No - Customer\\nFile Unavailable| STOP\n\n    D --> D_OK\n    D_OK -->|Yes| E\n    D_OK -->|No - Cross-Reference\\nFile Unavailable| STOP\n\n    E --> E_OK\n    E_OK -->|Yes| F\n    E_OK -->|No - Card\\nFile Unavailable| STOP\n\n    F --> F_OK\n    F_OK -->|Yes| G\n    F_OK -->|No - Account\\nFile Unavailable| STOP\n\n    G --> G_OK\n    G_OK -->|Yes| END\n    G_OK -->|No - Transaction\\nFile Unavailable| STOP",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00010",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Daily Transaction File Must Be Available at Program Start",
+                    "rule_description": "The program must successfully open the Daily Transaction File as the first step of initialization. If the file is unavailable, the program cannot continue and must stop immediately.",
+                    "sub_graph_node_text": "Open Daily Transaction File",
+                    "acceptance_criteria": {
+                        "Given": "The program CBTRN01C is starting its initialization sequence",
+                        "When": "The program attempts to open the Daily Transaction File for reading",
+                        "Then": "If the Daily Transaction File opens successfully, the program proceeds to open the Customer File. If the Daily Transaction File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING DAILY TRANSACTION FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00011",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Customer File Must Be Available at Program Start",
+                    "rule_description": "After successfully opening the Daily Transaction File, the program must successfully open the Customer File. If the Customer File is unavailable, the program cannot continue and must stop immediately.",
+                    "sub_graph_node_text": "Open Customer File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File has been successfully opened",
+                        "When": "The program attempts to open the Customer File for reading",
+                        "Then": "If the Customer File opens successfully, the program proceeds to open the Card Cross-Reference File. If the Customer File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CUSTOMER FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00012",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Card Cross-Reference File Must Be Available at Program Start",
+                    "rule_description": "After successfully opening the Customer File, the program must successfully open the Card Cross-Reference File. This file is critical for linking card numbers to accounts and customers. If unavailable, the program cannot continue.",
+                    "sub_graph_node_text": "Open Card Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File and Customer File have both been successfully opened",
+                        "When": "The program attempts to open the Card Cross-Reference File for reading",
+                        "Then": "If the Card Cross-Reference File opens successfully, the program proceeds to open the Card File. If the Card Cross-Reference File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CROSS REF FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00013",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Card File Must Be Available at Program Start",
+                    "rule_description": "After successfully opening the Card Cross-Reference File, the program must successfully open the Card File. If the Card File is unavailable, the program cannot continue and must stop immediately.",
+                    "sub_graph_node_text": "Open Card File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File, Customer File, and Card Cross-Reference File have all been successfully opened",
+                        "When": "The program attempts to open the Card File for reading",
+                        "Then": "If the Card File opens successfully, the program proceeds to open the Account File. If the Card File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CARD FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00014",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Account File Must Be Available at Program Start",
+                    "rule_description": "After successfully opening the Card File, the program must successfully open the Account File. This file is required to validate account details linked to card transactions. If unavailable, the program cannot continue.",
+                    "sub_graph_node_text": "Open Account File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File, Customer File, Card Cross-Reference File, and Card File have all been successfully opened",
+                        "When": "The program attempts to open the Account File for reading",
+                        "Then": "If the Account File opens successfully, the program proceeds to open the Transaction File. If the Account File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING ACCOUNT FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00015",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transaction File Must Be Available at Program Start",
+                    "rule_description": "After successfully opening the Account File, the program must successfully open the Transaction File as the final step of initialization. If unavailable, the program cannot continue and must stop immediately.",
+                    "sub_graph_node_text": "Open Transaction File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File, Customer File, Card Cross-Reference File, Card File, and Account File have all been successfully opened",
+                        "When": "The program attempts to open the Transaction File for reading",
+                        "Then": "If the Transaction File opens successfully, all six required files are available and the program is ready to begin processing daily transactions. If the Transaction File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING TRANSACTION FILE', displays the file status details, and terminates immediately without processing any transactions."
+                    },
+                    "key_functionality_id": "program-initialization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00016",
+                    "rule_type": "Policy Rules",
+                    "rule_name": "All Required Files Must Be Successfully Opened Before Transaction Processing Begins",
+                    "rule_description": "All six required business files \u2014 Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File \u2014 must be successfully opened in sequence before any transaction processing can begin. Failure to open any single file prevents the entire program from running.",
+                    "sub_graph_node_text": "All Files Opened Successfully\nReady to Process Transactions",
+                    "acceptance_criteria": {
+                        "Given": "The program CBTRN01C has been initiated and is in the initialization phase",
+                        "When": "The program sequentially attempts to open all six required files: Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File",
+                        "Then": "Only when all six files are opened successfully does the program proceed to transaction processing. If any one of the six files fails to open, the program immediately logs the corresponding error message for that file, displays the file status details, and terminates \u2014 preventing any transaction processing from occurring."
+                    },
+                    "key_functionality_id": "program-initialization"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Initialization"
+        },
+        {
+            "id": "daily-transaction-record-reading",
+            "title": "Daily Transaction Record Reading",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Read Next\\nDaily Transaction Record])\n    B[Read Next Record from\\nDaily Transaction File]\n    C{Was Record\\nRead Successfully?}\n    D[Record Available\\nfor Processing]\n    E{Is it End\\nof File?}\n    F[Mark End-of-File Flag\\nas 'Y'\\nStop Processing Loop]\n    G([Return to\\nMain Processing])\n\n    A --> B\n    B --> C\n    C -->|Yes - Record Read OK| D\n    D --> G\n    C -->|No - Read Issue| E\n    E -->|Yes - No More Records| F\n    F --> G\n    E -->|No - Unexpected Issue| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00017",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Reading of Daily Transaction Records",
+                    "rule_description": "The program reads daily transaction records one at a time, sequentially from the Daily Transaction File, to process each card transaction.",
+                    "sub_graph_node_text": "Read Next Record from Daily Transaction File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File has been opened successfully and the end-of-file flag is set to 'N' (not yet reached end of file)",
+                        "When": "The program requests the next transaction record from the Daily Transaction File",
+                        "Then": "The next available daily transaction record is read and loaded into the transaction record buffer for further processing"
+                    },
+                    "key_functionality_id": "daily-transaction-record-reading"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00018",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Successful Transaction Record Read Confirmation",
+                    "rule_description": "After attempting to read a daily transaction record, the program confirms whether the record was retrieved successfully and is available for processing.",
+                    "sub_graph_node_text": "Was Record Read Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Daily Transaction File",
+                        "When": "The Daily Transaction File returns a successful read status (no errors, no end-of-file condition)",
+                        "Then": "The transaction record is confirmed as successfully read and made available for downstream processing steps including card number verification and account lookup"
+                    },
+                    "key_functionality_id": "daily-transaction-record-reading"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00019",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display of Successfully Read Transaction Record",
+                    "rule_description": "When a daily transaction record is successfully read, its full content is displayed to confirm the record is available and ready for processing.",
+                    "sub_graph_node_text": "Record Available for Processing",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been successfully read from the Daily Transaction File",
+                        "When": "The end-of-file flag remains 'N' after the read operation",
+                        "Then": "The full content of the daily transaction record is displayed, confirming the record is available for card verification and account lookup processing"
+                    },
+                    "key_functionality_id": "daily-transaction-record-reading"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00020",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Detection on Daily Transaction File",
+                    "rule_description": "When no more transaction records are available in the Daily Transaction File, the program detects the end-of-file condition and marks the processing loop to stop.",
+                    "sub_graph_node_text": "Is it End of File?",
+                    "acceptance_criteria": {
+                        "Given": "A read operation has been performed on the Daily Transaction File and the read was not successful",
+                        "When": "The Daily Transaction File signals that there are no more records to read (end-of-file condition is reached)",
+                        "Then": "The end-of-file flag is set to 'Y', which causes the main processing loop to stop and no further transaction records are read or processed"
+                    },
+                    "key_functionality_id": "daily-transaction-record-reading"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00021",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Stop Processing Loop When All Transactions Are Consumed",
+                    "rule_description": "Once the end-of-file condition is confirmed on the Daily Transaction File, the program sets a flag to terminate the transaction processing loop, ensuring all records have been processed.",
+                    "sub_graph_node_text": "Mark End-of-File Flag as 'Y' Stop Processing Loop",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File has signaled that no more records are available (end-of-file detected)",
+                        "When": "The end-of-file condition is confirmed after an unsuccessful read attempt",
+                        "Then": "The end-of-file flag is set to 'Y', the processing loop exits, and no further daily transaction records are read; the program proceeds to close all files and end execution"
+                    },
+                    "key_functionality_id": "daily-transaction-record-reading"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Daily Transaction Record Reading"
+        },
+        {
+            "id": "transaction-display",
+            "title": "Transaction Display",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Transaction Display])\n    B{Was Daily Transaction\\nRecord Successfully Read?\\nEnd-of-File = No?}\n    C[Display Full Transaction\\nRecord Details]\n    D([End: Proceed to\\nCard Verification])\n    E([End: Skip Display\\nEnd of File Reached])\n\n    A --> B\n    B -->|Yes - Record Successfully Read| C\n    C --> D\n    B -->|No - End of File Detected| E",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00022",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Daily Transaction Record After Successful Read",
+                    "rule_description": "After each daily transaction record is successfully read from the Daily Transaction file (i.e., end-of-file has not been reached), the full transaction record details are displayed for visibility and audit purposes. If the end-of-file condition is detected after the read attempt, the display step is skipped.",
+                    "sub_graph_node_text": "Display Full Transaction Record Details",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction file is open and being processed sequentially, and the system has just attempted to read the next transaction record",
+                        "When": "The read operation completes and the end-of-file indicator remains 'No' (meaning a valid transaction record was successfully retrieved)",
+                        "Then": "The complete details of the daily transaction record \u2014 including all fields such as Card Number, Transaction ID, and any other transaction data \u2014 must be displayed in full for audit and visibility purposes; if the end-of-file indicator is 'Yes' after the read, no transaction record is displayed and processing moves to the next stage"
+                    },
+                    "key_functionality_id": "transaction-display"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Transaction Display"
+        },
+        {
+            "id": "card-number-cross",
+            "title": "Card Number Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Card Number\\nCross-Reference Lookup])\n    B[Extract Card Number\\nfrom Daily Transaction Record]\n    C[Search Card Cross-Reference File\\nUsing Transaction Card Number]\n    D{Card Number\\nFound in\\nCross-Reference File?}\n    E[Retrieve Associated\\nAccount ID and Customer ID\\nfrom Cross-Reference Record]\n    F[Display Card Number,\\nAccount ID and Customer ID\\nfor Audit Visibility]\n    G[Mark Cross-Reference\\nLookup as Successful]\n    H[Mark Cross-Reference\\nLookup as Failed]\n    I([End: Return Lookup Result\\nto Transaction Processing])\n\n    XREF_FILE[(Card Cross-Reference File\\nXREF-FILE\\nVSAM KSDS)]\n\n    A --> B\n    B --> C\n    XREF_FILE -.->|Keyed Lookup\\nby Card Number| C\n    C --> D\n    D -->|Yes - Card Number Matched| E\n    E --> F\n    F --> G\n    G --> I\n    D -->|No - Card Number Not Found| H\n    H --> I",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00023",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Extract Card Number from Daily Transaction for Cross-Reference Lookup",
+                    "rule_description": "Before performing a cross-reference lookup, the card number must be extracted from the current daily transaction record and prepared as the search key for the Card Cross-Reference File.",
+                    "sub_graph_node_text": "Extract Card Number from Daily Transaction Record",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been successfully read from the Daily Transaction File and contains a Card Number",
+                        "When": "The system prepares to validate the transaction by initiating a Card Cross-Reference lookup",
+                        "Then": "The Card Number from the daily transaction record (DALYTRAN-CARD-NUM) is extracted and set as the lookup key (XREF-CARD-NUM) to be used for searching the Card Cross-Reference File"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00024",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Search Card Cross-Reference File by Card Number",
+                    "rule_description": "The Card Cross-Reference File must be searched using the transaction's card number as the key to retrieve the associated Account ID and Customer ID. The lookup is a direct keyed search on the Card Cross-Reference File.",
+                    "sub_graph_node_text": "Search Card Cross-Reference File Using Transaction Card Number",
+                    "acceptance_criteria": {
+                        "Given": "The card number from the daily transaction has been extracted and set as the search key",
+                        "When": "The system performs a keyed lookup on the Card Cross-Reference File using the transaction's Card Number as the search key",
+                        "Then": "The Card Cross-Reference File is searched directly by Card Number; the result is either a matched record containing Account ID and Customer ID, or a not-found condition indicating the card number does not exist in the Cross-Reference File"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00025",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Determine if Card Number Exists in Cross-Reference File",
+                    "rule_description": "After searching the Card Cross-Reference File, the system must determine whether the card number was successfully matched. This decision drives whether the transaction proceeds to account lookup or is flagged as unverifiable.",
+                    "sub_graph_node_text": "Card Number Found in Cross-Reference File?",
+                    "acceptance_criteria": {
+                        "Given": "A keyed lookup has been performed on the Card Cross-Reference File using the transaction's Card Number",
+                        "When": "The system evaluates the result of the Cross-Reference File search",
+                        "Then": "If the Card Number is found (lookup status = successful / not invalid key), the system proceeds to retrieve the Account ID and Customer ID from the matched record; if the Card Number is NOT found (invalid key condition), the system marks the cross-reference lookup as failed and the transaction cannot be verified"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00026",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Retrieve Account ID and Customer ID from Cross-Reference Record",
+                    "rule_description": "When a card number is successfully matched in the Cross-Reference File, the associated Account ID and Customer ID must be retrieved from the matched cross-reference record for use in subsequent account validation.",
+                    "sub_graph_node_text": "Retrieve Associated Account ID and Customer ID from Cross-Reference Record",
+                    "acceptance_criteria": {
+                        "Given": "The Card Number from the daily transaction has been found in the Card Cross-Reference File",
+                        "When": "The system reads the matched Cross-Reference record",
+                        "Then": "The Account ID (XREF-ACCT-ID) and Customer ID (XREF-CUST-ID) linked to the matched Card Number are retrieved from the Cross-Reference record and made available for subsequent account lookup and audit display"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00027",
+                    "rule_type": "Policy Rules",
+                    "rule_name": "Display Card Number, Account ID and Customer ID for Audit Visibility",
+                    "rule_description": "Upon a successful cross-reference lookup, the Card Number, Account ID, and Customer ID retrieved from the Cross-Reference File must be displayed to provide an audit trail of the card-to-account mapping used during transaction processing.",
+                    "sub_graph_node_text": "Display Card Number, Account ID and Customer ID for Audit Visibility",
+                    "acceptance_criteria": {
+                        "Given": "The Card Number has been successfully found in the Card Cross-Reference File and the associated Account ID and Customer ID have been retrieved",
+                        "When": "The system confirms a successful cross-reference match",
+                        "Then": "The system displays the following information for audit visibility: a confirmation message 'SUCCESSFUL READ OF XREF', the matched Card Number (XREF-CARD-NUM), the associated Account ID (XREF-ACCT-ID), and the associated Customer ID (XREF-CUST-ID)"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00028",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Mark Cross-Reference Lookup as Successful",
+                    "rule_description": "When the card number is found in the Cross-Reference File, the lookup result must be marked as successful so that downstream processing (account lookup) can proceed for this transaction.",
+                    "sub_graph_node_text": "Mark Cross-Reference Lookup as Successful",
+                    "acceptance_criteria": {
+                        "Given": "The Card Number from the daily transaction has been found in the Card Cross-Reference File and Account ID and Customer ID have been retrieved",
+                        "When": "The cross-reference lookup completes with a successful match",
+                        "Then": "The Cross-Reference lookup status remains at its initialized successful value (WS-XREF-READ-STATUS = 0), signaling to the transaction processing flow that the card has been verified and account lookup should proceed"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00029",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Mark Cross-Reference Lookup as Failed When Card Number Not Found",
+                    "rule_description": "When the card number from the daily transaction cannot be found in the Card Cross-Reference File, the lookup must be marked as failed to prevent further processing of the unverifiable transaction.",
+                    "sub_graph_node_text": "Mark Cross-Reference Lookup as Failed",
+                    "acceptance_criteria": {
+                        "Given": "A keyed lookup has been performed on the Card Cross-Reference File using the transaction's Card Number",
+                        "When": "The Card Number is NOT found in the Card Cross-Reference File (invalid key condition is triggered)",
+                        "Then": "The system displays the message 'INVALID CARD NUMBER FOR XREF' and sets the Cross-Reference lookup status to failed (WS-XREF-READ-STATUS = 4), which signals to the transaction processing flow that the card could not be verified and the transaction must be skipped"
+                    },
+                    "key_functionality_id": "card-number-cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card Number Cross"
+        },
+        {
+            "id": "card-number-validation",
+            "title": "Card Number Validation",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start:\\nCard Number Validation])\n    B[Extract Card Number\\nfrom Daily Transaction Record]\n    C[Search Card Number\\nin Cross-Reference File]\n    D{Card Number\\nFound in\\nCross-Reference File?}\n    E[Retrieve Associated\\nAccount ID and Customer ID\\nfrom Cross-Reference Record]\n    F[Log Message:\\n'Card Number XXXX Could Not Be Verified']\n    G[Log Skipped Transaction ID:\\n'Skipping Transaction ID-XXXX']\n    H([End:\\nCard Verified\\nProceed to Account Retrieval])\n    I([End:\\nTransaction Skipped])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes - Card Found| E\n    E --> H\n    D -->|No - Card Not Found| F\n    F --> G\n    G --> I",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00030",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Extract Card Number from Daily Transaction for Cross-Reference Lookup",
+                    "rule_description": "Before validating a card, the card number must be extracted from the current daily transaction record and prepared as the search key for the Cross-Reference File lookup.",
+                    "sub_graph_node_text": "Extract Card Number\nfrom Daily Transaction Record",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been successfully read from the Daily Transaction File and contains a Card Number",
+                        "When": "The system prepares to validate the transaction's card number",
+                        "Then": "The Card Number from the daily transaction record is extracted and set as the search key to be used for the Cross-Reference File lookup"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00031",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Search Card Number in Cross-Reference File",
+                    "rule_description": "The system must look up the card number extracted from the daily transaction in the Cross-Reference File to determine whether the card is recognized and can be linked to an account and customer.",
+                    "sub_graph_node_text": "Search Card Number\nin Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "A Card Number has been extracted from the daily transaction record and set as the search key",
+                        "When": "The system performs a direct lookup of the Card Number in the Cross-Reference File",
+                        "Then": "The Cross-Reference File is searched using the Card Number as the unique key, and the result indicates either a successful match or no match found"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00032",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Determine if Card Number Exists in Cross-Reference File",
+                    "rule_description": "After searching the Cross-Reference File, the system must evaluate whether the card number was found. This decision determines whether the transaction proceeds to account retrieval or is skipped entirely.",
+                    "sub_graph_node_text": "Card Number\nFound in\nCross-Reference File?",
+                    "acceptance_criteria": {
+                        "Given": "A lookup of the Card Number has been performed against the Cross-Reference File",
+                        "When": "The system evaluates the result of the Cross-Reference File search",
+                        "Then": "If the Card Number is found in the Cross-Reference File, the transaction proceeds to account and customer retrieval; if the Card Number is NOT found in the Cross-Reference File, the transaction is flagged as unverifiable and skipped"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00033",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Retrieve Account ID and Customer ID from Cross-Reference Record",
+                    "rule_description": "When a card number is successfully verified in the Cross-Reference File, the system retrieves the associated Account ID and Customer ID from the matched Cross-Reference record, enabling subsequent account validation.",
+                    "sub_graph_node_text": "Retrieve Associated\nAccount ID and Customer ID\nfrom Cross-Reference Record",
+                    "acceptance_criteria": {
+                        "Given": "The Card Number from the daily transaction has been found in the Cross-Reference File",
+                        "When": "The Cross-Reference record is successfully retrieved",
+                        "Then": "The Account ID and Customer ID linked to the Card Number are extracted from the Cross-Reference record and made available for the subsequent account lookup step"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00034",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Log Card Number Verification Failure Message",
+                    "rule_description": "When a card number from a daily transaction cannot be found in the Cross-Reference File, the system must log a warning message identifying the specific card number that failed verification.",
+                    "sub_graph_node_text": "Log Message:\n'Card Number XXXX Could Not Be Verified'",
+                    "acceptance_criteria": {
+                        "Given": "A lookup of the Card Number from the daily transaction was performed against the Cross-Reference File",
+                        "When": "The Card Number is NOT found in the Cross-Reference File",
+                        "Then": "The system logs a warning message stating 'CARD NUMBER [Card Number] COULD NOT BE VERIFIED' identifying the specific unrecognized card number"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00035",
+                    "rule_type": "Policy Rules",
+                    "rule_name": "Log Skipped Transaction ID When Card Cannot Be Verified",
+                    "rule_description": "When a card number cannot be verified, the associated transaction must be skipped and the Transaction ID must be logged to provide a complete audit trail of which transactions were not processed.",
+                    "sub_graph_node_text": "Log Skipped Transaction ID:\n'Skipping Transaction ID-XXXX'",
+                    "acceptance_criteria": {
+                        "Given": "The Card Number from the daily transaction was NOT found in the Cross-Reference File and a card verification failure message has been logged",
+                        "When": "The system determines the transaction cannot be processed due to an unverifiable card number",
+                        "Then": "The system logs an additional message 'SKIPPING TRANSACTION ID-[Transaction ID]' identifying the specific Transaction ID that is being skipped, and the transaction is not forwarded for further processing"
+                    },
+                    "key_functionality_id": "card-number-validation"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Card Number Validation"
+        },
+        {
+            "id": "account-record-retrieval",
+            "title": "Account Record Retrieval",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start:\\nAccount Record Retrieval])\n    B[Use Account ID obtained\\nfrom Cross-Reference Lookup]\n    C[(Account File\\nACCOUNT-FILE\\nVSAM KSDS)]\n    D[Search Account File\\nUsing Account ID as Key]\n    E{Account Record\\nFound?}\n    F[Retrieve Account Details\\ninto Account Record]\n    G[Display: Account Successfully Retrieved]\n    H[Display: Account Not Found\\nfor Account ID]\n    I([End:\\nAccount Record Retrieval])\n\n    A --> B\n    B --> D\n    D -->|Keyed Read by Account ID| C\n    C --> E\n    E -->|Yes - Valid Account| F\n    F --> G\n    G --> I\n    E -->|No - Invalid Account ID| H\n    H --> I",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00036",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Account ID Must Be Sourced from Cross-Reference Lookup Result",
+                    "rule_description": "The Account ID used to retrieve account details must always be the one obtained from a successful Cross-Reference lookup. Account retrieval is only triggered when the Cross-Reference lookup has succeeded.",
+                    "sub_graph_node_text": "Use Account ID obtained from Cross-Reference Lookup",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction has been read and its card number has been successfully verified through the Cross-Reference file, yielding a valid Account ID",
+                        "When": "The system prepares to retrieve account details",
+                        "Then": "The Account ID obtained from the Cross-Reference record must be used as the key to look up the account, and no account lookup should be attempted unless the Cross-Reference lookup was successful"
+                    },
+                    "key_functionality_id": "account-record-retrieval"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00037",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Account Record Lookup Using Account ID as Search Key",
+                    "rule_description": "The Account File must be searched using the Account ID as the unique key to retrieve the corresponding account record. The Account File is a keyed file where each account is uniquely identified by its Account ID.",
+                    "sub_graph_node_text": "Search Account File Using Account ID as Key",
+                    "acceptance_criteria": {
+                        "Given": "A valid Account ID has been obtained from the Cross-Reference file for a given card number",
+                        "When": "The system performs a keyed lookup on the Account File using the Account ID",
+                        "Then": "The system must search the Account File using the Account ID as the unique search key to locate the matching account record"
+                    },
+                    "key_functionality_id": "account-record-retrieval"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00038",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Successful Account Record Retrieval",
+                    "rule_description": "When the Account File lookup finds a matching record for the given Account ID, the full account details are retrieved and made available for further processing.",
+                    "sub_graph_node_text": "Retrieve Account Details into Account Record",
+                    "acceptance_criteria": {
+                        "Given": "A keyed lookup has been performed on the Account File using a valid Account ID",
+                        "When": "The Account File contains a record matching the provided Account ID",
+                        "Then": "The account details are successfully retrieved into the Account Record and the system confirms successful retrieval of the account"
+                    },
+                    "key_functionality_id": "account-record-retrieval"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00039",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Account Not Found for Given Account ID",
+                    "rule_description": "When the Account File does not contain a record matching the Account ID obtained from the Cross-Reference lookup, the system must flag this as an unresolved account and display a warning identifying the missing Account ID.",
+                    "sub_graph_node_text": "Display: Account Not Found for Account ID",
+                    "acceptance_criteria": {
+                        "Given": "A keyed lookup has been performed on the Account File using an Account ID obtained from the Cross-Reference file",
+                        "When": "No matching account record is found in the Account File for the given Account ID",
+                        "Then": "The system must display a warning message stating 'ACCOUNT [Account ID] NOT FOUND', identifying the specific Account ID that could not be located, and continue processing the remaining daily transactions without stopping"
+                    },
+                    "key_functionality_id": "account-record-retrieval"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Account Record Retrieval"
+        },
+        {
+            "id": "account-validation",
+            "title": "Account Validation",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Account Validation\\nStart]) \n    B[Use Account ID obtained\\nfrom Cross-Reference Lookup]\n    C[Search Account File\\nusing Account ID]\n    D{Account ID\\nFound in\\nAccount File?}\n    E[Account Record\\nSuccessfully Retrieved]\n    F[Display Message:\\n'ACCOUNT - NOT FOUND']\n    G([Return to\\nTransaction Processing])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes - Account Exists| E\n    D -->|No - Account Does Not Exist| F\n    E --> G\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00040",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Account ID Must Be Sourced from Cross-Reference Lookup",
+                    "rule_description": "The Account ID used to search the Account File must be the one retrieved from the Card Cross-Reference record, ensuring the account lookup is always driven by the verified card-to-account mapping.",
+                    "sub_graph_node_text": "Use Account ID obtained from Cross-Reference Lookup",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction has been processed through the Card Cross-Reference lookup and a valid Cross-Reference record has been found containing an Account ID linked to the transaction's card number",
+                        "When": "The system prepares to validate the account associated with the transaction",
+                        "Then": "The Account ID retrieved from the Cross-Reference record (XREF-ACCT-ID) must be used as the key to search the Account File, and no other source of Account ID is permitted for this lookup"
+                    },
+                    "key_functionality_id": "account-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00041",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Account File Must Be Searched Using the Cross-Reference Account ID",
+                    "rule_description": "The system must perform a direct keyed lookup against the Account File using the Account ID obtained from the Cross-Reference record to determine whether the account exists and retrieve its details.",
+                    "sub_graph_node_text": "Search Account File using Account ID",
+                    "acceptance_criteria": {
+                        "Given": "The Account ID has been obtained from the Cross-Reference record and is ready for account validation",
+                        "When": "The system searches the Account File using the Account ID as the search key",
+                        "Then": "The system must perform a direct keyed search of the Account File using the Account ID, and the result must indicate either that the account record was successfully found and retrieved, or that no matching account exists for the given Account ID"
+                    },
+                    "key_functionality_id": "account-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00042",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Valid Account Record Must Be Retrieved When Account Exists",
+                    "rule_description": "When the Account ID is found in the Account File, the full account record must be successfully retrieved and made available for further transaction processing.",
+                    "sub_graph_node_text": "Account Record Successfully Retrieved",
+                    "acceptance_criteria": {
+                        "Given": "The system has searched the Account File using the Account ID obtained from the Cross-Reference record",
+                        "When": "The Account ID is found in the Account File",
+                        "Then": "The full account record is successfully retrieved into the Account Record, the account read status remains at its initial successful state, and processing continues normally for the transaction"
+                    },
+                    "key_functionality_id": "account-validation"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Transaction With Unresolvable Account Must Be Flagged",
+                    "rule_description": "When the Account ID obtained from the Cross-Reference lookup does not match any record in the Account File, the system must flag the transaction by displaying an account-not-found message, and then continue processing the remaining transactions without stopping.",
+                    "sub_graph_node_text": "Display Message: 'ACCOUNT - NOT FOUND'",
+                    "acceptance_criteria": {
+                        "Given": "The system has searched the Account File using the Account ID obtained from the Cross-Reference record, and the card number was previously verified successfully through the Cross-Reference lookup",
+                        "When": "The Account ID is not found in the Account File, resulting in a failed account lookup",
+                        "Then": "The system must display the message 'ACCOUNT [Account ID] NOT FOUND' identifying the specific Account ID that could not be located, and then return to the transaction processing loop to continue processing the next daily transaction without terminating the program"
+                    },
+                    "key_functionality_id": "account-validation"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Account Validation"
+        },
+        {
+            "id": "transaction-skipping",
+            "title": "Transaction Skipping",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Card Number\\nVerification Check])\n    B{Was Card Number\\nFound in\\nCross-Reference File?}\n    C[/Log Message:\\nCard Number Could Not Be Verified/]\n    D[/Log Skipped\\nTransaction ID/]\n    E([Skip Transaction\\nProceed to Next Record])\n    F([Continue to\\nAccount Processing])\n\n    A --> B\n    B -->|No - Card Not Found\\nin Cross-Reference File| C\n    C --> D\n    D --> E\n    B -->|Yes - Card Verified\\nSuccessfully| F",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00044",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Card Number Must Exist in Cross-Reference File for Transaction Processing",
+                    "rule_description": "Every daily transaction card number must be validated against the Card Cross-Reference File before any further processing can occur. The card number from the daily transaction record is used as the lookup key.",
+                    "sub_graph_node_text": "Was Card Number Found in Cross-Reference File?",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been read from the Daily Transaction File, and the transaction contains a Card Number",
+                        "When": "The Card Number from the daily transaction is looked up in the Card Cross-Reference File using the Card Number as the search key",
+                        "Then": "If the Card Number is found in the Cross-Reference File, the transaction is marked as verified and processing continues to Account lookup; if the Card Number is NOT found in the Cross-Reference File, the transaction is marked as unverified and must be skipped"
+                    },
+                    "key_functionality_id": "transaction-skipping"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00045",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Log Warning Message When Card Number Cannot Be Verified",
+                    "rule_description": "When a card number from a daily transaction cannot be found in the Card Cross-Reference File, a warning message must be logged identifying the specific card number that failed verification.",
+                    "sub_graph_node_text": "Log Message: Card Number Could Not Be Verified",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been read and its Card Number has been looked up in the Card Cross-Reference File",
+                        "When": "The Card Number is NOT found in the Card Cross-Reference File (card verification fails)",
+                        "Then": "A warning message is logged stating 'CARD NUMBER [Card Number] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[Transaction ID]', identifying both the unverified card number and the transaction ID being skipped"
+                    },
+                    "key_functionality_id": "transaction-skipping"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00046",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Log Skipped Transaction ID for Unverified Card Transactions",
+                    "rule_description": "When a transaction is skipped due to an unverified card number, the Transaction ID of the skipped transaction must be recorded in the log message to provide a complete audit trail of which transactions were not processed.",
+                    "sub_graph_node_text": "Log Skipped Transaction ID",
+                    "acceptance_criteria": {
+                        "Given": "A card number from a daily transaction has failed verification against the Card Cross-Reference File",
+                        "When": "The warning message for the unverified card is being logged",
+                        "Then": "The Transaction ID (DALYTRAN-ID) of the skipped transaction is included in the log message alongside the unverified Card Number, so that the specific skipped transaction can be identified for review"
+                    },
+                    "key_functionality_id": "transaction-skipping"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00047",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Skip Transaction and Proceed to Next Record When Card Cannot Be Verified",
+                    "rule_description": "A daily transaction whose card number cannot be verified in the Cross-Reference File must be entirely skipped \u2014 no account lookup or further processing is performed \u2014 and the program must move on to process the next transaction in the Daily Transaction File.",
+                    "sub_graph_node_text": "Skip Transaction Proceed to Next Record",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been read, its Card Number has been looked up in the Card Cross-Reference File, and the Card Number was NOT found",
+                        "When": "The card verification failure is confirmed and the warning message has been logged",
+                        "Then": "All further processing for that transaction (including Account lookup) is bypassed entirely, and the program proceeds to read and process the next record from the Daily Transaction File without any account or customer updates for the skipped transaction"
+                    },
+                    "key_functionality_id": "transaction-skipping"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00048",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue to Account Processing When Card Is Successfully Verified",
+                    "rule_description": "When a card number from a daily transaction is successfully found and verified in the Card Cross-Reference File, the transaction is eligible for further processing, and the Account ID linked to that card is used to look up the full account details.",
+                    "sub_graph_node_text": "Continue to Account Processing",
+                    "acceptance_criteria": {
+                        "Given": "A daily transaction record has been read and its Card Number has been looked up in the Card Cross-Reference File",
+                        "When": "The Card Number IS found in the Card Cross-Reference File (card verification succeeds), and the Cross-Reference record returns the linked Account ID and Customer ID",
+                        "Then": "The Account ID retrieved from the Cross-Reference record is used to look up the account in the Account File, and processing continues to the account validation step"
+                    },
+                    "key_functionality_id": "transaction-skipping"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Transaction Skipping"
+        },
+        {
+            "id": "end",
+            "title": "End",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Begin Transaction\\nProcessing Loop]) \n    B{Is End-of-File\\nFlag = 'Y'?}\n    C[Read Next Daily\\nTransaction Record]\n    D{Was Read\\nSuccessful?}\n    E[Process\\nTransaction Record]\n    F[Set End-of-File\\nFlag to 'Y']\n    G([Stop Processing Loop\\nProceed to Close Files])\n\n    A --> B\n    B -->|No - More Records\\nMay Exist| C\n    C --> D\n    D -->|Yes - Record Retrieved\\nSuccessfully| E\n    E --> B\n    D -->|No - No More Records\\nEnd of File Reached| F\n    F --> B\n    B -->|Yes - All Daily Transaction\\nRecords Have Been Read| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00049",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transaction Processing Loop Continuation Check",
+                    "rule_description": "At the start of each iteration, the system checks whether all daily transaction records have already been read. If not, the loop continues to fetch and process the next transaction. This governs whether the daily transaction processing cycle should continue or stop.",
+                    "sub_graph_node_text": "Is End-of-File Flag = 'Y'?",
+                    "acceptance_criteria": {
+                        "Given": "The daily transaction processing loop is active and the End-of-File flag has been initialized to 'N' indicating there are potentially more daily transaction records to be read",
+                        "When": "The system evaluates the End-of-File flag at the beginning of each loop iteration",
+                        "Then": "If the End-of-File flag is 'N', the system proceeds to read the next daily transaction record and continues processing; if the End-of-File flag is 'Y', the system exits the processing loop and proceeds to close all files"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00050",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Read Next Daily Transaction Record",
+                    "rule_description": "When the End-of-File flag indicates more records may exist, the system attempts to retrieve the next daily transaction record from the Daily Transaction file for processing.",
+                    "sub_graph_node_text": "Read Next Daily Transaction Record",
+                    "acceptance_criteria": {
+                        "Given": "The daily transaction processing loop is active and the End-of-File flag is 'N', indicating that more daily transaction records may be available",
+                        "When": "The system attempts to read the next record from the Daily Transaction file",
+                        "Then": "If the read is successful, the daily transaction record is retrieved and made available for further processing including card number verification and account lookup; if the read is unsuccessful due to end of file, the End-of-File flag is set to 'Y'; if the read fails for any other reason, the transaction processing is halted"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00051",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Successful Transaction Record Retrieval",
+                    "rule_description": "After attempting to read a daily transaction record, the system determines whether the read was successful. A successful read means a valid transaction record was retrieved and is ready for card verification and account lookup processing.",
+                    "sub_graph_node_text": "Was Read Successful?",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to read the next record from the Daily Transaction file",
+                        "When": "The read operation completes and the result is evaluated",
+                        "Then": "If the read was successful (a valid transaction record was retrieved), the transaction record is displayed and the system proceeds to verify the card number against the Cross-Reference file and look up the associated account; the loop then returns to check the End-of-File flag for the next iteration"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00052",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Detection on Daily Transaction File",
+                    "rule_description": "When the system attempts to read a daily transaction record and there are no more records remaining in the Daily Transaction file, the End-of-File condition is detected and the processing loop flag is updated to signal that all transactions have been read.",
+                    "sub_graph_node_text": "Set End-of-File Flag to 'Y'",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to read the next record from the Daily Transaction file",
+                        "When": "The read operation determines that no more records exist in the Daily Transaction file (end of file is reached)",
+                        "Then": "The End-of-File flag is set to 'Y', signaling that all daily transaction records have been read; on the next loop iteration, the End-of-File flag check will evaluate to 'Y' and the processing loop will stop"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00053",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Stop Daily Transaction Processing Loop",
+                    "rule_description": "Once the End-of-File flag is set to 'Y', confirming all daily transaction records have been read and processed, the transaction processing loop terminates and the program proceeds to the file closure phase.",
+                    "sub_graph_node_text": "Stop Processing Loop Proceed to Close Files",
+                    "acceptance_criteria": {
+                        "Given": "The End-of-File flag has been set to 'Y' after all records in the Daily Transaction file have been read",
+                        "When": "The system evaluates the End-of-File flag at the top of the processing loop",
+                        "Then": "The daily transaction processing loop is exited and the system proceeds to close all open files: Daily Transaction file, Customer file, Cross-Reference file, Card file, Account file, and Transaction file, after which the program ends"
+                    },
+                    "key_functionality_id": "end"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "process-transaction-record",
+                    "title": "Process Transaction Record",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    A([Begin: Process\\nTransaction Record]) \n    B[Display Transaction\\nRecord Details]\n    C[Look Up Card Number\\nin Cross-Reference File]\n    D{Card Number\\nFound in\\nCross-Reference?}\n    E[Log Message:\\n'Card Number Could Not Be Verified'\\nSkip Transaction ID]\n    F[Retrieve from Cross-Reference:\\n- Account ID\\n- Customer ID]\n    G[Look Up Account Record\\nUsing Account ID]\n    H{Account\\nRecord\\nFound?}\n    I[Display Message:\\n'Account Not Found']\n    J[Account Record\\nSuccessfully Retrieved]\n    K([End: Transaction\\nRecord Processed])\n\n    XREF_FILE[(Card Cross-Reference File\\nXREF-FILE\\nVSAM KSDS)]\n    ACCOUNT_FILE[(Account File\\nACCOUNT-FILE\\nVSAM KSDS)]\n\n    A --> B\n    B --> C\n    XREF_FILE -.->|Keyed Read\\nby Card Number| C\n    C --> D\n    D -->|No - Card Number\\nNot Found| E\n    E --> K\n    D -->|Yes - Card Number\\nVerified| F\n    F --> G\n    ACCOUNT_FILE -.->|Keyed Read\\nby Account ID| G\n    G --> H\n    H -->|No - Account\\nNot Found| I\n    I --> K\n    H -->|Yes - Account\\nFound| J\n    J --> K",
+                    "rules": [
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00062",
+                            "rule_type": "Process Rules",
+                            "rule_name": "Display Daily Transaction Record Details",
+                            "rule_description": "When a daily transaction record is successfully read and the end of the daily transaction file has not been reached, the full transaction record details are displayed for visibility and audit purposes.",
+                            "sub_graph_node_text": "Display Transaction Record Details",
+                            "acceptance_criteria": {
+                                "Given": "A daily transaction record has been read from the Daily Transaction File and the end-of-file indicator is 'N' (not yet reached end of file)",
+                                "When": "The transaction record is available for processing",
+                                "Then": "The complete transaction record details (including Card Number and Transaction ID) are displayed"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00063",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Look Up Card Number in Card Cross-Reference File",
+                            "rule_description": "For each daily transaction, the card number from the transaction record is used as a key to perform a direct lookup in the Card Cross-Reference File (XREF-FILE, VSAM KSDS) to verify the card and retrieve associated account and customer information.",
+                            "sub_graph_node_text": "Look Up Card Number in Cross-Reference File",
+                            "acceptance_criteria": {
+                                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and the cross-reference read status is initialized to 0",
+                                "When": "The Card Number from the transaction is used as the key to look up the Card Cross-Reference File",
+                                "Then": "The system attempts a keyed read of the Card Cross-Reference File using the Card Number as the lookup key, and the result determines whether the card is verified or not"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00064",
+                            "rule_type": "Decision Rules",
+                            "rule_name": "Card Number Not Found in Cross-Reference \u2014 Skip Transaction",
+                            "rule_description": "If the card number from the daily transaction cannot be found in the Card Cross-Reference File, the transaction cannot be verified and must be skipped. A warning message is logged identifying the unverifiable card number and the skipped transaction ID.",
+                            "sub_graph_node_text": "Log Message: 'Card Number Could Not Be Verified' Skip Transaction ID",
+                            "acceptance_criteria": {
+                                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and a Transaction ID (DALYTRAN-ID)",
+                                "When": "The Card Number is not found in the Card Cross-Reference File (cross-reference read status is set to 4 \u2014 invalid key)",
+                                "Then": "A warning message is displayed stating 'CARD NUMBER [DALYTRAN-CARD-NUM] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[DALYTRAN-ID]', and the transaction is skipped without further processing"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00065",
+                            "rule_type": "Validation Rules",
+                            "rule_name": "Card Number Verified \u2014 Retrieve Account ID and Customer ID from Cross-Reference",
+                            "rule_description": "When a card number is successfully verified in the Card Cross-Reference File, the associated Account ID and Customer ID are retrieved from the cross-reference record. These details are confirmed and made available for subsequent account validation.",
+                            "sub_graph_node_text": "Retrieve from Cross-Reference: - Account ID - Customer ID",
+                            "acceptance_criteria": {
+                                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM)",
+                                "When": "The Card Number is found in the Card Cross-Reference File (successful keyed read \u2014 not invalid key)",
+                                "Then": "The system retrieves and displays the verified Card Number (XREF-CARD-NUM), the linked Account ID (XREF-ACCT-ID), and the linked Customer ID (XREF-CUST-ID) from the cross-reference record, and the cross-reference read status remains 0 (successful)"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00066",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Look Up Account Record Using Account ID from Cross-Reference",
+                            "rule_description": "After a card number is successfully verified and the Account ID is retrieved from the Cross-Reference File, the Account ID is used as a key to perform a direct lookup in the Account File (ACCOUNT-FILE, VSAM KSDS) to retrieve the full account record.",
+                            "sub_graph_node_text": "Look Up Account Record Using Account ID",
+                            "acceptance_criteria": {
+                                "Given": "The card number has been verified in the Cross-Reference File and the Account ID (XREF-ACCT-ID) has been retrieved, and the account read status is initialized to 0",
+                                "When": "The Account ID is used as the key to look up the Account File",
+                                "Then": "The system attempts a keyed read of the Account File using the Account ID (ACCT-ID) as the lookup key, and the result determines whether the account record is found or not"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00067",
+                            "rule_type": "Validation Rules",
+                            "rule_name": "Account Record Not Found \u2014 Log Warning",
+                            "rule_description": "If the Account ID retrieved from the Cross-Reference File does not match any record in the Account File, a warning message is logged identifying the missing account. This covers both the immediate invalid key detection during the file read and the subsequent status check.",
+                            "sub_graph_node_text": "Display Message: 'Account Not Found'",
+                            "acceptance_criteria": {
+                                "Given": "The card number has been verified and the Account ID (ACCT-ID) has been retrieved from the Cross-Reference File",
+                                "When": "The Account ID is not found in the Account File (invalid key during keyed read, setting account read status to 4), and the account read status is checked and found to be non-zero",
+                                "Then": "A warning message 'INVALID ACCOUNT NUMBER FOUND' is displayed at the time of the failed read, and subsequently 'ACCOUNT [ACCT-ID] NOT FOUND' is displayed; the transaction record processing ends without a valid account record"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        },
+                        {
+                            "rule_id": "R-CBTRN01C-cbl-00068",
+                            "rule_type": "Validation Rules",
+                            "rule_name": "Account Record Successfully Retrieved",
+                            "rule_description": "When the Account ID is found in the Account File, the full account record is successfully retrieved and a confirmation message is displayed. The account read status remains 0, indicating successful retrieval.",
+                            "sub_graph_node_text": "Account Record Successfully Retrieved",
+                            "acceptance_criteria": {
+                                "Given": "The card number has been verified and the Account ID (ACCT-ID) has been retrieved from the Cross-Reference File",
+                                "When": "The Account ID is found in the Account File (successful keyed read \u2014 not invalid key)",
+                                "Then": "The full account record (ACCOUNT-RECORD) is successfully retrieved, a message 'SUCCESSFUL READ OF ACCOUNT FILE' is displayed, and the account read status remains 0 (successful), completing the transaction record processing successfully"
+                            },
+                            "key_functionality_id": "process-transaction-record"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "End"
+        },
+        {
+            "id": "program-finalization",
+            "title": "Program Finalization",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([All Daily Transactions Processed\\nBegin Program Finalization])\n\n    subgraph CLOSE1[Close Daily Transaction File]\n        B[Close Daily Transaction File]\n        C{Closed\\nSuccessfully?}\n    end\n\n    subgraph CLOSE2[Close Customer File]\n        E[Close Customer File]\n        F{Closed\\nSuccessfully?}\n    end\n\n    subgraph CLOSE3[Close Card Cross-Reference File]\n        H[Close Card Cross-Reference File]\n        I{Closed\\nSuccessfully?}\n    end\n\n    subgraph CLOSE4[Close Card File]\n        K[Close Card File]\n        L{Closed\\nSuccessfully?}\n    end\n\n    subgraph CLOSE5[Close Account File]\n        N[Close Account File]\n        O{Closed\\nSuccessfully?}\n    end\n\n    subgraph CLOSE6[Close Transaction File]\n        Q[Close Transaction File]\n        R{Closed\\nSuccessfully?}\n    end\n\n    Z([Program End\\nCBTRN01C])\n\n    A --> B\n    B --> C\n    C -->|Yes| E\n    C -->|No - File Close Error| D[Stop Processing]\n    E --> F\n    F -->|Yes| H\n    F -->|No - File Close Error| G[Stop Processing]\n    H --> I\n    I -->|Yes| K\n    I -->|No - File Close Error| J[Stop Processing]\n    K --> L\n    L -->|Yes| N\n    L -->|No - File Close Error| M[Stop Processing]\n    N --> O\n    O -->|Yes| Q\n    O -->|No - File Close Error| P[Stop Processing]\n    Q --> R\n    R -->|Yes| Z\n    R -->|No - File Close Error| S[Stop Processing]",
+            "rules": [
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00054",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Daily Transaction File After Processing",
+                    "rule_description": "Once all daily transactions have been processed, the Daily Transaction File must be closed successfully before proceeding to close remaining files.",
+                    "sub_graph_node_text": "Close Daily Transaction File",
+                    "acceptance_criteria": {
+                        "Given": "All daily transactions have been processed and the program is in the finalization phase",
+                        "When": "The program attempts to close the Daily Transaction File",
+                        "Then": "If the file closes successfully, the program proceeds to close the Customer File. If the file fails to close, processing stops immediately and no further files are closed."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00055",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Customer File After Daily Transaction File",
+                    "rule_description": "After the Daily Transaction File has been successfully closed, the Customer File must be closed before proceeding to close remaining files.",
+                    "sub_graph_node_text": "Close Customer File",
+                    "acceptance_criteria": {
+                        "Given": "The Daily Transaction File has been successfully closed during program finalization",
+                        "When": "The program attempts to close the Customer File",
+                        "Then": "If the file closes successfully, the program proceeds to close the Card Cross-Reference File. If the file fails to close, processing stops immediately and no further files are closed."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00056",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Card Cross-Reference File After Customer File",
+                    "rule_description": "After the Customer File has been successfully closed, the Card Cross-Reference File must be closed before proceeding to close remaining files.",
+                    "sub_graph_node_text": "Close Card Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File has been successfully closed during program finalization",
+                        "When": "The program attempts to close the Card Cross-Reference File",
+                        "Then": "If the file closes successfully, the program proceeds to close the Card File. If the file fails to close, processing stops immediately and no further files are closed."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00057",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Card File After Card Cross-Reference File",
+                    "rule_description": "After the Card Cross-Reference File has been successfully closed, the Card File must be closed before proceeding to close remaining files.",
+                    "sub_graph_node_text": "Close Card File",
+                    "acceptance_criteria": {
+                        "Given": "The Card Cross-Reference File has been successfully closed during program finalization",
+                        "When": "The program attempts to close the Card File",
+                        "Then": "If the file closes successfully, the program proceeds to close the Account File. If the file fails to close, processing stops immediately and no further files are closed."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00058",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Account File After Card File",
+                    "rule_description": "After the Card File has been successfully closed, the Account File must be closed before proceeding to close the final file.",
+                    "sub_graph_node_text": "Close Account File",
+                    "acceptance_criteria": {
+                        "Given": "The Card File has been successfully closed during program finalization",
+                        "When": "The program attempts to close the Account File",
+                        "Then": "If the file closes successfully, the program proceeds to close the Transaction File. If the file fails to close, processing stops immediately and no further files are closed."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00059",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Transaction File as Final Step",
+                    "rule_description": "After the Account File has been successfully closed, the Transaction File is the last file to be closed, completing the program finalization sequence.",
+                    "sub_graph_node_text": "Close Transaction File",
+                    "acceptance_criteria": {
+                        "Given": "The Account File has been successfully closed during program finalization",
+                        "When": "The program attempts to close the Transaction File",
+                        "Then": "If the file closes successfully, the program reaches its end and terminates normally. If the file fails to close, processing stops immediately and the program does not complete its normal termination."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00060",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential File Closure Order Enforcement",
+                    "rule_description": "All six files must be closed in a strict sequential order during program finalization: Daily Transaction File first, followed by Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File last.",
+                    "sub_graph_node_text": "All Daily Transactions Processed\nBegin Program Finalization",
+                    "acceptance_criteria": {
+                        "Given": "All daily transactions have been fully processed and the program enters the finalization phase",
+                        "When": "The program executes the file closure sequence",
+                        "Then": "Files must be closed in the following mandatory order: (1) Daily Transaction File, (2) Customer File, (3) Card Cross-Reference File, (4) Card File, (5) Account File, (6) Transaction File. Each file must close successfully before the next file closure is attempted. If any file fails to close, the remaining files are not closed and the program stops."
+                    },
+                    "key_functionality_id": "program-finalization"
+                },
+                {
+                    "rule_id": "R-CBTRN01C-cbl-00061",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Program Normal Termination After All Files Closed",
+                    "rule_description": "The program CBTRN01C reaches its normal end only after all six files have been successfully closed in sequence.",
+                    "sub_graph_node_text": "Program End\nCBTRN01C",
+                    "acceptance_criteria": {
+                        "Given": "All six files \u2014 Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File \u2014 have been successfully closed in the required sequence",
+                        "When": "The final Transaction File closure completes successfully",
+                        "Then": "The program terminates normally, signaling successful completion of the daily transaction processing run."
+                    },
+                    "key_functionality_id": "program-finalization"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Finalization"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File (DALYTRAN-FILE) is open and contains one or more transaction records, and the end-of-file indicator is set to 'N'",
+                "When": "The program requests the next sequential record from the Daily Transaction File",
+                "Then": "The next Daily Transaction Record is read into memory, including the Card Number (DALYTRAN-CARD-NUM) and Transaction ID (DALYTRAN-ID), and processing continues for that record"
+            },
+            "Rule_Name": "Sequential Processing of All Daily Transactions",
+            "Rule_Description": "The program reads all daily transaction records one at a time from the Daily Transaction File in sequential order, continuing until all records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is reading records sequentially from the Daily Transaction File",
+                "When": "A read attempt returns an end-of-file condition (file status '10')",
+                "Then": "The end-of-daily-transaction-file indicator is set to 'Y', the processing loop terminates, and the program proceeds to close all files"
+            },
+            "Rule_Name": "End-of-File Detection on Daily Transaction File",
+            "Rule_Description": "When the Daily Transaction File has no more records to process, the program detects the end-of-file condition and stops the transaction processing loop."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00003",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been successfully read from the Daily Transaction File and the end-of-file indicator remains 'N'",
+                "When": "The record is confirmed as a valid read (not end-of-file)",
+                "Then": "The full contents of the Daily Transaction Record (DALYTRAN-RECORD) are displayed, including all transaction details"
+            },
+            "Rule_Name": "Display of Each Transaction Record Upon Successful Read",
+            "Rule_Description": "Each successfully read daily transaction record is displayed in full before any validation is performed, providing a log of all transactions encountered."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00004",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read and its Card Number (DALYTRAN-CARD-NUM) is available",
+                "When": "The Card Number is used as the key to look up a matching record in the Card Cross-Reference File (XREF-FILE)",
+                "Then": "If found, the Cross-Reference record is retrieved containing the Card Number (XREF-CARD-NUM), Account ID (XREF-ACCT-ID), and Customer ID (XREF-CUST-ID), and these details are displayed; the cross-reference read status is set to success (0)"
+            },
+            "Rule_Name": "Card Number Verification via Cross-Reference File",
+            "Rule_Description": "Every transaction's card number must be verified by performing a keyed lookup in the Card Cross-Reference File to confirm the card is known and to retrieve the associated Account ID and Customer ID."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00005",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and Transaction ID (DALYTRAN-ID)",
+                "When": "The Card Number lookup in the Cross-Reference File returns an invalid key (card number not found), setting the cross-reference read status to a non-zero value (4)",
+                "Then": "A warning message is logged stating 'CARD NUMBER [DALYTRAN-CARD-NUM] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[DALYTRAN-ID]', the transaction is not processed further, and the program moves on to the next transaction record"
+            },
+            "Rule_Name": "Transaction Skipped When Card Number Cannot Be Verified",
+            "Rule_Description": "If a transaction's card number is not found in the Card Cross-Reference File, the transaction cannot be validated and must be skipped entirely, with a warning logged identifying the unverifiable card and the skipped transaction."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00006",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number has been successfully verified in the Cross-Reference File and the Account ID (XREF-ACCT-ID) has been retrieved",
+                "When": "The Account ID is used as the key to perform a keyed lookup in the Account File (ACCOUNT-FILE)",
+                "Then": "If the account exists, the full Account Record is retrieved and a success message 'SUCCESSFUL READ OF ACCOUNT FILE' is displayed; the account read status is set to success (0)"
+            },
+            "Rule_Name": "Account Record Retrieval Using Account ID from Cross-Reference",
+            "Rule_Description": "When a card number is successfully verified through the Cross-Reference File, the associated Account ID is used to retrieve the full account record from the Account File."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00007",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card number was successfully verified in the Cross-Reference File and an Account ID (ACCT-ID) was retrieved",
+                "When": "The keyed lookup of the Account ID in the Account File returns an invalid key (account not found), setting the account read status to a non-zero value (4)",
+                "Then": "A warning message 'ACCOUNT [ACCT-ID] NOT FOUND' is displayed, and the program continues to process the next transaction record without further processing of the current transaction"
+            },
+            "Rule_Name": "Account Not Found Warning After Verified Card Lookup",
+            "Rule_Description": "If the Account ID retrieved from the Cross-Reference File does not correspond to any existing account in the Account File, a warning is issued identifying the missing account."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00008",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program CBTRN01C is starting execution",
+                "When": "The program initializes and attempts to open all required files in sequence: Daily Transaction File (DALYTRAN-FILE), Customer File (CUSTOMER-FILE), Card Cross-Reference File (XREF-FILE), Card File (CARD-FILE), Account File (ACCOUNT-FILE), and Transaction File (TRANSACT-FILE)",
+                "Then": "All six files are successfully opened and available for processing; if any file fails to open, the program halts immediately with an error message identifying the specific file that could not be opened"
+            },
+            "Rule_Name": "Program Initialization - Open All Required Files",
+            "Rule_Description": "Before any transaction processing begins, all six required files must be successfully opened: Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00009",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The end-of-file condition has been detected on the Daily Transaction File and the processing loop has ended",
+                "When": "The program proceeds to finalize by closing all files in sequence: Daily Transaction File (DALYTRAN-FILE), Customer File (CUSTOMER-FILE), Card Cross-Reference File (XREF-FILE), Card File (CARD-FILE), Account File (ACCOUNT-FILE), and Transaction File (TRANSACT-FILE)",
+                "Then": "All six files are successfully closed; if any file fails to close, an error message identifying the specific file is displayed, and the program halts; upon successful closure of all files, the program ends normally"
+            },
+            "Rule_Name": "Program Finalization - Close All Files After Processing",
+            "Rule_Description": "After all daily transaction records have been processed (end-of-file reached), all six files must be properly closed in sequence before the program ends."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00010",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program CBTRN01C is starting its initialization sequence",
+                "When": "The program attempts to open the Daily Transaction File for reading",
+                "Then": "If the Daily Transaction File opens successfully, the program proceeds to open the Customer File. If the Daily Transaction File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING DAILY TRANSACTION FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Daily Transaction File Must Be Available at Program Start",
+            "Rule_Description": "The program must successfully open the Daily Transaction File as the first step of initialization. If the file is unavailable, the program cannot continue and must stop immediately."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00011",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File has been successfully opened",
+                "When": "The program attempts to open the Customer File for reading",
+                "Then": "If the Customer File opens successfully, the program proceeds to open the Card Cross-Reference File. If the Customer File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CUSTOMER FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Customer File Must Be Available at Program Start",
+            "Rule_Description": "After successfully opening the Daily Transaction File, the program must successfully open the Customer File. If the Customer File is unavailable, the program cannot continue and must stop immediately."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00012",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File and Customer File have both been successfully opened",
+                "When": "The program attempts to open the Card Cross-Reference File for reading",
+                "Then": "If the Card Cross-Reference File opens successfully, the program proceeds to open the Card File. If the Card Cross-Reference File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CROSS REF FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Card Cross-Reference File Must Be Available at Program Start",
+            "Rule_Description": "After successfully opening the Customer File, the program must successfully open the Card Cross-Reference File. This file is critical for linking card numbers to accounts and customers. If unavailable, the program cannot continue."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00013",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File, Customer File, and Card Cross-Reference File have all been successfully opened",
+                "When": "The program attempts to open the Card File for reading",
+                "Then": "If the Card File opens successfully, the program proceeds to open the Account File. If the Card File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING CARD FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Card File Must Be Available at Program Start",
+            "Rule_Description": "After successfully opening the Card Cross-Reference File, the program must successfully open the Card File. If the Card File is unavailable, the program cannot continue and must stop immediately."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00014",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File, Customer File, Card Cross-Reference File, and Card File have all been successfully opened",
+                "When": "The program attempts to open the Account File for reading",
+                "Then": "If the Account File opens successfully, the program proceeds to open the Transaction File. If the Account File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING ACCOUNT FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Account File Must Be Available at Program Start",
+            "Rule_Description": "After successfully opening the Card File, the program must successfully open the Account File. This file is required to validate account details linked to card transactions. If unavailable, the program cannot continue."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00015",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File, Customer File, Card Cross-Reference File, Card File, and Account File have all been successfully opened",
+                "When": "The program attempts to open the Transaction File for reading",
+                "Then": "If the Transaction File opens successfully, all six required files are available and the program is ready to begin processing daily transactions. If the Transaction File is unavailable or cannot be opened, the program logs an error message 'ERROR OPENING TRANSACTION FILE', displays the file status details, and terminates immediately without processing any transactions."
+            },
+            "Rule_Name": "Transaction File Must Be Available at Program Start",
+            "Rule_Description": "After successfully opening the Account File, the program must successfully open the Transaction File as the final step of initialization. If unavailable, the program cannot continue and must stop immediately."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00016",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program CBTRN01C has been initiated and is in the initialization phase",
+                "When": "The program sequentially attempts to open all six required files: Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File",
+                "Then": "Only when all six files are opened successfully does the program proceed to transaction processing. If any one of the six files fails to open, the program immediately logs the corresponding error message for that file, displays the file status details, and terminates \u2014 preventing any transaction processing from occurring."
+            },
+            "Rule_Name": "All Required Files Must Be Successfully Opened Before Transaction Processing Begins",
+            "Rule_Description": "All six required business files \u2014 Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File \u2014 must be successfully opened in sequence before any transaction processing can begin. Failure to open any single file prevents the entire program from running."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00017",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File has been opened successfully and the end-of-file flag is set to 'N' (not yet reached end of file)",
+                "When": "The program requests the next transaction record from the Daily Transaction File",
+                "Then": "The next available daily transaction record is read and loaded into the transaction record buffer for further processing"
+            },
+            "Rule_Name": "Sequential Reading of Daily Transaction Records",
+            "Rule_Description": "The program reads daily transaction records one at a time, sequentially from the Daily Transaction File, to process each card transaction."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00018",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Daily Transaction File",
+                "When": "The Daily Transaction File returns a successful read status (no errors, no end-of-file condition)",
+                "Then": "The transaction record is confirmed as successfully read and made available for downstream processing steps including card number verification and account lookup"
+            },
+            "Rule_Name": "Successful Transaction Record Read Confirmation",
+            "Rule_Description": "After attempting to read a daily transaction record, the program confirms whether the record was retrieved successfully and is available for processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00019",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been successfully read from the Daily Transaction File",
+                "When": "The end-of-file flag remains 'N' after the read operation",
+                "Then": "The full content of the daily transaction record is displayed, confirming the record is available for card verification and account lookup processing"
+            },
+            "Rule_Name": "Display of Successfully Read Transaction Record",
+            "Rule_Description": "When a daily transaction record is successfully read, its full content is displayed to confirm the record is available and ready for processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00020",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation has been performed on the Daily Transaction File and the read was not successful",
+                "When": "The Daily Transaction File signals that there are no more records to read (end-of-file condition is reached)",
+                "Then": "The end-of-file flag is set to 'Y', which causes the main processing loop to stop and no further transaction records are read or processed"
+            },
+            "Rule_Name": "End-of-File Detection on Daily Transaction File",
+            "Rule_Description": "When no more transaction records are available in the Daily Transaction File, the program detects the end-of-file condition and marks the processing loop to stop."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00021",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File has signaled that no more records are available (end-of-file detected)",
+                "When": "The end-of-file condition is confirmed after an unsuccessful read attempt",
+                "Then": "The end-of-file flag is set to 'Y', the processing loop exits, and no further daily transaction records are read; the program proceeds to close all files and end execution"
+            },
+            "Rule_Name": "Stop Processing Loop When All Transactions Are Consumed",
+            "Rule_Description": "Once the end-of-file condition is confirmed on the Daily Transaction File, the program sets a flag to terminate the transaction processing loop, ensuring all records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00022",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction file is open and being processed sequentially, and the system has just attempted to read the next transaction record",
+                "When": "The read operation completes and the end-of-file indicator remains 'No' (meaning a valid transaction record was successfully retrieved)",
+                "Then": "The complete details of the daily transaction record \u2014 including all fields such as Card Number, Transaction ID, and any other transaction data \u2014 must be displayed in full for audit and visibility purposes; if the end-of-file indicator is 'Yes' after the read, no transaction record is displayed and processing moves to the next stage"
+            },
+            "Rule_Name": "Display Daily Transaction Record After Successful Read",
+            "Rule_Description": "After each daily transaction record is successfully read from the Daily Transaction file (i.e., end-of-file has not been reached), the full transaction record details are displayed for visibility and audit purposes. If the end-of-file condition is detected after the read attempt, the display step is skipped."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00023",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been successfully read from the Daily Transaction File and contains a Card Number",
+                "When": "The system prepares to validate the transaction by initiating a Card Cross-Reference lookup",
+                "Then": "The Card Number from the daily transaction record (DALYTRAN-CARD-NUM) is extracted and set as the lookup key (XREF-CARD-NUM) to be used for searching the Card Cross-Reference File"
+            },
+            "Rule_Name": "Extract Card Number from Daily Transaction for Cross-Reference Lookup",
+            "Rule_Description": "Before performing a cross-reference lookup, the card number must be extracted from the current daily transaction record and prepared as the search key for the Card Cross-Reference File."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00024",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card number from the daily transaction has been extracted and set as the search key",
+                "When": "The system performs a keyed lookup on the Card Cross-Reference File using the transaction's Card Number as the search key",
+                "Then": "The Card Cross-Reference File is searched directly by Card Number; the result is either a matched record containing Account ID and Customer ID, or a not-found condition indicating the card number does not exist in the Cross-Reference File"
+            },
+            "Rule_Name": "Search Card Cross-Reference File by Card Number",
+            "Rule_Description": "The Card Cross-Reference File must be searched using the transaction's card number as the key to retrieve the associated Account ID and Customer ID. The lookup is a direct keyed search on the Card Cross-Reference File."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00025",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed lookup has been performed on the Card Cross-Reference File using the transaction's Card Number",
+                "When": "The system evaluates the result of the Cross-Reference File search",
+                "Then": "If the Card Number is found (lookup status = successful / not invalid key), the system proceeds to retrieve the Account ID and Customer ID from the matched record; if the Card Number is NOT found (invalid key condition), the system marks the cross-reference lookup as failed and the transaction cannot be verified"
+            },
+            "Rule_Name": "Determine if Card Number Exists in Cross-Reference File",
+            "Rule_Description": "After searching the Card Cross-Reference File, the system must determine whether the card number was successfully matched. This decision drives whether the transaction proceeds to account lookup or is flagged as unverifiable."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00026",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number from the daily transaction has been found in the Card Cross-Reference File",
+                "When": "The system reads the matched Cross-Reference record",
+                "Then": "The Account ID (XREF-ACCT-ID) and Customer ID (XREF-CUST-ID) linked to the matched Card Number are retrieved from the Cross-Reference record and made available for subsequent account lookup and audit display"
+            },
+            "Rule_Name": "Retrieve Account ID and Customer ID from Cross-Reference Record",
+            "Rule_Description": "When a card number is successfully matched in the Cross-Reference File, the associated Account ID and Customer ID must be retrieved from the matched cross-reference record for use in subsequent account validation."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00027",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number has been successfully found in the Card Cross-Reference File and the associated Account ID and Customer ID have been retrieved",
+                "When": "The system confirms a successful cross-reference match",
+                "Then": "The system displays the following information for audit visibility: a confirmation message 'SUCCESSFUL READ OF XREF', the matched Card Number (XREF-CARD-NUM), the associated Account ID (XREF-ACCT-ID), and the associated Customer ID (XREF-CUST-ID)"
+            },
+            "Rule_Name": "Display Card Number, Account ID and Customer ID for Audit Visibility",
+            "Rule_Description": "Upon a successful cross-reference lookup, the Card Number, Account ID, and Customer ID retrieved from the Cross-Reference File must be displayed to provide an audit trail of the card-to-account mapping used during transaction processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00028",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number from the daily transaction has been found in the Card Cross-Reference File and Account ID and Customer ID have been retrieved",
+                "When": "The cross-reference lookup completes with a successful match",
+                "Then": "The Cross-Reference lookup status remains at its initialized successful value (WS-XREF-READ-STATUS = 0), signaling to the transaction processing flow that the card has been verified and account lookup should proceed"
+            },
+            "Rule_Name": "Mark Cross-Reference Lookup as Successful",
+            "Rule_Description": "When the card number is found in the Cross-Reference File, the lookup result must be marked as successful so that downstream processing (account lookup) can proceed for this transaction."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00029",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed lookup has been performed on the Card Cross-Reference File using the transaction's Card Number",
+                "When": "The Card Number is NOT found in the Card Cross-Reference File (invalid key condition is triggered)",
+                "Then": "The system displays the message 'INVALID CARD NUMBER FOR XREF' and sets the Cross-Reference lookup status to failed (WS-XREF-READ-STATUS = 4), which signals to the transaction processing flow that the card could not be verified and the transaction must be skipped"
+            },
+            "Rule_Name": "Mark Cross-Reference Lookup as Failed When Card Number Not Found",
+            "Rule_Description": "When the card number from the daily transaction cannot be found in the Card Cross-Reference File, the lookup must be marked as failed to prevent further processing of the unverifiable transaction."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00030",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been successfully read from the Daily Transaction File and contains a Card Number",
+                "When": "The system prepares to validate the transaction's card number",
+                "Then": "The Card Number from the daily transaction record is extracted and set as the search key to be used for the Cross-Reference File lookup"
+            },
+            "Rule_Name": "Extract Card Number from Daily Transaction for Cross-Reference Lookup",
+            "Rule_Description": "Before validating a card, the card number must be extracted from the current daily transaction record and prepared as the search key for the Cross-Reference File lookup."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00031",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Card Number has been extracted from the daily transaction record and set as the search key",
+                "When": "The system performs a direct lookup of the Card Number in the Cross-Reference File",
+                "Then": "The Cross-Reference File is searched using the Card Number as the unique key, and the result indicates either a successful match or no match found"
+            },
+            "Rule_Name": "Search Card Number in Cross-Reference File",
+            "Rule_Description": "The system must look up the card number extracted from the daily transaction in the Cross-Reference File to determine whether the card is recognized and can be linked to an account and customer."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00032",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A lookup of the Card Number has been performed against the Cross-Reference File",
+                "When": "The system evaluates the result of the Cross-Reference File search",
+                "Then": "If the Card Number is found in the Cross-Reference File, the transaction proceeds to account and customer retrieval; if the Card Number is NOT found in the Cross-Reference File, the transaction is flagged as unverifiable and skipped"
+            },
+            "Rule_Name": "Determine if Card Number Exists in Cross-Reference File",
+            "Rule_Description": "After searching the Cross-Reference File, the system must evaluate whether the card number was found. This decision determines whether the transaction proceeds to account retrieval or is skipped entirely."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00033",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number from the daily transaction has been found in the Cross-Reference File",
+                "When": "The Cross-Reference record is successfully retrieved",
+                "Then": "The Account ID and Customer ID linked to the Card Number are extracted from the Cross-Reference record and made available for the subsequent account lookup step"
+            },
+            "Rule_Name": "Retrieve Account ID and Customer ID from Cross-Reference Record",
+            "Rule_Description": "When a card number is successfully verified in the Cross-Reference File, the system retrieves the associated Account ID and Customer ID from the matched Cross-Reference record, enabling subsequent account validation."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00034",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A lookup of the Card Number from the daily transaction was performed against the Cross-Reference File",
+                "When": "The Card Number is NOT found in the Cross-Reference File",
+                "Then": "The system logs a warning message stating 'CARD NUMBER [Card Number] COULD NOT BE VERIFIED' identifying the specific unrecognized card number"
+            },
+            "Rule_Name": "Log Card Number Verification Failure Message",
+            "Rule_Description": "When a card number from a daily transaction cannot be found in the Cross-Reference File, the system must log a warning message identifying the specific card number that failed verification."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00035",
+            "Rule_Type": "Policy Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number from the daily transaction was NOT found in the Cross-Reference File and a card verification failure message has been logged",
+                "When": "The system determines the transaction cannot be processed due to an unverifiable card number",
+                "Then": "The system logs an additional message 'SKIPPING TRANSACTION ID-[Transaction ID]' identifying the specific Transaction ID that is being skipped, and the transaction is not forwarded for further processing"
+            },
+            "Rule_Name": "Log Skipped Transaction ID When Card Cannot Be Verified",
+            "Rule_Description": "When a card number cannot be verified, the associated transaction must be skipped and the Transaction ID must be logged to provide a complete audit trail of which transactions were not processed."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00036",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction has been read and its card number has been successfully verified through the Cross-Reference file, yielding a valid Account ID",
+                "When": "The system prepares to retrieve account details",
+                "Then": "The Account ID obtained from the Cross-Reference record must be used as the key to look up the account, and no account lookup should be attempted unless the Cross-Reference lookup was successful"
+            },
+            "Rule_Name": "Account ID Must Be Sourced from Cross-Reference Lookup Result",
+            "Rule_Description": "The Account ID used to retrieve account details must always be the one obtained from a successful Cross-Reference lookup. Account retrieval is only triggered when the Cross-Reference lookup has succeeded."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00037",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid Account ID has been obtained from the Cross-Reference file for a given card number",
+                "When": "The system performs a keyed lookup on the Account File using the Account ID",
+                "Then": "The system must search the Account File using the Account ID as the unique search key to locate the matching account record"
+            },
+            "Rule_Name": "Account Record Lookup Using Account ID as Search Key",
+            "Rule_Description": "The Account File must be searched using the Account ID as the unique key to retrieve the corresponding account record. The Account File is a keyed file where each account is uniquely identified by its Account ID."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00038",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed lookup has been performed on the Account File using a valid Account ID",
+                "When": "The Account File contains a record matching the provided Account ID",
+                "Then": "The account details are successfully retrieved into the Account Record and the system confirms successful retrieval of the account"
+            },
+            "Rule_Name": "Successful Account Record Retrieval",
+            "Rule_Description": "When the Account File lookup finds a matching record for the given Account ID, the full account details are retrieved and made available for further processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00039",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed lookup has been performed on the Account File using an Account ID obtained from the Cross-Reference file",
+                "When": "No matching account record is found in the Account File for the given Account ID",
+                "Then": "The system must display a warning message stating 'ACCOUNT [Account ID] NOT FOUND', identifying the specific Account ID that could not be located, and continue processing the remaining daily transactions without stopping"
+            },
+            "Rule_Name": "Account Not Found for Given Account ID",
+            "Rule_Description": "When the Account File does not contain a record matching the Account ID obtained from the Cross-Reference lookup, the system must flag this as an unresolved account and display a warning identifying the missing Account ID."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00040",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction has been processed through the Card Cross-Reference lookup and a valid Cross-Reference record has been found containing an Account ID linked to the transaction's card number",
+                "When": "The system prepares to validate the account associated with the transaction",
+                "Then": "The Account ID retrieved from the Cross-Reference record (XREF-ACCT-ID) must be used as the key to search the Account File, and no other source of Account ID is permitted for this lookup"
+            },
+            "Rule_Name": "Account ID Must Be Sourced from Cross-Reference Lookup",
+            "Rule_Description": "The Account ID used to search the Account File must be the one retrieved from the Card Cross-Reference record, ensuring the account lookup is always driven by the verified card-to-account mapping."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00041",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account ID has been obtained from the Cross-Reference record and is ready for account validation",
+                "When": "The system searches the Account File using the Account ID as the search key",
+                "Then": "The system must perform a direct keyed search of the Account File using the Account ID, and the result must indicate either that the account record was successfully found and retrieved, or that no matching account exists for the given Account ID"
+            },
+            "Rule_Name": "Account File Must Be Searched Using the Cross-Reference Account ID",
+            "Rule_Description": "The system must perform a direct keyed lookup against the Account File using the Account ID obtained from the Cross-Reference record to determine whether the account exists and retrieve its details."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00042",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has searched the Account File using the Account ID obtained from the Cross-Reference record",
+                "When": "The Account ID is found in the Account File",
+                "Then": "The full account record is successfully retrieved into the Account Record, the account read status remains at its initial successful state, and processing continues normally for the transaction"
+            },
+            "Rule_Name": "Valid Account Record Must Be Retrieved When Account Exists",
+            "Rule_Description": "When the Account ID is found in the Account File, the full account record must be successfully retrieved and made available for further transaction processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has searched the Account File using the Account ID obtained from the Cross-Reference record, and the card number was previously verified successfully through the Cross-Reference lookup",
+                "When": "The Account ID is not found in the Account File, resulting in a failed account lookup",
+                "Then": "The system must display the message 'ACCOUNT [Account ID] NOT FOUND' identifying the specific Account ID that could not be located, and then return to the transaction processing loop to continue processing the next daily transaction without terminating the program"
+            },
+            "Rule_Name": "Transaction With Unresolvable Account Must Be Flagged",
+            "Rule_Description": "When the Account ID obtained from the Cross-Reference lookup does not match any record in the Account File, the system must flag the transaction by displaying an account-not-found message, and then continue processing the remaining transactions without stopping."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00044",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read from the Daily Transaction File, and the transaction contains a Card Number",
+                "When": "The Card Number from the daily transaction is looked up in the Card Cross-Reference File using the Card Number as the search key",
+                "Then": "If the Card Number is found in the Cross-Reference File, the transaction is marked as verified and processing continues to Account lookup; if the Card Number is NOT found in the Cross-Reference File, the transaction is marked as unverified and must be skipped"
+            },
+            "Rule_Name": "Card Number Must Exist in Cross-Reference File for Transaction Processing",
+            "Rule_Description": "Every daily transaction card number must be validated against the Card Cross-Reference File before any further processing can occur. The card number from the daily transaction record is used as the lookup key."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00045",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read and its Card Number has been looked up in the Card Cross-Reference File",
+                "When": "The Card Number is NOT found in the Card Cross-Reference File (card verification fails)",
+                "Then": "A warning message is logged stating 'CARD NUMBER [Card Number] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[Transaction ID]', identifying both the unverified card number and the transaction ID being skipped"
+            },
+            "Rule_Name": "Log Warning Message When Card Number Cannot Be Verified",
+            "Rule_Description": "When a card number from a daily transaction cannot be found in the Card Cross-Reference File, a warning message must be logged identifying the specific card number that failed verification."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00046",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A card number from a daily transaction has failed verification against the Card Cross-Reference File",
+                "When": "The warning message for the unverified card is being logged",
+                "Then": "The Transaction ID (DALYTRAN-ID) of the skipped transaction is included in the log message alongside the unverified Card Number, so that the specific skipped transaction can be identified for review"
+            },
+            "Rule_Name": "Log Skipped Transaction ID for Unverified Card Transactions",
+            "Rule_Description": "When a transaction is skipped due to an unverified card number, the Transaction ID of the skipped transaction must be recorded in the log message to provide a complete audit trail of which transactions were not processed."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00047",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read, its Card Number has been looked up in the Card Cross-Reference File, and the Card Number was NOT found",
+                "When": "The card verification failure is confirmed and the warning message has been logged",
+                "Then": "All further processing for that transaction (including Account lookup) is bypassed entirely, and the program proceeds to read and process the next record from the Daily Transaction File without any account or customer updates for the skipped transaction"
+            },
+            "Rule_Name": "Skip Transaction and Proceed to Next Record When Card Cannot Be Verified",
+            "Rule_Description": "A daily transaction whose card number cannot be verified in the Cross-Reference File must be entirely skipped \u2014 no account lookup or further processing is performed \u2014 and the program must move on to process the next transaction in the Daily Transaction File."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00048",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read and its Card Number has been looked up in the Card Cross-Reference File",
+                "When": "The Card Number IS found in the Card Cross-Reference File (card verification succeeds), and the Cross-Reference record returns the linked Account ID and Customer ID",
+                "Then": "The Account ID retrieved from the Cross-Reference record is used to look up the account in the Account File, and processing continues to the account validation step"
+            },
+            "Rule_Name": "Continue to Account Processing When Card Is Successfully Verified",
+            "Rule_Description": "When a card number from a daily transaction is successfully found and verified in the Card Cross-Reference File, the transaction is eligible for further processing, and the Account ID linked to that card is used to look up the full account details."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00049",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The daily transaction processing loop is active and the End-of-File flag has been initialized to 'N' indicating there are potentially more daily transaction records to be read",
+                "When": "The system evaluates the End-of-File flag at the beginning of each loop iteration",
+                "Then": "If the End-of-File flag is 'N', the system proceeds to read the next daily transaction record and continues processing; if the End-of-File flag is 'Y', the system exits the processing loop and proceeds to close all files"
+            },
+            "Rule_Name": "Transaction Processing Loop Continuation Check",
+            "Rule_Description": "At the start of each iteration, the system checks whether all daily transaction records have already been read. If not, the loop continues to fetch and process the next transaction. This governs whether the daily transaction processing cycle should continue or stop."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00050",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The daily transaction processing loop is active and the End-of-File flag is 'N', indicating that more daily transaction records may be available",
+                "When": "The system attempts to read the next record from the Daily Transaction file",
+                "Then": "If the read is successful, the daily transaction record is retrieved and made available for further processing including card number verification and account lookup; if the read is unsuccessful due to end of file, the End-of-File flag is set to 'Y'; if the read fails for any other reason, the transaction processing is halted"
+            },
+            "Rule_Name": "Read Next Daily Transaction Record",
+            "Rule_Description": "When the End-of-File flag indicates more records may exist, the system attempts to retrieve the next daily transaction record from the Daily Transaction file for processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00051",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to read the next record from the Daily Transaction file",
+                "When": "The read operation completes and the result is evaluated",
+                "Then": "If the read was successful (a valid transaction record was retrieved), the transaction record is displayed and the system proceeds to verify the card number against the Cross-Reference file and look up the associated account; the loop then returns to check the End-of-File flag for the next iteration"
+            },
+            "Rule_Name": "Successful Transaction Record Retrieval",
+            "Rule_Description": "After attempting to read a daily transaction record, the system determines whether the read was successful. A successful read means a valid transaction record was retrieved and is ready for card verification and account lookup processing."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00052",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to read the next record from the Daily Transaction file",
+                "When": "The read operation determines that no more records exist in the Daily Transaction file (end of file is reached)",
+                "Then": "The End-of-File flag is set to 'Y', signaling that all daily transaction records have been read; on the next loop iteration, the End-of-File flag check will evaluate to 'Y' and the processing loop will stop"
+            },
+            "Rule_Name": "End-of-File Detection on Daily Transaction File",
+            "Rule_Description": "When the system attempts to read a daily transaction record and there are no more records remaining in the Daily Transaction file, the End-of-File condition is detected and the processing loop flag is updated to signal that all transactions have been read."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00053",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The End-of-File flag has been set to 'Y' after all records in the Daily Transaction file have been read",
+                "When": "The system evaluates the End-of-File flag at the top of the processing loop",
+                "Then": "The daily transaction processing loop is exited and the system proceeds to close all open files: Daily Transaction file, Customer file, Cross-Reference file, Card file, Account file, and Transaction file, after which the program ends"
+            },
+            "Rule_Name": "Stop Daily Transaction Processing Loop",
+            "Rule_Description": "Once the End-of-File flag is set to 'Y', confirming all daily transaction records have been read and processed, the transaction processing loop terminates and the program proceeds to the file closure phase."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00054",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All daily transactions have been processed and the program is in the finalization phase",
+                "When": "The program attempts to close the Daily Transaction File",
+                "Then": "If the file closes successfully, the program proceeds to close the Customer File. If the file fails to close, processing stops immediately and no further files are closed."
+            },
+            "Rule_Name": "Close Daily Transaction File After Processing",
+            "Rule_Description": "Once all daily transactions have been processed, the Daily Transaction File must be closed successfully before proceeding to close remaining files."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00055",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File has been successfully closed during program finalization",
+                "When": "The program attempts to close the Customer File",
+                "Then": "If the file closes successfully, the program proceeds to close the Card Cross-Reference File. If the file fails to close, processing stops immediately and no further files are closed."
+            },
+            "Rule_Name": "Close Customer File After Daily Transaction File",
+            "Rule_Description": "After the Daily Transaction File has been successfully closed, the Customer File must be closed before proceeding to close remaining files."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00056",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File has been successfully closed during program finalization",
+                "When": "The program attempts to close the Card Cross-Reference File",
+                "Then": "If the file closes successfully, the program proceeds to close the Card File. If the file fails to close, processing stops immediately and no further files are closed."
+            },
+            "Rule_Name": "Close Card Cross-Reference File After Customer File",
+            "Rule_Description": "After the Customer File has been successfully closed, the Card Cross-Reference File must be closed before proceeding to close remaining files."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00057",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference File has been successfully closed during program finalization",
+                "When": "The program attempts to close the Card File",
+                "Then": "If the file closes successfully, the program proceeds to close the Account File. If the file fails to close, processing stops immediately and no further files are closed."
+            },
+            "Rule_Name": "Close Card File After Card Cross-Reference File",
+            "Rule_Description": "After the Card Cross-Reference File has been successfully closed, the Card File must be closed before proceeding to close remaining files."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00058",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card File has been successfully closed during program finalization",
+                "When": "The program attempts to close the Account File",
+                "Then": "If the file closes successfully, the program proceeds to close the Transaction File. If the file fails to close, processing stops immediately and no further files are closed."
+            },
+            "Rule_Name": "Close Account File After Card File",
+            "Rule_Description": "After the Card File has been successfully closed, the Account File must be closed before proceeding to close the final file."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00059",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File has been successfully closed during program finalization",
+                "When": "The program attempts to close the Transaction File",
+                "Then": "If the file closes successfully, the program reaches its end and terminates normally. If the file fails to close, processing stops immediately and the program does not complete its normal termination."
+            },
+            "Rule_Name": "Close Transaction File as Final Step",
+            "Rule_Description": "After the Account File has been successfully closed, the Transaction File is the last file to be closed, completing the program finalization sequence."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00060",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All daily transactions have been fully processed and the program enters the finalization phase",
+                "When": "The program executes the file closure sequence",
+                "Then": "Files must be closed in the following mandatory order: (1) Daily Transaction File, (2) Customer File, (3) Card Cross-Reference File, (4) Card File, (5) Account File, (6) Transaction File. Each file must close successfully before the next file closure is attempted. If any file fails to close, the remaining files are not closed and the program stops."
+            },
+            "Rule_Name": "Sequential File Closure Order Enforcement",
+            "Rule_Description": "All six files must be closed in a strict sequential order during program finalization: Daily Transaction File first, followed by Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File last."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00061",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All six files \u2014 Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File \u2014 have been successfully closed in the required sequence",
+                "When": "The final Transaction File closure completes successfully",
+                "Then": "The program terminates normally, signaling successful completion of the daily transaction processing run."
+            },
+            "Rule_Name": "Program Normal Termination After All Files Closed",
+            "Rule_Description": "The program CBTRN01C reaches its normal end only after all six files have been successfully closed in sequence."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00062",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read from the Daily Transaction File and the end-of-file indicator is 'N' (not yet reached end of file)",
+                "When": "The transaction record is available for processing",
+                "Then": "The complete transaction record details (including Card Number and Transaction ID) are displayed"
+            },
+            "Rule_Name": "Display Daily Transaction Record Details",
+            "Rule_Description": "When a daily transaction record is successfully read and the end of the daily transaction file has not been reached, the full transaction record details are displayed for visibility and audit purposes."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00063",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and the cross-reference read status is initialized to 0",
+                "When": "The Card Number from the transaction is used as the key to look up the Card Cross-Reference File",
+                "Then": "The system attempts a keyed read of the Card Cross-Reference File using the Card Number as the lookup key, and the result determines whether the card is verified or not"
+            },
+            "Rule_Name": "Look Up Card Number in Card Cross-Reference File",
+            "Rule_Description": "For each daily transaction, the card number from the transaction record is used as a key to perform a direct lookup in the Card Cross-Reference File (XREF-FILE, VSAM KSDS) to verify the card and retrieve associated account and customer information."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00064",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM) and a Transaction ID (DALYTRAN-ID)",
+                "When": "The Card Number is not found in the Card Cross-Reference File (cross-reference read status is set to 4 \u2014 invalid key)",
+                "Then": "A warning message is displayed stating 'CARD NUMBER [DALYTRAN-CARD-NUM] COULD NOT BE VERIFIED. SKIPPING TRANSACTION ID-[DALYTRAN-ID]', and the transaction is skipped without further processing"
+            },
+            "Rule_Name": "Card Number Not Found in Cross-Reference \u2014 Skip Transaction",
+            "Rule_Description": "If the card number from the daily transaction cannot be found in the Card Cross-Reference File, the transaction cannot be verified and must be skipped. A warning message is logged identifying the unverifiable card number and the skipped transaction ID."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00065",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A daily transaction record has been read with a Card Number (DALYTRAN-CARD-NUM)",
+                "When": "The Card Number is found in the Card Cross-Reference File (successful keyed read \u2014 not invalid key)",
+                "Then": "The system retrieves and displays the verified Card Number (XREF-CARD-NUM), the linked Account ID (XREF-ACCT-ID), and the linked Customer ID (XREF-CUST-ID) from the cross-reference record, and the cross-reference read status remains 0 (successful)"
+            },
+            "Rule_Name": "Card Number Verified \u2014 Retrieve Account ID and Customer ID from Cross-Reference",
+            "Rule_Description": "When a card number is successfully verified in the Card Cross-Reference File, the associated Account ID and Customer ID are retrieved from the cross-reference record. These details are confirmed and made available for subsequent account validation."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00066",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card number has been verified in the Cross-Reference File and the Account ID (XREF-ACCT-ID) has been retrieved, and the account read status is initialized to 0",
+                "When": "The Account ID is used as the key to look up the Account File",
+                "Then": "The system attempts a keyed read of the Account File using the Account ID (ACCT-ID) as the lookup key, and the result determines whether the account record is found or not"
+            },
+            "Rule_Name": "Look Up Account Record Using Account ID from Cross-Reference",
+            "Rule_Description": "After a card number is successfully verified and the Account ID is retrieved from the Cross-Reference File, the Account ID is used as a key to perform a direct lookup in the Account File (ACCOUNT-FILE, VSAM KSDS) to retrieve the full account record."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00067",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card number has been verified and the Account ID (ACCT-ID) has been retrieved from the Cross-Reference File",
+                "When": "The Account ID is not found in the Account File (invalid key during keyed read, setting account read status to 4), and the account read status is checked and found to be non-zero",
+                "Then": "A warning message 'INVALID ACCOUNT NUMBER FOUND' is displayed at the time of the failed read, and subsequently 'ACCOUNT [ACCT-ID] NOT FOUND' is displayed; the transaction record processing ends without a valid account record"
+            },
+            "Rule_Name": "Account Record Not Found \u2014 Log Warning",
+            "Rule_Description": "If the Account ID retrieved from the Cross-Reference File does not match any record in the Account File, a warning message is logged identifying the missing account. This covers both the immediate invalid key detection during the file read and the subsequent status check."
+        },
+        {
+            "Rule_Id": "R-CBTRN01C-cbl-00068",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The card number has been verified and the Account ID (ACCT-ID) has been retrieved from the Cross-Reference File",
+                "When": "The Account ID is found in the Account File (successful keyed read \u2014 not invalid key)",
+                "Then": "The full account record (ACCOUNT-RECORD) is successfully retrieved, a message 'SUCCESSFUL READ OF ACCOUNT FILE' is displayed, and the account read status remains 0 (successful), completing the transaction record processing successfully"
+            },
+            "Rule_Name": "Account Record Successfully Retrieved",
+            "Rule_Description": "When the Account ID is found in the Account File, the full account record is successfully retrieved and a confirmation message is displayed. The account read status remains 0, indicating successful retrieval."
+        }
+    ],
+    "description": "CBTRN01C is a batch COBOL program in the CardDemo application that reads daily transaction records sequentially and validates each transaction by cross-referencing the card number against a cross-reference file to retrieve the associated account, then looks up the account details in the account file. It serves as a transaction posting driver, opening all required reference files at startup, processing each daily transaction record, and closing all files upon completion.\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: VSAM (Indexed and Sequential Files)\n- **MQ Calls**: No\n- **Module Type**: Main/Driver module\n\n<br>\n\n### Key Functionalities:\n\n1: Program Initialization - Open all required files (Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File) before processing begins\n\n2: Daily Transaction Record Reading - Sequentially read each transaction record from the Daily Transaction File one at a time until all records are processed\n\n3: Transaction Display - Display the details of each successfully read daily transaction record for visibility and audit purposes\n\n4: Card Number Cross-Reference Lookup - For each transaction, use the card number from the daily transaction to look up the corresponding Account ID and Customer ID from the Card Cross-Reference File\n\n5: Card Number Validation - Verify that the card number from the daily transaction exists in the Cross-Reference File; if not found, log a message indicating the card could not be verified and skip the transaction\n\n6: Account Record Retrieval - Using the Account ID obtained from the Cross-Reference lookup, retrieve the corresponding account details from the Account File\n\n7: Account Validation - Verify that the account associated with the transaction exists in the Account File; if not found, display a message indicating the account was not found\n\n8: Transaction Skipping - When a card number cannot be verified in the Cross-Reference File, skip the current transaction and log the transaction ID that was skipped\n\n9: End-of-File Detection - Detect when all daily transaction records have been read and stop the transaction processing loop\n\n10: Program Finalization - Close all opened files (Daily Transaction File, Customer File, Card Cross-Reference File, Card File, Account File, and Transaction File) after all transactions have been processed\n\n"
+}

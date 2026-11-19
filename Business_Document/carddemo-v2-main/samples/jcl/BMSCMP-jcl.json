@@ -1,0 +1,230 @@
+{
+    "created_on": "2026-11-05",
+    "name": "BMSCMP.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/BMSCMP.jcl",
+    "type": "jcl",
+    "description": "This JCL job compiles a CICS BMS (Basic Mapping Support) map named CICSMAP, assembles it into a load module, generates a DSECT (Data Section) copybook, and then activates the newly compiled map in the running CICS region (CICSAWSA) without requiring a restart.Key Functionalities:\nReads the BMS map source from the CARDDEMO BMS library (CICSMAP member) and copies it to a temporary dataset for processing.\nAssembles the BMS map source using the ASMA90 assembler with MAP parameter to produce an object deck used for link-editing.\nLink-edits the assembled map object into the CARDDEMO load library (CICSMAP member), making it available as an executable CICS map.\nAssembles the BMS map source a second time with DSECT parameter to generate a COBOL copybook, storing the output in the CARDDEMO copy library (CICSMAP member) for use by application programs.\nDisplays the assembly listing on system output by copying the listing dataset, providing a visible record of the compilation results.\nIssues a CICS CEMT command via SDSF to perform a NEWCOPY of the CICSMAP program in the active CICS region (CICSAWSA), immediately activating the newly compiled map without a CICS restart.\nCleans up the temporary dataset (&&TEMPM) at the end of the job to release allocated disk space.",
+    "rules": [
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo BMS source library (AWS.M2.CARDDEMO.BMS) contains the CICSMAP screen map source member",
+                "When": "The BMS Map build process is initiated and the PRINT step executes",
+                "Then": "The CICSMAP screen map source member is successfully retrieved from the CardDemo BMS source library in shared mode, allowing other jobs or users to simultaneously access the same source library without conflict or exclusive lock"
+            },
+            "Rule_Name": "PRINT - IEBGENER - BMS Map Source Retrieval from CardDemo Library",
+            "Rule_Description": "The CICSMAP screen map source member is retrieved from the CardDemo BMS source library as the starting point of the screen map build process. The library is accessed in shared mode to allow concurrent access by other processes or users during retrieval.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CICSMAP screen map source has been retrieved from the CardDemo BMS source library",
+                "When": "The copy operation is performed with no transformation instructions provided (no control statements supplied to the copy utility)",
+                "Then": "An exact, unmodified replica of the CICSMAP screen map source is created in a temporary staging file maintaining the 80-character fixed-length record format, with no data modification, filtering, or transformation applied to the source content"
+            },
+            "Rule_Name": "PRINT - IEBGENER - Exact Copy of BMS Map Source to Temporary Staging Area",
+            "Rule_Description": "The retrieved CICSMAP screen map source is copied exactly as-is into a temporary staging file without any modification, filtering, or transformation. The staging file preserves the 80-character fixed-length record format required for subsequent assembly processing steps.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The CICSMAP screen map source has been successfully copied into the temporary staging file",
+                "When": "The PRINT step completes",
+                "Then": "The temporary staging file containing the BMS Map source is passed to and made available for all subsequent assembly steps, ensuring both the physical screen map assembly step and the symbolic screen map assembly step consume the same staged source version without re-reading the original source library"
+            },
+            "Rule_Name": "PRINT - IEBGENER - Temporary Staged File Availability for Downstream Assembly Steps",
+            "Rule_Description": "Upon successful staging of the BMS Map source, the temporary staging file is made available and passed forward to subsequent assembly steps \u2014 both the physical map assembly and the symbolic map assembly \u2014 ensuring both outputs are always derived from the exact same source version.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The staged CardDemo BMS Map source file (&&TEMPM) is available and has been successfully created by the preceding PRINT step, AND the following macro libraries are accessible in the specified search order: (1) CICS Macro Library (OEM.CICSTS.V05R06M0.CICS.SDFHMAC), (2) IBM System Macro Library (SYS1.MACLIB), (3) IBM Language Environment Macro Library (CEE.SCEEMAC)",
+                "When": "The IBM High-Level Assembler (ASMA90) is invoked with the following three directives applied simultaneously: (1) SYSPARM set to MAP \u2014 instructing the assembler to generate the physical screen map output that defines how CardDemo screens look and behave at runtime, (2) DECK enabled \u2014 instructing the assembler to produce a compiled object deck as output, (3) NOLOAD enabled \u2014 instructing the assembler NOT to produce an executable load module directly, as link-editing will be handled in a separate subsequent step",
+                "Then": "(1) The assembler resolves all BMS macro definitions from the three macro libraries searched in strict order \u2014 CICS macros first, then System macros, then Language Environment macros \u2014 to correctly interpret all BMS screen layout instructions in the source, AND (2) A compiled physical map object deck is produced and written to the temporary dataset (&&MAP) in fixed-length 80-character record format, passed forward to the Link-Edit step for load module creation, AND (3) No executable load module is produced at this step \u2014 load module creation is deferred to the Link-Edit step, AND (4) The assembly listing (diagnostics, field definitions, macro expansions) is written to the job output log only and is NOT permanently saved to any library at this stage (the option to save the listing permanently to AWS.M2.CARDDEMO.LST(CICSMAP) is intentionally disabled for this step), AND (5) The staged BMS Map source file (&&TEMPM) is retained and passed forward for use by the subsequent symbolic map assembly step (DSECT)"
+            },
+            "Rule_Name": "MAP - ASMA90 - Physical BMS Screen Map Assembly from CardDemo BMS Source",
+            "Rule_Description": "This step assembles the staged CardDemo BMS Map source (CICSMAP) using the IBM High-Level Assembler to produce a physical screen map object deck. The physical map defines the runtime screen layout, field positions, field lengths, and display attributes that the CICS environment uses to render CardDemo screens to end users. The assembly listing is written to the job log only and is not permanently saved at this stage.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo BMS Map source (&&TEMPM) contains BMS macro instructions (such as DFHMSD, DFHMDI, DFHMDF) that must be resolved against macro library definitions during assembly",
+                "When": "The assembler encounters a macro instruction in the BMS Map source that requires resolution from a macro library",
+                "Then": "The assembler searches the macro libraries in the following strict order of precedence: (1) FIRST \u2014 CICS Macro Library (OEM.CICSTS.V05R06M0.CICS.SDFHMAC) is searched first, as it contains the primary BMS screen-building macro definitions specific to CICS Version 5.6, AND (2) SECOND \u2014 IBM System Macro Library (SYS1.MACLIB) is searched if the macro is not found in the CICS library, AND (3) THIRD \u2014 IBM Language Environment Macro Library (CEE.SCEEMAC) is searched last if the macro is not found in either of the preceding libraries. The first library in which the macro is found is used, and subsequent libraries are not searched for that macro."
+            },
+            "Rule_Name": "MAP - ASMA90 - Macro Library Search Order for BMS Map Assembly",
+            "Rule_Description": "When assembling the CardDemo BMS Map source, the assembler must resolve BMS macro definitions by searching three macro libraries in a strict, predefined order of precedence. This ensures that CICS-specific BMS screen-building macros take priority over general system macros.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The IBM High-Level Assembler (ASMA90) has successfully assembled the CardDemo BMS Map source with the DECK directive enabled, producing a compiled physical map object deck",
+                "When": "The assembler writes the compiled physical map object deck to the SYSPUNCH output destination",
+                "Then": "(1) The object deck is written to the temporary dataset (&&MAP) in fixed-length, unblocked record format with a record length of 80 characters and a block size of 400 bytes, AND (2) The temporary dataset (&&MAP) is created on disk storage and its disposition is set to PASS \u2014 meaning it is retained and made available to the immediately following Link-Edit step (LKED), AND (3) The temporary dataset (&&MAP) is NOT written to any permanent library at this stage \u2014 it exists solely as an intermediate artifact to bridge the MAP assembly step and the LKED link-edit step, AND (4) No linkage editor input is produced from this step (SYSLIN is set to DUMMY), confirming that load module creation is entirely deferred to the dedicated Link-Edit step"
+            },
+            "Rule_Name": "MAP - ASMA90 - Physical Map Object Deck Output Specification",
+            "Rule_Description": "The compiled physical map object deck produced by the assembly step must conform to a specific format and disposition so that it can be reliably consumed by the subsequent Link-Edit step to produce the final executable screen map load module.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The physical BMS screen map object deck (&&MAP) has been successfully assembled in the prior MAP step and is available as input to the link-edit process",
+                "When": "The link-edit process (HEWL) is executed against the physical map object deck",
+                "Then": "An executable load module named CICSMAP is created and stored as member CICSMAP in the CardDemo application load library (CARDDEMO.LOADLIB), making it immediately available for the CICS runtime to load and render CardDemo screens for end users"
+            },
+            "Rule_Name": "LKED - HEWL - Build Executable Screen Map Load Module",
+            "Rule_Description": "The compiled physical BMS screen map object deck is link-edited into an executable load module and stored in the CardDemo application load library, making it available for the CICS runtime to load and render CardDemo screens for end users.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit process is executing against the physical map object deck to produce the CICSMAP load module",
+                "When": "Non-severe (warning-level) errors are encountered during the link-edit process",
+                "Then": "The link-edit process does NOT stop \u2014 it continues processing and produces the executable CICSMAP load module in the CardDemo load library regardless of the non-severe errors encountered; only critical (severe) errors would prevent the load module from being created"
+            },
+            "Rule_Name": "LKED - HEWL - Continue Link-Edit on Non-Severe Errors",
+            "Rule_Description": "The link-edit process is configured to tolerate non-severe (warning-level) errors and continue producing the executable load module, ensuring the CardDemo screen map build completes as long as no critical errors are present.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The temporary physical map object deck (&&MAP) has been provided as input to the link-edit process",
+                "When": "The link-edit process completes its execution",
+                "Then": "The temporary physical map object deck (&&MAP) is permanently deleted and the associated disk space is released; the object deck is no longer needed as the executable load module now exists in the CardDemo load library"
+            },
+            "Rule_Name": "LKED - HEWL - Delete Physical Map Object Deck After Link-Edit",
+            "Rule_Description": "The temporary physical map object deck (&&MAP) is permanently deleted immediately after it has been consumed by the link-edit process, ensuring temporary build artifacts do not persist beyond their useful life.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit process is executing against the physical map object deck",
+                "When": "The link-edit process completes",
+                "Then": "A detailed link-edit listing (LIST) showing all processed modules AND a cross-reference listing (XREF) of all symbols and entry points are produced and written to the job output log (SYSPRINT), making the full build results immediately available for review without accessing any library dataset directly"
+            },
+            "Rule_Name": "LKED - HEWL - Generate Link-Edit Audit Listing",
+            "Rule_Description": "A detailed listing and a full cross-reference of all symbols and entry points produced during the link-edit process are written to the job output log, providing a complete and reviewable audit trail of the CardDemo screen map build.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo BMS Map source (CICSMAP) has been staged and is ready for symbolic map assembly, and the assembly step is being executed to produce named field definitions for CardDemo application programs",
+                "When": "The IBM High-Level Assembler (ASMA90) is invoked with the following three directives: (1) SYSPARM set to DSECT \u2014 instructing the assembler to generate the symbolic screen map that defines each CardDemo screen field by a meaningful business name rather than by physical screen position, (2) DECK \u2014 instructing the assembler to write the symbolic map output to the designated copybook output destination (SYSPUNCH DD), and (3) NOLOAD \u2014 explicitly instructing the assembler NOT to produce any executable load module, since this step is solely for generating the symbolic field definition copybook",
+                "Then": "The assembler must produce the symbolic screen map (DSECT) output containing all named field definitions for the CICSMAP screen and write it to the CardDemo copybook library destination, AND must not produce any executable load module as output, ensuring that only the symbolic field definition artifact is generated from this assembly step"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Symbolic Screen Map Generation for CardDemo Application Programs",
+            "Rule_Description": "When assembling the BMS Map source for the CardDemo application, the assembler must be configured to generate a symbolic screen map (DSECT) that defines all screen fields by meaningful names for use by CardDemo application programs. The assembler must produce only the symbolic field definition output and must not produce any executable load module during this step.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The staged BMS Map source file (&&TEMPM) is available as input to the assembler, and the CICSMAP member already exists in the CardDemo Copybook Library (CARDDEMO.CPY)",
+                "When": "The BMS Map source is assembled using the symbolic map (DSECT) generation parameter",
+                "Then": "A symbolic map copybook is generated and written into the existing CICSMAP member in the CardDemo Copybook Library (CARDDEMO.CPY(CICSMAP)), defining all screen field names for use by CardDemo application programs; additionally, the staged BMS Map source file (&&TEMPM) is preserved and passed forward for potential use by any subsequent steps in the job"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Symbolic Screen Map Copybook Generation",
+            "Rule_Description": "The staged BMS Map source for CICSMAP is assembled using the symbolic map (DSECT) generation mode to produce a copybook that defines all screen field names. This copybook is stored in the CardDemo Copybook Library and is used by CardDemo application programs to reference screen fields by meaningful business names rather than physical screen positions.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The DSECT symbolic map assembly of the BMS Map source is being executed, and the alternative option of writing the listing only to the job output log (SYSOUT) has been explicitly deactivated",
+                "When": "The assembly process generates its listing output containing all field definitions, macro expansions, and diagnostic messages",
+                "Then": "The full assembly listing is permanently saved to the CICSMAP member in the CardDemo Listing Library (CARDDEMO.LST(CICSMAP)) in shared access mode, making it available for future audit, review, and reference; the listing is NOT written only to the transient job output log"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Permanent Assembly Listing Storage",
+            "Rule_Description": "The assembly listing produced during the symbolic map generation is permanently saved to the CardDemo Listing Library rather than being written only to the transient job output log. This ensures a lasting, retrievable audit record of every screen field definition and diagnostic message produced during the build.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The BMS Map source (CICSMAP) contains CICS BMS macro instructions (such as DFHMSD, DFHMDI, DFHMDF) that must be resolved during the symbolic map assembly",
+                "When": "The assembler searches for macro definitions to resolve the BMS Map source instructions",
+                "Then": "Macro definitions are searched and resolved in the following strict order of precedence: (1) CICS Macro Library \u2014 OEM.CICSTS.V05R06M0.CICS.SDFHMAC (Version 5.6), (2) IBM System Macro Library \u2014 SYS1.MACLIB, (3) IBM Language Environment Macro Library \u2014 CEE.SCEEMAC; the first matching macro definition found in this sequence is used, and CICS-specific definitions always take priority over general system definitions"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Macro Library Resolution Order for Symbolic Map Assembly",
+            "Rule_Description": "During the symbolic map assembly, the assembler resolves BMS macro instructions by searching through three macro libraries in a strictly defined order of precedence. CICS-specific macro definitions take the highest priority, followed by general IBM system macros, and then IBM Language Environment macros.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The DSECT assembly step is executed to generate the symbolic map copybook for CardDemo application programs",
+                "When": "The assembly process completes its execution",
+                "Then": "No executable load module is produced from the symbolic map assembly; the only outputs generated are the symbolic map copybook written to the CardDemo Copybook Library (CARDDEMO.CPY(CICSMAP)) and the assembly listing written to the CardDemo Listing Library (CARDDEMO.LST(CICSMAP)); the load module output channel (SYSLIN) is explicitly suppressed"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Symbolic Map Assembly Produces Copybook Only, Not an Executable",
+            "Rule_Description": "The symbolic map assembly step is explicitly scoped to produce only the screen field name definitions (copybook) for CardDemo application programs. It does not produce an executable load module, keeping the physical screen map (for CICS runtime) and the symbolic map (for application programs) as two distinct, separately managed outputs.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The DSECT assembly step is about to write the generated symbolic map copybook to the CardDemo Copybook Library (CARDDEMO.CPY)",
+                "When": "The assembler attempts to open and write the symbolic map output to the CICSMAP member in the CardDemo Copybook Library",
+                "Then": "The CICSMAP member in the CardDemo Copybook Library (CARDDEMO.CPY(CICSMAP)) must already exist prior to this step executing; if the member does not pre-exist, the step will fail immediately and the symbolic map copybook will not be generated or updated"
+            },
+            "Rule_Name": "DSECT - ASMA90 - Copybook Member Pre-existence Requirement",
+            "Rule_Description": "Before the symbolic map assembly step can write its output, the CICSMAP member must already exist in the CardDemo Copybook Library. The step is designed to update an existing copybook member, not to create a new one. If the member does not pre-exist, the step will fail and no symbolic map copybook will be produced.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The CICSMAP assembly listing has been generated and permanently stored in the CardDemo listing library (CARDDEMO.LST) as a result of the preceding symbolic map assembly step",
+                "When": "The DISPLIST step executes using the IEBGENER file copy utility, reading the CICSMAP member from the CardDemo listing library in shared mode",
+                "Then": "The complete content of the CICSMAP assembly listing is copied from the CardDemo listing library and written to the job output log, making the full assembly build results immediately visible to anyone reviewing the job execution output"
+            },
+            "Rule_Name": "DISPLIST - IEBGENER - Publish CICSMAP Assembly Listing to Job Output Log",
+            "Rule_Description": "After the CICSMAP symbolic map assembly completes and the listing is permanently saved to the CardDemo listing library, the same listing is copied to the job output log. This makes the full build results immediately accessible for review without requiring direct access to the CardDemo listing library dataset.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The CICSMAP assembly listing is available in the CardDemo listing library and the DISPLIST step is initiated with no control statements provided (SYSIN=DUMMY)",
+                "When": "The IEBGENER file copy utility processes the CICSMAP assembly listing",
+                "Then": "The assembly listing is copied verbatim to the job output log \u2014 every record is reproduced exactly as stored with no filtering, no record selection, no reformatting, and no transformation of any kind applied to the listing content"
+            },
+            "Rule_Name": "DISPLIST - IEBGENER - Reproduce CICSMAP Assembly Listing Without Modification",
+            "Rule_Description": "The CICSMAP assembly listing must be displayed in the job output log exactly as it was stored in the CardDemo listing library. No filtering, record selection, reformatting, or any other transformation is permitted during this display step, ensuring the listing accurately reflects the true output of the symbolic map assembly.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The temporary BMS Map source staging file (TEMPM) exists and has already been used as input by both the physical map assembly step (MAP) and the symbolic map assembly step (DSECT) during the CardDemo CICSMAP build process",
+                "When": "The DELTEMP cleanup step is executed after all assembly and link-edit steps have completed",
+                "Then": "The temporary BMS Map source staging file (TEMPM) is permanently deleted and the storage space it occupied is released, ensuring no temporary build artifacts remain after the CardDemo CICSMAP build process is complete"
+            },
+            "Rule_Name": "DELTEMP - IEFBR14 - Temporary BMS Map Source File Cleanup",
+            "Rule_Description": "After the BMS Map source has been successfully staged and consumed by both the physical map assembly step and the symbolic map assembly step, the temporary staging file holding the BMS Map source is permanently deleted to release storage resources and ensure no residual temporary data remains after the build process completes.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-BMSCMP-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo CICSMAP BMS screen map has been compiled and the new executable load module has been stored in the CardDemo application load library (CARDDEMO.LOADLIB), AND the live CICS application region CICSAWSA is currently running and serving CardDemo end users with the previously active version of the CICSMAP screen map",
+                "When": "The system issues a MODIFY command targeting the live CICS application region CICSAWSA with the instruction 'CEMT SET PROG(CICSMAP) NEWCOPY', directing CICS to load a fresh copy of the CICSMAP screen map from the CardDemo load library",
+                "Then": "The live CICS application region CICSAWSA immediately discards the currently loaded version of the CICSMAP screen map and reloads the newly compiled version from the CardDemo application load library, AND all subsequent CardDemo user transactions will use the newly compiled CICSMAP screen map, AND this activation takes effect without requiring a CICS region restart or any interruption to CardDemo application service"
+            },
+            "Rule_Name": "SDSF1 - SDSF - Activate Newly Compiled CardDemo Screen Map in Live CICS Region",
+            "Rule_Description": "After the CardDemo CICSMAP BMS screen map has been successfully compiled and stored in the application load library, the live CICS application region must be instructed to immediately reload and activate the new screen map version. This ensures CardDemo end users begin using the updated screen map on their very next transaction without any service interruption or CICS region restart.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#fff\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#fff\n\n    START([Start: CardDemo CICS BMS Map\nBuild and Deploy Job]):::start\n\n    DS_BMS[(CardDemo BMS Source Library\nCARDDEMO.BMS\nMember: CICSMAP)]:::datasource\n    DS_TEMPM[(Temporary BMS Map\nSource Staging File\n&&TEMPM)]:::datasource\n    DS_MAP[(Temporary Physical Map\nObject Deck\n&&MAP)]:::datasource\n    DS_LOADLIB[(CardDemo Application\nLoad Library\nCARDDEMO.LOADLIB\nMember: CICSMAP)]:::datasource\n    DS_CPY[(CardDemo Application\nCopybook Library\nCARDDEMO.CPY\nMember: CICSMAP)]:::datasource\n    DS_LST[(CardDemo Application\nListing Library\nCARDDEMO.LST\nMember: CICSMAP)]:::datasource\n    CICS_REGION[(Live CICS Application Region\nCICSAWSA)]:::datasource\n\n    STEP1[PRINT - IEBGENER\nStage BMS Map Source Code\nfor Assembly Processing]:::process\n    STEP2[MAP - ASMA90\nAssemble Physical CICS Screen Map\nDefines Screen Layout and Field Positions for CICS Runtime]:::process\n    STEP3[LKED - HEWL\nBuild Executable Screen Map Load Module\nLink-Edit Physical Map into CardDemo Load Library]:::process\n    STEP4[DSECT - ASMA90\nAssemble Symbolic CICS Screen Map\nGenerate Named Field Definitions for CardDemo Application Programs]:::process\n    STEP5[DISPLIST - IEBGENER\nDisplay Assembly Listing\nPrint Symbolic Map Build Results to Job Log for Review]:::process\n    STEP6[DELTEMP - IEFBR14\nCleanup Temporary Work Files\nDelete Temporary BMS Map Source Staging File]:::process\n    STEP7[SDSF1 - SDSF\nActivate Updated Screen Map in Live CICS\nIssue CEMT NEWCOPY Command to CICS Region CICSAWSA]:::process\n\n    END_NODE([End: CardDemo CICSMAP Screen Map\nSuccessfully Built and Deployed\nActive in CICS Region CICSAWSA]):::final\n\n    START --> STEP1\n    DS_BMS -.->|Read: BMS Map Source Member CICSMAP| STEP1\n    STEP1 -.->|Write: Staged Source File| DS_TEMPM\n    STEP1 --> STEP2\n    DS_TEMPM -.->|Read: BMS Map Source for Physical Map Assembly| STEP2\n    STEP2 -.->|Write: Physical Map Object Deck| DS_MAP\n    STEP2 --> STEP3\n    DS_MAP -.->|Read: Physical Map Object Deck| STEP3\n    STEP3 -.->|Write: Executable Load Module CICSMAP| DS_LOADLIB\n    STEP3 --> STEP4\n    DS_TEMPM -.->|Read: BMS Map Source for Symbolic Map Assembly| STEP4\n    STEP4 -.->|Write: Symbolic Map Copybook CICSMAP| DS_CPY\n    STEP4 -.->|Write: Assembly Listing CICSMAP| DS_LST\n    STEP4 --> STEP5\n    DS_LST -.->|Read: Assembly Listing for Display| STEP5\n    STEP5 --> STEP6\n    DS_TEMPM -.->|Delete: Temporary Staging File| STEP6\n    STEP6 --> STEP7\n    DS_LOADLIB -.->|New CICSMAP Load Module Ready for Activation| STEP7\n    STEP7 -.->|Issue CEMT NEWCOPY: Reload CICSMAP from Load Library| CICS_REGION\n    STEP7 --> END_NODE"
+}

@@ -1,0 +1,43 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CICCMP.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/CICCMP.jcl",
+    "type": "jcl",
+    "description": "This JCL compiles a CICS program named CICSPGMN using a build procedure (BUILDONL) and then refreshes the program in the active CICS region (CICSAWSA) so that the newly compiled version is immediately available for use without requiring a CICS restart.Key Functionalities:\nCompiles the CICS application program CICSPGMN using the BUILDONL procedure sourced from the AWS.M2 utility procedure library.\nAfter a successful compilation (condition code less than 4), issues a CICS NEWCOPY command to the CICSAWSA CICS region, forcing CICS to load the newly compiled version of program CICSPGMN into memory.\nEnsures the updated business logic in CICSPGMN is immediately active in the CICS environment without any service interruption or region restart.",
+    "rules": [
+        {
+            "Rule_Id": "R-CICCMP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CICS program CICSPGMN has been submitted for compilation in the prior job step",
+                "When": "The compilation step completes with a return code of 4 or greater, indicating errors or failure",
+                "Then": "The CICS program refresh step is skipped entirely, and the CICS region CICSAWSA continues running the existing version of CICSPGMN without any changes"
+            },
+            "Rule_Name": "NEWCOPY - SDSF - Conditional CICS Program Refresh Based on Compilation Outcome",
+            "Rule_Description": "This step determines whether the CICS program refresh should proceed based on the outcome of the prior compilation step. The CICS region CICSAWSA is only updated with the new version of CICSPGMN if the compilation completed successfully without errors.",
+            "Rule_Type": "Decision Rule"
+        },
+        {
+            "Rule_Id": "R-CICCMP-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CICS program CICSPGMN has been successfully compiled with a return code less than 4, and the CICS region CICSAWSA is actively running",
+                "When": "The NEWCOPY step executes and issues the CEMT SET PROG(CICSPGMN) NEWCOPY command to the CICS region CICSAWSA",
+                "Then": "The CICS region CICSAWSA immediately discards the old in-memory version of CICSPGMN and reloads the newly compiled version from the load library, making the updated program live without requiring a CICS region restart"
+            },
+            "Rule_Name": "NEWCOPY - SDSF - Automatic Live Deployment of Newly Compiled CICS Program",
+            "Rule_Description": "Upon successful compilation of CICSPGMN, this step automatically instructs the live CICS region CICSAWSA to discard its in-memory copy of the program and immediately reload the newly compiled version, enabling zero-downtime deployment.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-CICCMP-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The NEWCOPY step has been triggered to issue the CICS refresh command to region CICSAWSA",
+                "When": "The CEMT SET PROG(CICSPGMN) NEWCOPY command is processed by SDSF and a response is returned from the CICS region CICSAWSA",
+                "Then": "All SDSF processing messages are written to the job output log under ISFOUT, and the CICS command execution response is written to the job output log under CMDOUT, creating a permanent audit record of the deployment"
+            },
+            "Rule_Name": "NEWCOPY - SDSF - Audit Logging of CICS Refresh Command Execution",
+            "Rule_Description": "All outputs from the CICS refresh command execution \u2014 including SDSF processing messages and the CICS command response \u2014 are captured and retained in the job output log to provide a verifiable audit trail of the deployment activity.",
+            "Rule_Type": "Process Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000,font-weight:bold\n    classDef process fill:#6699ff,stroke:#333,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,stroke:#333,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,stroke:#333,color:#000,font-weight:bold\n    classDef final fill:#ae74de,stroke:#333,color:#fff,font-weight:bold\n    classDef success fill:#22c55e,stroke:#333,color:#fff,font-weight:bold\n    classDef error fill:#ef4444,stroke:#333,color:#fff,font-weight:bold\n\n    A([JOB START]):::start\n\n    B{Prior Steps Completed\nSuccessfully?\nReturn Code Less Than 4?}:::decision\n\n    C[_NEWCOPY - SDSF\nIssue CICS Operator Command to Refresh\nProgram CICSPGMN in CICS Region CICSAWSA\nCEMT SET PROG NEWCOPY_]:::process\n\n    D([STEP BYPASSED\nPrior Steps Returned\nError Code 4 or Higher\nCICS Program NOT Refreshed]):::error\n\n    E([JOB END\nCICS Program CICSPGMN\nSuccessfully Refreshed\nNew Version Now Active in CICSAWSA]):::success\n\n    A --> B\n    B -->|YES - All Prior Steps Passed| C\n    B -->|NO - Prior Step Failed| D\n    C --> E"
+}

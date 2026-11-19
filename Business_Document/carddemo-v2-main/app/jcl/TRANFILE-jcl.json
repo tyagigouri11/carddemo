@@ -1,0 +1,252 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job initializes and rebuilds the Transaction Master VSAM file structure for the CardDemo application. It deletes existing VSAM files, recreates the primary keyed cluster and alternate index, loads initial transaction data, and reopens the files for online CICS processing.Key Functionalities:\nCloses the Transaction (TRANSACT) and Alternate Index (CXACAIX) CICS files before any structural changes to prevent data corruption during the rebuild process.\nDeletes the existing Transaction VSAM KSDS cluster (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) and its Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX), suppressing warnings for conditions up to return code 8 (e.g., file not found).\nRecreates the Transaction VSAM KSDS cluster with a primary key of 16 bytes starting at offset 0, fixed record size of 350 bytes, allocated 1 primary cylinder with 5 secondary cylinders on volume AWSHJ1, with share options (2,3).\nLoads initial transaction data from the sequential seed file (AWS.M2.CARDDEMO.DALYTRAN.PS.INIT) into the newly created VSAM KSDS cluster.\nDefines a new Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) on the KSDS with a non-unique key of 26 bytes at offset 304, allocated 5 primary cylinders with 1 secondary cylinder, set to automatically upgrade when the base cluster is updated.\nCreates an Access Path (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH) for the Alternate Index to enable access to the KSDS via the alternate key.\nBuilds the Alternate Index entries by scanning the base KSDS cluster and populating the AIX dataset.\nReopens the TRANSACT and CXACAIX CICS files to restore online transaction processing availability after the rebuild is complete.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo Transaction Master File rebuild job has been initiated AND the CICS region CICSAWSA is actively serving online users with access to the Transaction Primary File (TRANSACT)",
+                "When": "The batch job begins its pre-processing phase and issues a command to the CICSAWSA CICS region to close the TRANSACT file",
+                "Then": "The TRANSACT file in the CICSAWSA CICS region must be closed AND online users must no longer be able to access Transaction records via Transaction ID lookup through the CICS online interface until the file is explicitly reopened at the end of the rebuild process"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CICS Transaction Primary File Before Batch Rebuild",
+            "Rule_Description": "Before the Transaction Master File rebuild process begins, the CICS online Transaction Primary File (TRANSACT) must be closed in the CICSAWSA region to prevent simultaneous online and batch access, ensuring data integrity during the rebuild.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo Transaction Master File rebuild job has been initiated AND the CICS region CICSAWSA is actively serving online users with access to the Card Number Alternate Index File (CXACAIX)",
+                "When": "The batch job begins its pre-processing phase and issues a command to the CICSAWSA CICS region to close the CXACAIX file",
+                "Then": "The CXACAIX file in the CICSAWSA CICS region must be closed AND online users must no longer be able to retrieve Transaction records by Card Number through the CICS online interface until the file is explicitly reopened at the end of the rebuild process"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CICS Card Number Alternate Index File Before Batch Rebuild",
+            "Rule_Description": "Before the Transaction Master File rebuild process begins, the CICS online Card Number Alternate Index File (CXACAIX) must be closed in the CICSAWSA region to prevent simultaneous online and batch access, ensuring data integrity during the rebuild.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master File rebuild process has been initiated and the CICS Transaction files have already been closed for batch processing",
+                "When": "The system attempts to delete the Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) including all its components (data and index)",
+                "Then": "If the deletion completes successfully (return code = 0), the Transaction Primary Dataset is fully removed and processing continues to the next deletion; AND if the dataset does not exist (return code = 8), this is treated as a successful outcome (return code is reset to 0) and processing continues to the next deletion; AND if the deletion fails for any other reason (return code greater than 8, such as the dataset being in use, a security violation, or a system error), the step fails and the entire job stops with no further steps executed"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Transaction Primary Dataset Before Rebuild",
+            "Rule_Description": "Before rebuilding the Transaction Master File system from scratch, the existing Transaction Primary Dataset (KSDS) must be deleted. The process must tolerate the case where the dataset does not yet exist, treating it as a successful outcome so that the rebuild can safely proceed in both fresh and existing environments.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Primary Dataset deletion in the same step has completed successfully (or was found absent and treated as success), and the process is now proceeding to remove the Card Number Alternate Index",
+                "When": "The system attempts to delete the Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) which provides Card Number-based access to Transaction records",
+                "Then": "If the deletion completes successfully (return code = 0), the Card Number Alternate Index is fully removed and the step completes successfully, allowing the job to proceed to dataset recreation; AND if the Alternate Index does not exist (return code = 8), this is treated as a successful outcome (return code is reset to 0) and the step completes successfully, allowing the job to proceed to dataset recreation; AND if the deletion fails for any other reason (return code greater than 8, such as the index being in use, a security violation, or a system error), the step fails and the entire job stops with no further steps executed, leaving the Transaction Master File system in an incomplete state"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Card Number Alternate Index Before Rebuild",
+            "Rule_Description": "As part of the Transaction Master File rebuild, the existing Card Number Alternate Index must also be deleted after the Transaction Primary Dataset is removed. The process must equally tolerate the case where the Alternate Index does not yet exist, treating it as a successful outcome so that the rebuild can safely proceed in both fresh and existing environments.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A new Transaction Master Dataset needs to be created for the CardDemo application",
+                "When": "The Transaction Master Dataset is defined in the system",
+                "Then": "The dataset must be created with the official name 'AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS', organized as an indexed (Key-Sequenced) dataset, with a dedicated Data component named 'AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA' and a dedicated Index component named 'AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX'"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Master Dataset Identity",
+            "Rule_Description": "Establishes the official name and structural identity of the Transaction Master Dataset as a Key-Sequenced (indexed) data store within the CardDemo system, ensuring it is uniquely identifiable and organized for direct Transaction ID-based access.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master Dataset is being defined with a primary key for record identification",
+                "When": "The key structure of the Transaction Master Dataset is configured",
+                "Then": "The Transaction ID must be defined as the primary key with a length of exactly 16 bytes, starting at the very first byte (position 0) of every Transaction record, ensuring every transaction is uniquely identifiable and directly retrievable by its Transaction ID"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Record Key Structure",
+            "Rule_Description": "Establishes the Transaction ID as the primary unique identifier for every Transaction record, defining its exact position and length within the record layout so that every transaction can be directly located and retrieved by its Transaction ID.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master Dataset is being defined with a record size specification",
+                "When": "A Transaction record is stored in or retrieved from the Transaction Master Dataset",
+                "Then": "Every Transaction record must be exactly 350 bytes in both minimum and maximum length (RECORDSIZE 350 350), meaning no variable-length records are permitted \u2014 all Transaction records must conform to the fixed 350-byte structure"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed Transaction Record Size",
+            "Rule_Description": "Enforces that every Transaction record stored in the Transaction Master Dataset must be exactly 350 bytes in length \u2014 no shorter and no longer \u2014 ensuring uniform record structure across all transactions in the CardDemo system.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master Dataset requires physical disk storage allocation",
+                "When": "The Transaction Master Dataset is created on the system",
+                "Then": "The dataset must be allocated on disk volume AWSHJ1 with an initial primary allocation of 1 cylinder, and must be permitted to automatically expand by up to 5 additional secondary cylinders when the primary allocation is exhausted, for a maximum total capacity of 6 cylinders"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Dataset Storage Allocation",
+            "Rule_Description": "Defines the initial and maximum storage capacity for the Transaction Master Dataset on a designated disk volume, ensuring sufficient space is reserved for Transaction data while allowing for controlled growth as transaction volume increases.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master Dataset may be accessed by multiple batch jobs or systems simultaneously",
+                "When": "The concurrent access policy for the Transaction Master Dataset is configured",
+                "Then": "The dataset must enforce Share Option 2 for cross-region access (multiple jobs within the same system may read simultaneously, but only one job may write at a time) and Share Option 3 for cross-system access (multiple systems may read or write simultaneously), as defined by SHAREOPTIONS(2 3)"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Concurrent Access Policy for Transaction Data",
+            "Rule_Description": "Defines the rules governing simultaneous access to the Transaction Master Dataset by multiple batch jobs and systems, protecting Transaction data integrity while allowing controlled concurrent read access across the CardDemo processing environment.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master Dataset contains sensitive financial transaction records",
+                "When": "The Transaction Master Dataset is deleted from the system at any point in the future",
+                "Then": "All Transaction data stored in the dataset must be physically erased from the disk (ERASE attribute), ensuring that sensitive financial transaction information cannot be recovered or reconstructed by any means after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Transaction Data Security on Deletion",
+            "Rule_Description": "Enforces a data security policy requiring that all Transaction data is physically and permanently wiped from disk whenever the Transaction Master Dataset is deleted, preventing unauthorized recovery of sensitive financial transaction information.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction Initialization flat file (AWS.M2.CARDDEMO.DALYTRAN.PS.INIT) exists and contains Card Transaction records, AND the Transaction VSAM Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) has been freshly created and is empty, AND both datasets are available for shared access",
+                "When": "The Transaction record load process is triggered to populate the Transaction Master Dataset from the Daily Transaction Initialization file",
+                "Then": "Every Card Transaction record from the Daily Transaction Initialization flat file is copied in its entirety (all 350 bytes per record) into the Transaction VSAM Primary Dataset, AND all copied Transaction records are automatically organized and stored in ascending order by their Transaction ID (the unique 16-byte identifier at the start of each record), AND upon successful completion the Transaction VSAM Primary Dataset contains a complete and fully indexed copy of all initial daily Transaction records ready for both direct Transaction ID-based lookup and sequential browsing, AND if the load fails for any reason (such as a duplicate Transaction ID, source file unavailable, or insufficient storage space) the step fails and no further processing occurs leaving the Transaction dataset empty or incomplete and unusable"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Load Daily Transaction Records into Transaction Master Dataset",
+            "Rule_Description": "This step loads all Card Transaction records from the Daily Transaction Initialization flat file into the Transaction VSAM Primary Dataset. All records are copied in full without filtering or transformation, and are automatically organized by Transaction ID upon entry into the VSAM dataset. Both the source and target datasets are accessed in shared mode, allowing other processes to read them concurrently during the load.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) exists and contains Transaction records, and no Alternate Index named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX currently exists",
+                "When": "The Card Number Alternate Index definition is executed",
+                "Then": "A new Alternate Index named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX must be created and formally associated with the Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) as its base cluster, establishing Card Number as a valid secondary access path to Transaction records"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Card Number Alternate Index Over Transaction Master Dataset",
+            "Rule_Description": "Define a secondary index structure over the Transaction Master Dataset that enables retrieval of Transaction records using Card Number as a lookup key, establishing the relationship between the Alternate Index and the Transaction Primary Dataset.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "Each Transaction record in the Transaction Primary Dataset is exactly 350 bytes in fixed length",
+                "When": "The Alternate Index key definition is applied",
+                "Then": "The Card Number field \u2014 spanning 26 bytes starting at byte position 304 within each Transaction record \u2014 must be designated as the secondary lookup key for the Alternate Index, so that any search by Card Number uses exactly these 26 bytes at position 304 to locate matching Transaction records"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Card Number as Secondary Lookup Key for Transaction Records",
+            "Rule_Description": "Designate the Card Number field \u2014 located at a specific position within each Transaction record \u2014 as the secondary key for the Alternate Index, enabling Transaction records to be retrieved by Card Number in addition to Transaction ID.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index is being defined over the Transaction Primary Dataset",
+                "When": "The NONUNIQUEKEY policy is applied to the Alternate Index",
+                "Then": "The Alternate Index must allow multiple Transaction records to share the same Card Number key value \u2014 meaning one Card Number can map to many Transaction IDs \u2014 and the index must store and return all Transaction records associated with a given Card Number when a Card Number-based lookup is performed"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Allow Multiple Transactions Per Card Number",
+            "Rule_Description": "Enforce the business rule that a single Credit Card Number can be associated with many Transaction records, reflecting the real-world relationship where one card generates multiple transactions over time.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index has been defined with the UPGRADE attribute over the Transaction Primary Dataset",
+                "When": "A Transaction record is added to or deleted from the Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) by any batch or online process",
+                "Then": "The Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) must be automatically updated to reflect the change \u2014 new Card Number-to-Transaction-ID mappings must be added for inserted records, and existing mappings must be removed for deleted records \u2014 without requiring any separate manual index maintenance job"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Automatically Synchronize Card Number Index When Transaction Data Changes",
+            "Rule_Description": "Ensure the Card Number Alternate Index remains current and accurate at all times by automatically reflecting any additions or deletions of Transaction records in the Transaction Primary Dataset without requiring manual index maintenance.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index is being defined to mirror the structure of the Transaction Primary Dataset",
+                "When": "The record size definition is applied to the Alternate Index",
+                "Then": "Both the minimum and maximum record size of the Alternate Index must be set to exactly 350 bytes \u2014 no Alternate Index record may be shorter or longer than 350 bytes \u2014 ensuring structural consistency between the Alternate Index and the Transaction Primary Dataset"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Enforce Fixed Record Size for Card Number Alternate Index",
+            "Rule_Description": "Enforce that all records within the Card Number Alternate Index conform to a fixed length of 350 bytes, consistent with the Transaction Primary Dataset record structure.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index is being created for the first time on the mainframe storage environment",
+                "When": "The storage allocation definition is applied",
+                "Then": "The Alternate Index must be allocated on disk volume AWSHJ1 with a primary allocation of 5 cylinders and a secondary (overflow) allocation of 1 additional cylinder \u2014 the primary allocation of 5 cylinders must be reserved immediately upon creation, and the secondary cylinder must be automatically acquired if the index grows beyond the initial 5 cylinders"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Allocate Dedicated Storage for Card Number Alternate Index",
+            "Rule_Description": "Allocate sufficient and expandable disk storage for the Card Number Alternate Index on the designated storage volume to support the expected volume of Card Number-to-Transaction mappings.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) is being defined",
+                "When": "The component naming definition is applied",
+                "Then": "Two distinct named components must be created: (1) a DATA component named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA \u2014 which physically stores the Card Number-to-Transaction-ID mapping records \u2014 and (2) an INDEX component named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX \u2014 which stores the index structure used to navigate the data component \u2014 both components must be independently identifiable and manageable by their respective names"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Named Data and Index Components for Card Number Alternate Index",
+            "Rule_Description": "Establish uniquely named physical storage components for the Card Number Alternate Index \u2014 one for the actual index data records and one for the index structure \u2014 enabling independent management and identification of each component.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) has been successfully defined in the previous step (STEP20) and exists on disk volume AWSHJ1",
+                "When": "The system is requested to define a new named access path called AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH with its entry point set to the Card Number Alternate Index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+                "Then": "A permanent named logical access path AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH is successfully created and registered, linking application programs to the Card Number Alternate Index so that any program opening this path by name can retrieve all Transaction records associated with a given Credit Card Number; if the path definition fails for any reason (e.g., the Alternate Index does not exist, naming conflict, or system error), the step fails and the job stops, leaving Card Number-based Transaction lookup unavailable to both online CICS users and batch programs"
+            },
+            "Rule_Name": "STEP25 - IDCAMS - Define Card Number Transaction Lookup Access Path",
+            "Rule_Description": "This step creates a named logical access path called AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH that serves as the stable, application-facing entry point for retrieving Card Transaction records by Card Number. The path is permanently linked to the Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX), enabling CardDemo application programs to look up all transactions associated with a specific Credit Card without needing to reference the underlying index structure directly.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) has been successfully created and populated with all initial daily Transaction records, AND the Card Number Alternate Index structure (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) has been defined with Card Number (26 bytes at byte position 304 of each 350-byte Transaction record) as the secondary lookup key, AND the Alternate Index is currently empty (no index entries exist yet)",
+                "When": "The BLDINDEX process is executed reading every Transaction record sequentially from the Transaction Primary Dataset (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) and writing all resulting Card Number-to-Transaction-ID mappings into the Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)",
+                "Then": "The Card Number Alternate Index must be fully populated with an index entry for every unique Card Number found across all Transaction records, AND each Card Number index entry must reference ALL Transaction IDs that share that same Card Number (reflecting the one-card-to-many-transactions business relationship), AND upon successful completion, CardDemo application programs must be able to retrieve all Transaction records belonging to a specific Credit Card Number by opening the Card Number Access Path (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH), AND if the BLDINDEX process fails for any reason (e.g., source dataset unavailable, target index structure missing, or insufficient disk space), the Card Number Alternate Index remains empty and all Card Number-based Transaction lookup functions return no data, causing the step and job to fail"
+            },
+            "Rule_Name": "STEP30 - IDCAMS BLDINDEX - Build Card Number Alternate Index from Transaction Records",
+            "Rule_Description": "After the Transaction Primary Dataset has been loaded with all daily Transaction records, this step scans every Transaction record and builds the Card Number Alternate Index. This enables CardDemo application programs to retrieve all transactions associated with a specific Credit Card Number using the pre-defined Card Number Access Path.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00021",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master File batch rebuild process (dataset deletion, creation, data load, alternate index definition, path definition, and index build) has fully completed, AND the TRANSACT file in CICS region CICSAWSA is currently in a CLOSED state from the pre-processing step",
+                "When": "The OPCIFIL step executes and issues the CEMT SET FILE command targeting the TRANSACT file in CICS region CICSAWSA with the OPEN directive",
+                "Then": "The TRANSACT file in CICS region CICSAWSA is set to OPEN status, restoring online user access to Transaction records via Transaction ID-based lookup and posting through CICS application screens"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Restore Online Transaction File Access After Batch Rebuild",
+            "Rule_Description": "After the Transaction Master File batch rebuild is fully completed, the TRANSACT file in the CICS online region CICSAWSA must be reopened so that online users can resume Transaction ID-based inquiries and postings.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANFILE-jcl-00022",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master File batch rebuild process (including the Card Number Alternate Index build in STEP30) has fully completed, AND the CXACAIX file in CICS region CICSAWSA is currently in a CLOSED state from the pre-processing step",
+                "When": "The OPCIFIL step executes and issues the CEMT SET FILE command targeting the CXACAIX file in CICS region CICSAWSA with the OPEN directive",
+                "Then": "The CXACAIX file in CICS region CICSAWSA is set to OPEN status, restoring online user access to Card Number-based Transaction history lookups \u2014 enabling retrieval of all transactions associated with a specific Credit Card Number through CICS application screens"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Restore Online Card Number Transaction Lookup Access After Batch Rebuild",
+            "Rule_Description": "After the Transaction Master File batch rebuild is fully completed, the CXACAIX file (Card Number Alternate Index path) in the CICS online region CICSAWSA must be reopened so that online users can resume Card Number-based Transaction history inquiries.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    START([Job Start\nCardDemo Transaction\nFile Setup and Rebuild]):::start\n\n    CLCIFIL[CLCIFIL - SDSF\nClose CICS Transaction Files\nTRANSACT and CXACAIX in CICSAWSA Region]:::process\n    D1{CICS Files\nClosed\nSuccessfully?}:::decision\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Transaction\nVSAM Datasets for Clean Rebuild]:::process\n    D2{Deletion Complete?\nRC le 8 Treated\nas Success}:::decision\n\n    STEP10[STEP10 - IDCAMS\nDefine New Transaction\nVSAM Primary Dataset\nKeyed by Transaction ID]:::process\n    D3{Transaction VSAM\nPrimary Dataset\nDefined Successfully?}:::decision\n\n    STEP15[STEP15 - IDCAMS\nLoad Transaction Records\nfrom Sequential File\ninto VSAM Primary Dataset]:::process\n    D4{Transaction Records\nLoaded\nSuccessfully?}:::decision\n\n    STEP20[STEP20 - IDCAMS\nDefine Card Number\nAlternate Index\nfor Secondary Key Access]:::process\n    D5{Card Number\nAlternate Index\nDefined Successfully?}:::decision\n\n    STEP25[STEP25 - IDCAMS\nDefine Card Number\nAlternate Index\nAccess Path]:::process\n    D6{Card Number\nAccess Path\nDefined Successfully?}:::decision\n\n    STEP30[STEP30 - IDCAMS\nBuild and Populate\nCard Number\nAlternate Index]:::process\n    D7{Card Number Index\nBuilt\nSuccessfully?}:::decision\n\n    OPCIFIL[OPCIFIL - SDSF\nReopen CICS Transaction Files\nTRANSACT and CXACAIX in CICSAWSA Region]:::process\n    D8{CICS Files\nReopened\nSuccessfully?}:::decision\n\n    KSDS[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\nTransaction Primary Dataset\nKeyed by Transaction ID)]:::datasource\n    AIX[(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX\nCard Number Alternate Index\nKeyed by Card Number)]:::datasource\n    SEQFILE[(TRANSACT-FILE\nAWS.M2.CARDDEMO.DALYTRAN.PS.INIT\nInitial Daily Transaction Records)]:::datasource\n\n    SUCCESS([Job Complete\nTransaction Files Fully Rebuilt\nReady for Online and Batch Processing]):::success\n    ERR1([Error - CICS File Close Failed\nBatch Cannot Safely Access Files]):::error\n    ERR2([Error - Dataset Deletion Failed\nUnable to Rebuild Transaction Files]):::error\n    ERR3([Error - VSAM Definition Failed\nTransaction Dataset Not Created]):::error\n    ERR4([Error - Transaction Load Failed\nNo Data in Transaction Dataset]):::error\n    ERR5([Error - Alternate Index Definition Failed\nCard Number Lookup Unavailable]):::error\n    ERR6([Error - Access Path Definition Failed\nCard Number Lookup Unavailable]):::error\n    ERR7([Error - Alternate Index Build Failed\nCard Number Lookup Returns No Data]):::error\n    ERR8([Error - CICS File Reopen Failed\nOnline Users Cannot Access Transactions]):::error\n\n    START --> CLCIFIL\n    CLCIFIL --> D1\n    D1 -->|Yes - Files Closed| STEP05\n    D1 -->|No| ERR1\n\n    STEP05 -.->|Delete Transaction Primary Dataset| KSDS\n    STEP05 -.->|Delete Card Number Alternate Index| AIX\n    STEP05 --> D2\n    D2 -->|Yes - Datasets Removed or Not Found| STEP10\n    D2 -->|No - Hard Failure RC gt 8| ERR2\n\n    STEP10 -.->|Create Empty Transaction KSDS| KSDS\n    STEP10 --> D3\n    D3 -->|Yes| STEP15\n    D3 -->|No| ERR3\n\n    SEQFILE -.->|Read All Transaction Records| STEP15\n    STEP15 -.->|Load Records Indexed by Transaction ID| KSDS\n    STEP15 --> D4\n    D4 -->|Yes| STEP20\n    D4 -->|No| ERR4\n\n    STEP20 -.->|Define Card Number Secondary Index over KSDS| AIX\n    STEP20 --> D5\n    D5 -->|Yes| STEP25\n    D5 -->|No| ERR5\n\n    STEP25 -.->|Create Card Number Lookup Access Path| AIX\n    STEP25 --> D6\n    D6 -->|Yes| STEP30\n    D6 -->|No| ERR6\n\n    KSDS -.->|Scan All Loaded Transaction Records| STEP30\n    STEP30 -.->|Populate Card Number to Transaction ID Pointers| AIX\n    STEP30 --> D7\n    D7 -->|Yes| OPCIFIL\n    D7 -->|No| ERR7\n\n    OPCIFIL --> D8\n    D8 -->|Yes - Files Open| SUCCESS\n    D8 -->|No| ERR8\n\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#fff"
+}

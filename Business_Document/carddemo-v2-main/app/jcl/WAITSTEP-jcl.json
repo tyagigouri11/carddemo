@@ -1,0 +1,21 @@
+{
+    "created_on": "2026-11-05",
+    "name": "WAITSTEP.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/WAITSTEP.jcl",
+    "type": "jcl",
+    "description": "This JCL job executes the COBSWAIT program, which introduces a deliberate pause/wait in processing for a specified duration of 36,000 centiseconds (360 seconds or 6 minutes). It is typically used to introduce a timed delay between dependent job steps or job streams in a batch processing workflow.Key Functionalities:\nExecutes the COBSWAIT program from the AWS.M2.CARDDEMO.LOADLIB load library to introduce a controlled wait/pause in batch processing\nAccepts a wait duration value of 36,000 centiseconds (equivalent to 360 seconds or 6 minutes) as inline input via the SYSIN DD statement\nDirects all system output messages to the system output class for job logging and monitoring purposes",
+    "rules": [
+        {
+            "Rule_Id": "R-WAITSTEP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The batch job requires a controlled pause before downstream processing can safely proceed, and a wait duration value of 00003600 centiseconds (36 seconds) is supplied as inline input via SYSIN",
+                "When": "The COBSWAIT program is executed and reads the wait duration value of 00003600 centiseconds from the SYSIN input",
+                "Then": "The batch job execution is suspended for exactly 36 seconds, after which the job completes normally and downstream processes are permitted to proceed"
+            },
+            "Rule_Name": "WAIT - COBSWAIT - Controlled Batch Execution Delay",
+            "Rule_Description": "This step invokes the COBSWAIT program to introduce a controlled pause in batch job execution. A wait duration of 00003600 centiseconds (equivalent to 36 seconds) is passed as input, causing the job to suspend all activity for that duration. This mechanism is used to synchronize batch processing by ensuring upstream jobs, files, or system resources are fully available before downstream steps are triggered.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000,font-weight:bold\n    classDef process fill:#6699ff,stroke:#333,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,stroke:#333,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,stroke:#333,color:#000,font-weight:bold\n    classDef final fill:#ae74de,stroke:#333,color:#fff,font-weight:bold\n    classDef success fill:#22c55e,stroke:#333,color:#fff,font-weight:bold\n    classDef error fill:#ef4444,stroke:#333,color:#fff,font-weight:bold\n\n    A([\ud83d\ude80 JOB START]):::start\n\n    B[_WAIT - COBSWAIT\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    \u23f1\ufe0f Introduce Controlled Time Delay\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    Pause Job Execution for 36 Seconds\n    'Wait Duration: 00003600 Centiseconds'\n    to Synchronize with Upstream Processes\n    or Ensure Resource Availability_]:::process\n\n    Z([\u2705 JOB END]):::final\n\n    A --> B\n    B --> Z"
+}

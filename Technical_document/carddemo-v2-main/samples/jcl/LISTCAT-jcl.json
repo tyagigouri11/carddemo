@@ -1,0 +1,77 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "LISTCAT.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **LISTFILS**, catalogs all dataset entries associated with the **CardDemo application** by executing an IDCAMS LISTCAT command against the `AWS.M2.CARDDEMO` dataset level. It first cleans up any pre-existing output file in STEP01, then in STEP05 generates a full catalog listing of all CardDemo-related datasets and saves the results to `AWS.M2.CARDDEMO.LISTCAT`. The business purpose is to provide an inventory and audit trail of all datasets belonging to the CardDemo application, useful for system administration, migration planning, or environment documentation.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "LISTFILS",
+          "description": "The name assigned to this job, used to identify the job in the system log, job queue, and output listings."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "CARDDEMO",
+          "description": "Positional parameter providing accounting information associated with the job, used for billing or tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted. CLASS=A determines the scheduling priority and resource allocation class for the job."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), determining where the system messages and job log are routed after job completion."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, sending a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP01",
+        "purpose": "Deletes the existing dataset AWS.M2.CARDDEMO.LISTCAT if it exists, using the do-nothing program IEFBR14 to allow JCL DD disposition processing to clean up the file before recreation in the next step.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "AWS.M2.CARDDEMO.LISTCAT (deleted if exists)"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Executes the IDCAMS LISTCAT command to list all catalog entries under the high-level qualifier AWS.M2.CARDDEMO, capturing full catalog details (ALL) for all datasets in the CARDDEMO application, and writes the output to a new cataloged dataset.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (LISTCAT LEVEL(AWS.M2.CARDDEMO) ALL command)",
+        "outputs": "SYSPRINT -> AWS.M2.CARDDEMO.LISTCAT (newly cataloged dataset containing the LISTCAT report, RECFM=FBA, LRECL=133)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LISTCAT",
+        "operations": "DELETE",
+        "description": "IEFBR14 is executed to delete the dataset AWS.M2.CARDDEMO.LISTCAT if it exists. DISP=(MOD,DELETE,DELETE) causes the dataset to be deleted on normal and abnormal termination, effectively cleaning up any pre-existing version of the dataset."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LISTCAT",
+        "operations": "WRITE",
+        "description": "IDCAMS writes the LISTCAT output to the newly cataloged dataset AWS.M2.CARDDEMO.LISTCAT. DISP=(NEW,CATLG,DELETE) creates and catalogs the dataset on normal completion, or deletes it on abnormal termination. The dataset is defined with RECFM=FBA, LRECL=133, on SYSDA with 1 track primary and 1 track secondary space."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO (catalog level)",
+        "operations": "READ",
+        "description": "IDCAMS executes the LISTCAT command with LEVEL(AWS.M2.CARDDEMO) ALL, reading the system catalog to retrieve and list all catalog entries at the AWS.M2.CARDDEMO level, including all associated attributes and statistics."
+      }
+    ]
+  }
+}

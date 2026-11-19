@@ -1,0 +1,32 @@
+{
+    "created_on": "2026-11-05",
+    "name": "RACFCMDS.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/RACFCMDS.jcl",
+    "type": "jcl",
+    "description": "This JCL job performs RACF (Resource Access Control Facility) security administration tasks by executing TSO batch commands to manage access controls and group memberships. It updates a RACF general resource profile and connects a user to a security group, ensuring proper authorization controls are in place.Key Functionalities:\nUpdates the RACF general resource profile for transaction group GCICSTRN (CARD) by adding member CT02, which grants the CT02 transaction access permissions under the CARD resource profile\nConnects user AWSCODR to the RACF group M2APPDEV, granting the user the access rights and permissions associated with the M2APPDEV application development group",
+    "rules": [
+        {
+            "Rule_Id": "R-RACFCMDS-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CARD resource profile already exists within the GCICSTRN (CICS Transaction) security class in the RACF security system",
+                "When": "The RACF Resource Alter (RALT) command is executed targeting the CARD profile in the GCICSTRN class with the instruction to add CT02 as a new member",
+                "Then": "The CICS transaction CT02 is registered as a member of the CARD security profile, and all users or groups that are currently authorized to access the CARD profile automatically inherit the permission to execute the CT02 transaction"
+            },
+            "Rule_Name": "TSOBAT - IKJEFT01 - Add CICS Transaction CT02 to CARD Security Profile",
+            "Rule_Description": "The CARD resource security profile in the CICS Transaction (GCICSTRN) security class must be updated to include the CICS transaction CT02 as an authorized member, ensuring that all users and groups holding access to the CARD profile can execute the CT02 transaction.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-RACFCMDS-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The user AWSCODR exists as a valid user in the RACF security system and the M2APPDEV (M2 Application Development) group exists as a valid RACF group",
+                "When": "The RACF CONNECT command is executed to establish a membership relationship between user AWSCODR and the M2APPDEV group",
+                "Then": "User AWSCODR becomes an active member of the M2APPDEV group and inherits all access rights, permissions, and resource entitlements currently defined for the M2APPDEV group"
+            },
+            "Rule_Name": "TSOBAT - IKJEFT01 - Connect User AWSCODR to M2APPDEV Security Group",
+            "Rule_Description": "The user AWSCODR must be granted membership in the M2APPDEV (M2 Application Development) security group so that the user inherits all access rights and resource entitlements defined for that group.",
+            "Rule_Type": "Authorization Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nRACF Security Administration]):::start\n\n    B[TSOBAT\nIKJEFT01 - TSO Batch Processor\nExecute RACF Security Administration Commands]:::process\n\n    C[RACF Resource Profile Update\nAdd CICS Transaction CT02 as Member\nto CARD Security Profile\nunder GCICSTRN Resource Class]:::process\n\n    D[RACF User-Group Connection\nConnect User AWSCODR\nto Application Development Group M2APPDEV\nGranting Group-Level Access Rights]:::process\n\n    E{Security Commands\nExecuted Successfully?}:::decision\n\n    F([JOB END\nRACF Security Updates Applied\nSuccessfully]):::final\n\n    G([JOB END\nRACF Security Updates\nFailed - Review SYSTSPRT Output]):::final\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E\n    E -->|Yes - Both Commands Completed| F\n    E -->|No - Command Error Encountered| G\n\n    classDef start fill:#ff6666,color:#000,stroke:#333,stroke-width:2px\n    classDef process fill:#6699ff,color:#000,stroke:#333,stroke-width:2px\n    classDef decision fill:#ffcc00,color:#000,stroke:#333,stroke-width:2px\n    classDef datasource fill:#66ff66,color:#000,stroke:#333,stroke-width:2px\n    classDef final fill:#ae74de,color:#000,stroke:#333,stroke-width:2px\n    classDef success fill:#22c55e,color:#000,stroke:#333,stroke-width:2px\n    classDef error fill:#ef4444,color:#000,stroke:#333,stroke-width:2px"
+}

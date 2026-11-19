@@ -1,0 +1,422 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COCRDSLC.cbl",
+        "type": "cobol",
+        "transaction_id": "CCDL"
+      },
+      "overview": "COCRDSLC operates within a CICS-based credit card management application, serving as the business logic layer for retrieving and displaying individual credit card details. It functions as a detail inquiry screen within a broader card management workflow, typically reached either directly by a user entering search criteria or via navigation from a credit card list screen (COCRDLIC). The program accepts an account number and card number as search criteria, validates the inputs, reads the card record from the CARDDAT file, and presents the card details — including embossed name, expiration date, and card status — on a formatted BMS map screen. It solves the operational need for customer service representatives or administrators to look up specific credit card records quickly and accurately within the mainframe transaction environment.",
+      "key_features": [
+        {
+          "feature": "Dual Entry Context Handling",
+          "description": "Supports two entry paths: direct user input of account and card number, or pre-validated navigation from the credit card list screen (COCRDLIC), adjusting behavior accordingly."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that both account number (11-digit numeric, non-zero) and card number (16-digit numeric, non-zero) are provided and correctly formatted before attempting a file read."
+        },
+        {
+          "feature": "Credit Card Record Retrieval",
+          "description": "Reads the CARDDAT file directly by card number as the primary key to retrieve card details including embossed name, expiration date, and active status."
+        },
+        {
+          "feature": "Alternate Index Card Lookup",
+          "description": "Contains a secondary read routine (9150-GETCARD-BYACCT) that supports lookup via the CARDAIX alternate index path using account ID, providing flexibility for account-based searches."
+        },
+        {
+          "feature": "BMS Screen Management",
+          "description": "Initializes, populates, and sends a formatted BMS map (CCRDSLA) with current date/time, search criteria, card details, and contextual error or informational messages."
+        },
+        {
+          "feature": "Dynamic Screen Attribute Control",
+          "description": "Adjusts field protection, cursor positioning, and color attributes based on context — protecting input fields when navigating from the list screen and highlighting fields in red when validation errors occur."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Handles PF3 to exit back to the calling program or main menu (COMEN01C), preserving communication area context for seamless navigation within the application."
+        },
+        {
+          "feature": "Error Handling and Abend Routine",
+          "description": "Provides structured file error messaging with operation name, file name, and CICS response codes, plus a centralized abend handler that displays diagnostic information and issues a CICS ABEND with code 9999."
+        },
+        {
+          "feature": "Communication Area State Management",
+          "description": "Maintains and passes a shared COMMAREA (CARDDEMO-COMMAREA) across CICS pseudo-conversational returns, preserving account ID, card number, program context, and navigation state between interactions."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDAT",
+        "type": "Read",
+        "description": "Card data file - reads credit card records by card number as the primary key to retrieve card details including account ID, CVV, embossed name, expiration date, and active status"
+      },
+      {
+        "name": "CARDAIX",
+        "type": "Read",
+        "description": "Card data file alternate index path - reads credit card records by account ID as an alternate key (defined but not invoked in the main execution path in this version of the code)"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and Initialization",
+          "description": "Program COCRDSLC is invoked under CICS transaction CCDL. ABEND handler is registered, working storage and communication areas are initialized. EIBCALEN is checked to determine if a COMMAREA was passed.",
+          "records": [
+            "EIBCALEN",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "WS-TRANID"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "COMMAREA Restoration",
+          "description": "If EIBCALEN is zero or the calling program is the main menu on first entry, communication areas are freshly initialized. Otherwise, DFHCOMMAREA is split into CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA to restore prior session context including account ID, card number, and navigation state.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "PF Key Mapping",
+          "description": "The CSSTRPFY copybook routine is performed to translate raw AID key values into logical PF key flags stored in CCARD-AID fields. Valid keys at this screen are Enter and PF03.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "WS-PFK-FLAG"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Validation",
+          "description": "The AID key received is evaluated. Only Enter and PF03 are valid. Any other key is treated as Enter to prevent unexpected navigation.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "PFK-VALID",
+            "PFK-INVALID"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Navigation Decision - PF03 Exit",
+          "description": "If PF03 is pressed, the program determines the return destination. If CDEMO-FROM-TRANID and CDEMO-FROM-PROGRAM are blank, navigation defaults to the main menu program COMEN01C under transaction CM00. Otherwise, the originating program and transaction are used. CICS XCTL transfers control with the updated COMMAREA.",
+          "records": [
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-TRANID",
+            "CDEMO-TO-PROGRAM",
+            "CARDDEMO-COMMAREA",
+            "LIT-MENUPGM",
+            "LIT-MENUTRANID"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Navigation Decision - Entry from Credit Card List Screen",
+          "description": "When the program is entered fresh (CDEMO-PGM-ENTER) and the calling program is COCRDLIC (credit card list), input validation is bypassed. Account ID and card number are taken directly from CDEMO-ACCT-ID and CDEMO-CARD-NUM in the COMMAREA as already validated.",
+          "records": [
+            "CDEMO-PGM-ENTER",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CARD-NUM",
+            "CC-ACCT-ID-N",
+            "CC-CARD-NUM-N"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Navigation Decision - Entry from Other Context",
+          "description": "When entered fresh from any program other than COCRDLIC, the screen is sent blank to prompt the user for account and card number input. No data read is performed.",
+          "records": [
+            "CDEMO-PGM-ENTER",
+            "WS-PROMPT-FOR-INPUT",
+            "CCRDSLAO"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Navigation Decision - Re-entry for Input Processing",
+          "description": "When CDEMO-PGM-REENTER is true, the program receives the BMS map to capture user-entered account and card number, then performs input editing. If errors are found, the screen is re-sent with error indicators. If inputs are valid, data retrieval is performed.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "CCRDSLAI",
+            "CC-ACCT-ID",
+            "CC-CARD-NUM",
+            "WS-INPUT-FLAG",
+            "WS-EDIT-ACCT-FLAG",
+            "WS-EDIT-CARD-FLAG"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Map Receive - Capture User Input",
+          "description": "CICS RECEIVE MAP is issued for map CCRDSLA in mapset COCRDSL. The input map CCRDSLAI is populated with the user-entered account ID (ACCTSIDI) and card number (CARDSIDI).",
+          "records": [
+            "CCRDSLAI",
+            "ACCTSIDI",
+            "CARDSIDI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Input Editing - Account Number Validation",
+          "description": "The account ID field is checked for blank, low-values, zeros, and non-numeric content. An 11-digit numeric non-zero value is required. Errors set INPUT-ERROR and FLG-ACCTFILTER flags. Valid values are moved to CDEMO-ACCT-ID.",
+          "records": [
+            "CC-ACCT-ID",
+            "CC-ACCT-ID-N",
+            "CDEMO-ACCT-ID",
+            "FLG-ACCTFILTER-NOT-OK",
+            "FLG-ACCTFILTER-BLANK",
+            "FLG-ACCTFILTER-ISVALID",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Input Editing - Card Number Validation",
+          "description": "The card number field is checked for blank, low-values, zeros, and non-numeric content. A 16-digit numeric non-zero value is required. Errors set INPUT-ERROR and FLG-CARDFILTER flags. Valid values are moved to CDEMO-CARD-NUM.",
+          "records": [
+            "CC-CARD-NUM",
+            "CC-CARD-NUM-N",
+            "CDEMO-CARD-NUM",
+            "FLG-CARDFILTER-NOT-OK",
+            "FLG-CARDFILTER-BLANK",
+            "FLG-CARDFILTER-ISVALID",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Cross-Field Validation",
+          "description": "After individual field edits, if both account and card filters are blank simultaneously, the error NO-SEARCH-CRITERIA-RECEIVED is set, requiring at least one search criterion.",
+          "records": [
+            "FLG-ACCTFILTER-BLANK",
+            "FLG-CARDFILTER-BLANK",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Card Record Retrieval by Card Number",
+          "description": "CICS READ is issued against the CARDDAT file using WS-CARD-RID-CARDNUM (16-byte card number) as the primary key. On success, CARD-RECORD is populated and FOUND-CARDS-FOR-ACCOUNT is set. On NOTFND, DID-NOT-FIND-ACCTCARD-COMBO error is set. On other errors, a formatted file error message is built.",
+          "records": [
+            "WS-CARD-RID-CARDNUM",
+            "CARD-RECORD",
+            "CARD-EMBOSSED-NAME",
+            "CARD-EXPIRAION-DATE",
+            "CARD-ACTIVE-STATUS",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-FILE-ERROR-MESSAGE"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Screen Initialization",
+          "description": "Output map CCRDSLAO is cleared to LOW-VALUES. Screen header fields are populated: titles from COTTL01Y, transaction ID, program name, current date (MM-DD-YY), and current time (HH-MM-SS) from CSDAT01Y.",
+          "records": [
+            "CCRDSLAO",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "WS-CURDATE-DATA",
+            "WS-CURTIME-HOURS"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Screen Variable Population",
+          "description": "Search criteria fields on the output map are populated from CDEMO-ACCT-ID and CDEMO-CARD-NUM. If FOUND-CARDS-FOR-ACCOUNT is true, card detail fields are populated: embossed name, expiry month, expiry year, and card status. Error and info messages are moved to their respective map fields.",
+          "records": [
+            "ACCTSIDO",
+            "CARDSIDO",
+            "CRDNAMEO",
+            "EXPMONO",
+            "EXPYEARO",
+            "CRDSTCDO",
+            "ERRMSGO",
+            "INFOMSGO",
+            "CARD-EMBOSSED-NAME",
+            "CARD-EXPIRY-MONTH",
+            "CARD-EXPIRY-YEAR",
+            "CARD-ACTIVE-STATUS"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Screen Attribute Setup",
+          "description": "Field protection and color attributes are set based on context. If coming from COCRDLIC, account and card fields are protected (DFHBMPRF) and displayed in default color. Otherwise fields are unprotected (DFHBMFSE). Error fields are highlighted in red (DFHRED). Cursor is positioned to the first invalid or blank field.",
+          "records": [
+            "ACCTSIDA",
+            "CARDSIDA",
+            "ACCTSIDC",
+            "CARDSIDC",
+            "ACCTSIDL",
+            "CARDSIDL",
+            "INFOMSGC",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-FROM-PROGRAM"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Map Send to Terminal",
+          "description": "CICS SEND MAP is issued for map CCRDSLA in mapset COCRDSL, sending CCRDSLAO to the terminal with CURSOR, ERASE, and FREEKB options. CDEMO-PGM-REENTER is set to TRUE so the next invocation processes user input.",
+          "records": [
+            "CCRDSLAO",
+            "CCARD-NEXT-MAP",
+            "CCARD-NEXT-MAPSET",
+            "WS-RESP-CD",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "COMMAREA Packaging and CICS RETURN",
+          "description": "WS-RETURN-MSG is moved to CCARD-ERROR-MSG. CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA are packed into WS-COMMAREA. CICS RETURN is issued with TRANSID CCDL and the combined COMMAREA, suspending the program until the next user interaction.",
+          "records": [
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CCARD-ERROR-MSG",
+            "LIT-THISTRANID"
+          ]
+        },
+        {
+          "step": 19,
+          "process": "Abend Handling",
+          "description": "If an unexpected abend occurs, the ABEND-ROUTINE is invoked. An abend message is sent to the terminal using CICS SEND, the abend handler is cancelled, and CICS ABEND with code 9999 is issued to terminate the task abnormally.",
+          "records": [
+            "ABEND-MSG",
+            "ABEND-DATA",
+            "ABEND-CULPRIT",
+            "ABEND-CODE",
+            "ABEND-REASON"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA length check before restoration",
+          "description": "EIBCALEN must be non-zero before DFHCOMMAREA is accessed. If zero, the program initializes fresh communication areas. Accessing DFHCOMMAREA when EIBCALEN is zero would cause an abend."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER state controls input processing path",
+          "description": "The program uses CDEMO-PGM-REENTER in CARDDEMO-COMMAREA to distinguish between first entry (send blank screen) and re-entry after user input (receive map and validate). This flag must be correctly set at CICS RETURN time to ensure the correct processing path on the next invocation."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM determines input validation bypass",
+          "description": "When CDEMO-FROM-PROGRAM equals LIT-CCLISTPGM (COCRDLIC), the program trusts that account and card number in CDEMO-ACCT-ID and CDEMO-CARD-NUM are already validated and skips the input editing paragraphs entirely, proceeding directly to file read."
+        },
+        {
+          "dependency": "INPUT-OK state required before CARDDAT file read",
+          "description": "The 9000-READ-DATA paragraph is only invoked after INPUT-OK is set. If INPUT-ERROR is set during editing, the file read is skipped and the screen is re-sent with error messages, preventing reads with invalid key values."
+        },
+        {
+          "dependency": "WS-CARD-RID-CARDNUM must be populated before CICS READ",
+          "description": "CC-CARD-NUM must be moved to WS-CARD-RID-CARDNUM before the CICS READ against CARDDAT is issued. The RIDFLD parameter references this field as the primary key, so its content directly determines which record is retrieved."
+        },
+        {
+          "dependency": "FOUND-CARDS-FOR-ACCOUNT flag controls screen data population",
+          "description": "Card detail fields (embossed name, expiry date, card status) are only moved to the output map in paragraph 1200-SETUP-SCREEN-VARS when FOUND-CARDS-FOR-ACCOUNT is true. This flag is set only on a successful DFHRESP(NORMAL) from the CARDDAT read."
+        },
+        {
+          "dependency": "WS-RETURN-MSG-OFF gate prevents overwriting first error message",
+          "description": "Multiple validation checks test WS-RETURN-MSG-OFF before setting an error message. This ensures the first error encountered is preserved and not overwritten by subsequent validation failures in the same pass."
+        },
+        {
+          "dependency": "CDEMO-LAST-MAPSET and CDEMO-FROM-PROGRAM jointly control field protection",
+          "description": "Both CDEMO-LAST-MAPSET must equal LIT-CCLISTMAPSET and CDEMO-FROM-PROGRAM must equal LIT-CCLISTPGM for account and card fields to be rendered as protected on the screen. Either condition alone is insufficient."
+        },
+        {
+          "dependency": "CARD-EXPIRAION-DATE-X redefine required for expiry field parsing",
+          "description": "CARD-EXPIRAION-DATE from the CARD-RECORD must be moved into CARD-EXPIRAION-DATE-X before CARD-EXPIRY-MONTH and CARD-EXPIRY-YEAR sub-fields can be individually accessed for display on the output map."
+        },
+        {
+          "dependency": "CICS XCTL on PF03 terminates current task - no RETURN issued",
+          "description": "When PF03 is pressed, CICS XCTL transfers control to the target program without returning to COCRDSLC. The COMMAREA is passed via XCTL. Any processing after the XCTL in the same paragraph is unreachable."
+        },
+        {
+          "dependency": "9150-GETCARD-BYACCT paragraph is defined but never called",
+          "description": "The alternate index read via CARDAIX (account path) is coded in paragraph 9150-GETCARD-BYACCT but is not invoked from 9000-READ-DATA. Any logic depending on account-only lookup via the alternate index is currently inactive."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Online transaction processing middleware",
+          "purpose": "Provides the runtime environment for the program. Used for terminal map send/receive (SEND MAP, RECEIVE MAP), file I/O against VSAM datasets (READ), inter-program transfer (XCTL), task return with COMMAREA (RETURN), abend handling (HANDLE ABEND, ABEND), and plain text terminal output (SEND TEXT)."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": "COMEN01C serves as the main navigation hub for regular users within the CardDemo credit card management application, operating as a CICS transaction under transaction ID 'CM00'. It sits at the center of the user workflow, presenting available menu options after successful sign-on and directing users to the appropriate functional programs. The program controls access by enforcing user-type restrictions, ensuring regular users cannot access administrator-only options, and dynamically builds the menu based on configured options stored in the shared communication area."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates account number and card number fields in paragraphs 2210-EDIT-ACCOUNT and 2220-EDIT-CARD. Checks for blank/low-values/zeros and non-numeric values. Sets INPUT-ERROR flag, field-level flags (FLG-ACCTFILTER-NOT-OK, FLG-CARDFILTER-NOT-OK, FLG-ACCTFILTER-BLANK, FLG-CARDFILTER-BLANK), and populates WS-RETURN-MSG with descriptive messages. Cross-field validation detects when both fields are blank and sets NO-SEARCH-CRITERIA-RECEIVED. Errors cause re-display of the map with cursor positioned on the offending field and the field highlighted in red (DFHRED)."
+      },
+      {
+        "category": "File Operation Errors",
+        "description": "CICS READ responses are evaluated using DFHRESP conditions in paragraphs 9100-GETCARD-BYACCTCARD and 9150-GETCARD-BYACCT. DFHRESP(NORMAL) sets FOUND-CARDS-FOR-ACCOUNT. DFHRESP(NOTFND) sets INPUT-ERROR and appropriate filter flags with user-friendly messages (DID-NOT-FIND-ACCTCARD-COMBO or DID-NOT-FIND-ACCT-IN-CARDXREF). WHEN OTHER captures unexpected file errors by populating a structured WS-FILE-ERROR-MESSAGE containing operation name, file name, RESP code, and RESP2 code, then moves it to WS-RETURN-MSG for display."
+      },
+      {
+        "category": "Unexpected Program Flow / Abend Handling",
+        "description": "A CICS HANDLE ABEND pointing to ABEND-ROUTINE is established at program entry. The ABEND-ROUTINE sets a default message if none exists, records the culprit program in ABEND-CULPRIT, sends the abend data to the screen using NOHANDLE, cancels the abend handler, then issues CICS ABEND with code 9999. An EVALUATE WHEN OTHER branch in the main logic handles unexpected AID or state combinations by setting ABEND-CODE '0001', populating WS-RETURN-MSG with 'UNEXPECTED DATA SCENARIO', and invoking SEND-PLAIN-TEXT."
+      },
+      {
+        "category": "PF Key / Navigation Errors",
+        "description": "Invalid PF key presses are handled by setting PFK-INVALID flag. If an unsupported key is detected, the program overrides it by setting CCARD-AID-ENTER to TRUE, effectively treating it as an Enter key press and continuing normal processing without displaying an explicit error message."
+      },
+      {
+        "category": "Screen Send/Receive Errors",
+        "description": "CICS SEND MAP and RECEIVE MAP commands capture RESP and RESP2 codes into WS-RESP-CD and WS-REAS-CD, but no explicit error branching is coded after these operations. Errors are implicitly handled by the global HANDLE ABEND routine if CICS raises an abend condition."
+      },
+      {
+        "category": "Error Message Priority / Suppression",
+        "description": "A WS-RETURN-MSG-OFF condition (88-level value SPACES) acts as a guard to prevent overwriting an already-set error message. Multiple validation checks test WS-RETURN-MSG-OFF before setting a new message, ensuring the first error encountered takes precedence and subsequent errors do not overwrite it."
+      },
+      {
+        "category": "Debugging / Diagnostic Output",
+        "description": "SEND-LONG-TEXT and SEND-PLAIN-TEXT paragraphs provide plain-text screen output for diagnostic purposes. Both are explicitly commented as not for production use. SEND-PLAIN-TEXT is invoked for unexpected data scenarios in the main EVALUATE WHEN OTHER branch, sending WS-RETURN-MSG and immediately returning to CICS."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COCRDSL",
+        "map_name": "CCRDSLA",
+        "business_function": "Credit Card Detail Selection screen that allows users to search for and view credit card details by entering an Account Number (11 digits) and Card Number (16 digits). The screen displays card information including the name embossed on the card, card active status, and expiry date. It is used as part of the CardDemo application transaction CCDL and can be invoked from the main menu or the credit card list screen."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COCRDSL - Card Detail Selection</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ff00;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .row{white-space:pre;height:1.5em;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .red{color:#ff5555;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .green{color:#00ff00;} .input-field{background:#000;border-bottom:1px solid #00ffff;color:#00ff00;display:inline-block;} .protected{color:#aaaaaa;} .bright{font-weight:bold;} .header-label{color:#5555ff;} </style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CCDL</span><span>                </span><span class='yellow'>      CardDemo Credit Card Detail      </span><span>    </span><span class='blue'>Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COCRDSLC</span><span>            </span><span class='yellow'>      Credit Card Detail Selection     </span><span>    </span><span class='blue'>Time: </span><span class='blue'>23:12:33</span></div><div class='row'>&nbsp;</div><div class='row'><span>                             </span><span class='neutral'>View Credit Card Detail</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>                      </span><span class='turquoise'>Account Number    :</span><span> </span><span class='input-field' style='width:11ch;border-bottom:1px solid #00ffff;color:#ffffff;'>12345678901</span></div><div class='row'><span>                      </span><span class='turquoise'>Card Number       :</span><span> </span><span class='input-field' style='width:16ch;border-bottom:1px solid #00ffff;color:#ffffff;'>4111111111111111</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>   </span><span class='turquoise'>Name on card      :</span><span> </span><span class='input-field' style='width:50ch;border-bottom:1px solid #00ffff;color:#aaaaaa;'>JOHN Q CARDHOLDER                                 </span></div><div class='row'>&nbsp;</div><div class='row'><span>   </span><span class='turquoise'>Card Active Y/N   : </span><span class='input-field' style='width:1ch;border-bottom:1px solid #00ffff;color:#aaaaaa;'>Y</span></div><div class='row'>&nbsp;</div><div class='row'><span>   </span><span class='turquoise'>Expiry Date       : </span><span class='input-field' style='width:2ch;border-bottom:1px solid #00ffff;color:#aaaaaa;'>12</span><span>/</span><span class='input-field' style='width:4ch;border-bottom:1px solid #00ffff;color:#aaaaaa;'>2025</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>                        </span><span class='neutral'>   Displaying requested details         </span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='red bright'>                                                                                </span></div><div class='row'><span class='yellow'>ENTER=Search Cards  F3=Exit                                                </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Search for credit card details using the entered Account Number and Card Number"
+        },
+        {
+          "key": "F3",
+          "action": "Exit the screen and return to the calling program (Credit Card List screen or Main Menu)"
+        }
+      ]
+    }
+  }
+}

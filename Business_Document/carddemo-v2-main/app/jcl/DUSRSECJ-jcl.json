@@ -1,0 +1,197 @@
+{
+    "created_on": "2026-11-05",
+    "name": "DUSRSECJ.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/DUSRSECJ.jcl",
+    "type": "jcl",
+    "description": "This JCL job (DUSRSECJ) initializes the User Security (USRSEC) VSAM file for the CardDemo application by creating and loading user credentials for both administrative and regular users. It first creates a flat sequential file with 10 predefined user records (5 administrators and 5 regular users), then rebuilds the VSAM KSDS cluster, and finally loads all user records into it.Key Functionalities:\nDeletes any pre-existing temporary sequential file (AWS.M2.CARDDEMO.USRSEC.PS) to ensure a clean start before processing.\nCreates a new sequential flat file containing exactly 10 user records: 5 administrator accounts (ADMIN001\u2013ADMIN005) and 5 regular user accounts (USER0001\u2013USER0005), each with first name, last name, and password, stored as fixed-length 80-byte records.\nDeletes the existing VSAM KSDS cluster (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS) and redefines it with an 8-byte key starting at position 0, fixed 80-byte record size, indexed organization, and allocated space of 45 primary and 15 secondary tracks.\nLoads all 10 user security records from the sequential flat file into the newly created VSAM KSDS cluster, establishing the initial user security reference data for the CardDemo application.",
+    "rules": [
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The User Security staging file (AWS.M2.CARDDEMO.USRSEC.PS) may or may not exist in the system from a prior execution of the initialization job",
+                "When": "The pre-deletion cleanup step is triggered at the start of the User Security database initialization job",
+                "Then": "The User Security staging file (AWS.M2.CARDDEMO.USRSEC.PS) must be deleted if it exists \u2014 whether the cleanup step completes successfully or encounters an error \u2014 ensuring no residual or stale user security data remains before the new file is created; if the file does not exist, the step must complete successfully without raising an error, allowing the job to continue normally"
+            },
+            "Rule_Name": "PREDEL - IEFBR14 - Pre-Initialization Cleanup of User Security Staging File",
+            "Rule_Description": "Before creating a fresh User Security staging file, any previously existing version of the file must be unconditionally removed to ensure the initialization process always starts from a clean state. This applies whether the job is being run for the first time or is being re-executed.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "A user security record is being created for the CardDemo User Security file",
+                "When": "The record is written to the User Security flat file (AWS.M2.CARDDEMO.USRSEC.PS)",
+                "Then": "The record must be exactly 80 characters long, structured as: User ID occupying characters 1\u20138, First Name occupying characters 9\u201328 (space-padded to 20 characters), Last Name occupying characters 29\u201348 (space-padded to 20 characters), Password occupying characters 49\u201357 (9 characters), and remaining characters 58\u201380 filled with spaces"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Define User Security Record Structure",
+            "Rule_Description": "Each user security record stored in the User Security file must follow a fixed 80-character layout with defined fields for User ID, First Name, Last Name, and Password.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "A user account is designated as an Administrator in the CardDemo system",
+                "When": "The Administrator's User ID is assigned",
+                "Then": "The User ID must be exactly 8 characters long, beginning with the prefix 'ADMIN' followed by a 3-digit zero-padded sequence number (e.g., ADMIN001, ADMIN002, ADMIN003, ADMIN004, ADMIN005)"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Define Administrator User Account Identity",
+            "Rule_Description": "Administrator user accounts in the CardDemo system are identified by a specific User ID format that combines a role prefix and a 3-digit sequence number.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "A user account is designated as a Regular User in the CardDemo system",
+                "When": "The Regular User's User ID is assigned",
+                "Then": "The User ID must be exactly 8 characters long, beginning with the prefix 'USER' followed by a 4-digit zero-padded sequence number (e.g., USER0001, USER0002, USER0003, USER0004, USER0005)"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Define Regular User Account Identity",
+            "Rule_Description": "Regular user accounts in the CardDemo system are identified by a specific User ID format that combines a role prefix and a 4-digit sequence number.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A user account has a User ID beginning with the prefix 'ADMIN' (i.e., the account is an Administrator)",
+                "When": "The password is assigned to the Administrator account",
+                "Then": "The password must be 'PASSWORDA' \u2014 the suffix 'A' designates the Administrator role"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Assign Administrator Password Convention",
+            "Rule_Description": "Administrator accounts must be assigned a password that follows the Administrator password convention, distinguishing them from Regular User passwords.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "A user account has a User ID beginning with the prefix 'USER' (i.e., the account is a Regular User)",
+                "When": "The password is assigned to the Regular User account",
+                "Then": "The password must be 'PASSWORDU' \u2014 the suffix 'U' designates the Regular User role"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Assign Regular User Password Convention",
+            "Rule_Description": "Regular user accounts must be assigned a password that follows the Regular User password convention, distinguishing them from Administrator passwords.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security system is being initialized for the first time or reset",
+                "When": "The User Security file is created",
+                "Then": "Exactly 5 Administrator accounts must be created with the following identities: (1) ADMIN001 \u2014 MARGARET GOLD, (2) ADMIN002 \u2014 RUSSELL RUSSELL, (3) ADMIN003 \u2014 RAYMOND WHITMORE, (4) ADMIN004 \u2014 EMMANUEL CASGRAIN, (5) ADMIN005 \u2014 GRANVILLE LACHAPELLE; all with password PASSWORDA"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Seed Initial Administrator Accounts",
+            "Rule_Description": "The CardDemo User Security system must be initialized with exactly 5 predefined Administrator accounts with their full names.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security system is being initialized for the first time or reset",
+                "When": "The User Security file is created",
+                "Then": "Exactly 5 Regular User accounts must be created with the following identities: (1) USER0001 \u2014 LAWRENCE THOMAS, (2) USER0002 \u2014 AJITH KUMAR, (3) USER0003 \u2014 LAURITZ ALME, (4) USER0004 \u2014 AVERARDO MAZZI, (5) USER0005 \u2014 LEE TING; all with password PASSWORDU"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Seed Initial Regular User Accounts",
+            "Rule_Description": "The CardDemo User Security system must be initialized with exactly 5 predefined Regular User accounts with their full names.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The 10 predefined user security records (5 Administrators and 5 Regular Users) are ready to be written to the User Security file",
+                "When": "The User Security flat file (AWS.M2.CARDDEMO.USRSEC.PS) is created",
+                "Then": "All 10 records must be copied to the output file exactly as-is with no transformation applied; the output file must be a new file registered in the system catalog upon successful completion, and if the file creation fails, no partial file must be retained"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Create User Security Flat File Without Transformation",
+            "Rule_Description": "User security records must be written to the User Security flat file exactly as defined, with no modification, filtering, or reformatting applied during the file creation process.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The User Security database initialization process has been triggered for the CardDemo application",
+                "When": "The system executes the DELETE command targeting the User Security database named AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+                "Then": "The existing User Security database \u2014 including all stored user records, the data component (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT), and the index component (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX) \u2014 is completely removed from the system, ensuring no residual user data carries over into the new database"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Existing User Security Database Removal",
+            "Rule_Description": "Before creating a fresh User Security database, any previously existing version must be completely removed, including all stored user records, the data store, and the index.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The DELETE command for the User Security database has been executed",
+                "When": "The User Security database did not exist prior to the deletion attempt \u2014 meaning this is either a first-time setup or the database was already removed",
+                "Then": "The error raised by the failed deletion is suppressed by resetting the condition code to zero (SET MAXCC = 0), and the process continues forward to database creation without failure \u2014 the absence of a prior database is treated as a valid and acceptable state"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - First-Time Initialization Error Suppression",
+            "Rule_Description": "When the User Security database does not yet exist (e.g., first-time environment setup), the deletion attempt would normally raise an error and halt processing. This rule ensures the initialization continues gracefully in that scenario.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The User Security VSAM database is being created via the DEFINE CLUSTER command",
+                "When": "The key structure is defined using KEYS(8,0)",
+                "Then": "The first 8 characters of every user record \u2014 representing the User ID (e.g., ADMIN001, USER0001) \u2014 are designated as the unique lookup key starting at position 1 of the record; no two users may share the same User ID, and the CardDemo application can retrieve any user record directly and instantly using their User ID"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - User ID as Unique Database Lookup Key",
+            "Rule_Description": "The User Security database must be structured so that every user record is uniquely identified and retrievable by their User ID, which occupies the first 8 characters of each record.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The User Security VSAM database is being created via the DEFINE CLUSTER command",
+                "When": "The record size is defined using RECORDSIZE(80,80) \u2014 setting both the minimum and maximum record length to 80 characters",
+                "Then": "Every user security record stored in the database must be exactly 80 characters in length; records shorter or longer than 80 characters are not permitted, enforcing a uniform fixed-length structure for all user accounts including User ID, First Name, Last Name, Password, and padding"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Fixed 80-Character User Record Size Enforcement",
+            "Rule_Description": "Every user security record stored in the database must conform to a strict fixed-length structure of exactly 80 characters to ensure consistent data layout across all user accounts.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The User Security VSAM database is being created via the DEFINE CLUSTER command",
+                "When": "The REUSE attribute is applied during database creation",
+                "Then": "The database is configured to allow its contents to be completely replaced and reloaded in future initialization runs without needing to redefine the database structure \u2014 enabling the initialization job to be safely re-executed multiple times to refresh user security data"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - User Security Database Reusability for Repeated Initialization",
+            "Rule_Description": "The User Security database must be designed to support repeated initialization runs \u2014 allowing the database to be fully reloaded with fresh user data in future executions without requiring structural redefinition.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The User Security VSAM database is being created via the DEFINE CLUSTER command",
+                "When": "The free space parameters are applied using FREESPACE(10,15)",
+                "Then": "The database reserves 10% free space within each individual data block and 15% free space within each larger storage area; this reserved capacity allows new user records to be added to the database in the future without disrupting the existing data layout or requiring a full database rebuild"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Free Space Reservation for Future User Additions",
+            "Rule_Description": "The User Security database must reserve internal free space at the time of creation to accommodate future user record insertions without requiring database reorganization.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The User Security VSAM database is being created via the DEFINE CLUSTER command",
+                "When": "The INDEXED organization is specified and separate component names are assigned \u2014 DATA component named AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT and INDEX component named AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX",
+                "Then": "The database maintains user records in User ID sequence within the data store (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT) and maintains a separate index structure (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX) that maps each User ID to its corresponding record location \u2014 enabling the CardDemo application to retrieve any user's security record directly and efficiently using their User ID without scanning all records"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Indexed User Security Database Structure with Separate Data and Index Components",
+            "Rule_Description": "The User Security database must be organized as an indexed structure with physically separate data and index components, enabling the CardDemo application to perform fast, direct user lookups by User ID.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DUSRSECJ-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The User Security sequential flat file (AWS.M2.CARDDEMO.USRSEC.PS) exists and contains all 10 predefined user records (5 Administrators and 5 Regular Users), AND the User Security VSAM database (AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS) has been defined and is empty and ready to receive records",
+                "When": "The bulk load process is triggered to transfer all records from the User Security flat file into the User Security VSAM database, reading every record sequentially from the flat file and inserting each one into the indexed database using the User ID (first 8 characters of each record) as the unique lookup key, with no filtering, transformation, or conditional selection applied \u2014 every record is loaded exactly as stored",
+                "Then": "All 10 user security records are successfully inserted into the User Security VSAM database indexed by User ID, making all Administrator accounts (ADMIN001\u2013ADMIN005) and all Regular User accounts (USER0001\u2013USER0005) fully accessible for authentication and role-based access control within the CardDemo application; the database is now the active, searchable source of user security information"
+            },
+            "Rule_Name": "STEP03 - IDCAMS - Bulk Load of User Security Records into User Security Database",
+            "Rule_Description": "All predefined user security records stored in the User Security sequential flat file are loaded in full into the User Security VSAM database, making every user account available for authentication and access control within the CardDemo application.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Start: CardDemo User Security\nDatabase Initialization Job]):::start\n\n    PREDEL[PREDEL - IEFBR14\nClean Up: Remove Any Previously\nExisting User Security Flat File]:::process\n\n    P_DEC{PREDEL\nCompleted\nSuccessfully?}:::decision\n\n    STEP01[STEP01 - IEBGENER\nSeed User Security Records:\nCreate Flat File with\n5 Admin Users + 5 Regular Users\n10 Records Total]:::process\n\n    S1_DEC{STEP01\nCompleted\nSuccessfully?}:::decision\n\n    STEP02[STEP02 - IDCAMS\nReset User Security VSAM Database:\nStep A - Delete Existing Database\nStep B - Define New Empty\nIndexed Database Keyed on User ID]:::process\n\n    S2_DEC{STEP02\nCompleted\nSuccessfully?}:::decision\n\n    STEP03[STEP03 - IDCAMS REPRO\nPopulate User Security Database:\nLoad All 10 User Records\nfrom Flat File into VSAM Database]:::process\n\n    S3_DEC{STEP03\nCompleted\nSuccessfully?}:::decision\n\n    VSAM[(AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS\nUser Security VSAM Database\nKey-Sequenced by User ID)]:::datasource\n\n    SUCCESS([Job Complete:\nCardDemo User Security VSAM Database\nFully Populated and Ready\nfor Application Authentication\nand Role-Based Access Control]):::success\n\n    ERR_PREDEL([Job Abended at PREDEL:\nFailed to Clean Up\nUser Security Flat File]):::error\n\n    ERR_S1([Job Abended at STEP01:\nFailed to Create\nUser Security Records Flat File]):::error\n\n    ERR_S2([Job Abended at STEP02:\nFailed to Reset\nUser Security VSAM Database]):::error\n\n    ERR_S3([Job Abended at STEP03:\nFailed to Load User Records\ninto VSAM Database]):::error\n\n    A --> PREDEL\n    PREDEL --> P_DEC\n    P_DEC -->|Yes - Flat File Cleaned Up| STEP01\n    P_DEC -->|No| ERR_PREDEL\n\n    STEP01 --> S1_DEC\n    S1_DEC -->|Yes - 10 User Records Created in Flat File| STEP02\n    S1_DEC -->|No| ERR_S1\n\n    STEP02 -->|Delete: Remove Existing VSAM Database| VSAM\n    VSAM -.->|Existing Database Removed| STEP02\n    STEP02 -->|Define: Create New Empty VSAM Database| VSAM\n    STEP02 --> S2_DEC\n    S2_DEC -->|Yes - Empty VSAM Database Ready| STEP03\n    S2_DEC -->|No| ERR_S2\n\n    STEP03 -->|Write: Load 10 User Security Records\nAdmin Users and Regular Users| VSAM\n    STEP03 --> S3_DEC\n    S3_DEC -->|Yes - All 10 Records Loaded| SUCCESS\n    S3_DEC -->|No| ERR_S3\n\n    classDef start fill:#ff6666,color:#000\n    classDef process fill:#6699ff,color:#000\n    classDef decision fill:#ffcc00,color:#000\n    classDef datasource fill:#66ff66,color:#000\n    classDef final fill:#ae74de,color:#000\n    classDef success fill:#22c55e,color:#000\n    classDef error fill:#ef4444,color:#000"
+}

@@ -1,0 +1,76 @@
+{
+    "created_on": "2026-11-05",
+    "name": "OPENFIL.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/OPENFIL.jcl",
+    "type": "jcl",
+    "description": "This JCL job opens five CICS files in the CICSAWSA CICS region by issuing CEMT SET FILE OPEN commands through SDSF. It is used to make critical business data files available for online transaction processing after they have been closed for maintenance or after a system restart.Key Functionalities:\nOpens the TRANSACT file in the CICSAWSA CICS region, making transaction data available for online processing.\nOpens the CCXREF file in the CICSAWSA CICS region, enabling cross-reference data lookups.\nOpens the ACCTDAT file in the CICSAWSA CICS region, making account data accessible for online transactions.\nOpens the CXACAIX file in the CICSAWSA CICS region, enabling access to the account cross-reference alternate index.\nOpens the USRSEC file in the CICSAWSA CICS region, making user security data available for authentication and authorization.",
+    "rules": [
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and all five business files \u2014 Transaction (TRANSACT), Credit Card Cross-Reference (CCXREF), Account Data (ACCTDAT), Account Alternate Index (CXACAIX), and User Security (USRSEC) \u2014 are registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "All five business files are activated in the following fixed sequence: (1) TRANSACT, (2) CCXREF, (3) ACCTDAT, (4) CXACAIX, (5) USRSEC \u2014 making all business data fully available for online processing in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Sequential Activation of All Business Files in CICS Region",
+            "Rule_Description": "All five business files must be sequentially activated in the CICS region CICSAWSA as a mandatory prerequisite before any online business transactions can be initiated or processed.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the Transaction file (TRANSACT) is registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "The Transaction file (TRANSACT) is opened and made fully available for reading and writing transaction records during online processing in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Activate Transaction File for Online Processing",
+            "Rule_Description": "The Transaction file (TRANSACT) must be activated in CICS region CICSAWSA to make transaction records accessible for online business processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the Credit Card Cross-Reference file (CCXREF) is registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "The Credit Card Cross-Reference file (CCXREF) is opened and made fully available for credit card-to-account mapping lookups in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Activate Credit Card Cross-Reference File",
+            "Rule_Description": "The Credit Card Cross-Reference file (CCXREF) must be activated in CICS region CICSAWSA to enable the mapping of credit card numbers to their associated customer accounts during online transactions.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the Account Data file (ACCTDAT) is registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "The Account Data file (ACCTDAT) is opened and made fully available for reading and updating customer account information in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Activate Account Data File",
+            "Rule_Description": "The Account Data file (ACCTDAT) must be activated in CICS region CICSAWSA to enable access to core customer account information for online business operations.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the Account Alternate Index (CXACAIX) is registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "The Account Alternate Index (CXACAIX) is opened and made fully available for alternate-key-based account data lookups in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Activate Account Alternate Index",
+            "Rule_Description": "The Account Alternate Index (CXACAIX) must be activated in CICS region CICSAWSA to provide an alternate lookup path into the Account Data file, supporting multiple ways to retrieve account records.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-OPENFIL-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The CICS region CICSAWSA is active and the User Security file (USRSEC) is registered within it",
+                "When": "The CICS file activation job (OPCIFIL) is executed",
+                "Then": "The User Security file (USRSEC) is opened and made fully available for user identity verification and access permission enforcement in CICS region CICSAWSA"
+            },
+            "Rule_Name": "OPCIFIL - SDSF/CEMT - Activate User Security File for Access Control",
+            "Rule_Description": "The User Security file (USRSEC) must be activated in CICS region CICSAWSA to enforce user authentication and access control for all online users before any business transactions are permitted.",
+            "Rule_Type": "Authorization Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCICS File Activation Job]):::start\n\n    B[_OPCIFIL - SDSF\nActivate CICS Files in Region CICSAWSA\nPrepare Online Environment for Business Processing_]:::process\n\n    C[_Open TRANSACT File\nMake Transaction Records Available\nfor Online Processing_]:::process\n\n    D[_Open CCXREF File\nMake Credit Card Cross-Reference Data Available\nfor Card-to-Account Lookups_]:::process\n\n    E[_Open ACCTDAT File\nMake Core Account Data Available\nfor Online Transactions_]:::process\n\n    F[_Open CXACAIX File\nMake Account Alternate Index Available\nfor Alternate Key Access to Account Data_]:::process\n\n    G[_Open USRSEC File\nMake User Security Profiles Available\nfor Access Control and Authentication_]:::process\n\n    H([_JOB END\nAll CICS Business Files Successfully Opened\nOnline Environment Ready for Transaction Processing_]):::final\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E\n    E --> F\n    F --> G\n    G --> H\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

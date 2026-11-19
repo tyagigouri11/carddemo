@@ -1,0 +1,98 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "INTCALC.jcl",
+        "type": "jcl"
+      },
+      "overview": "The INTCALC job processes a transaction balance file to compute interest and fees for credit card accounts, executing program CBACT04C with a processing date parameter of July 18, 2022. It reads from multiple VSAM datasets including transaction category balances, card cross-reference data, account data, and discount group information. The job produces a new generation of a transaction output dataset (SYSTRAN GDG +1) containing the calculated results, supporting the CardDemo credit card processing application.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "INTCALC",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, scheduling, and referencing the job in the JES spool and system logs."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'INTEREST CALCULATOR'",
+          "description": "A positional parameter providing accounting or identification information for the job. It is used for billing, auditing, or descriptive purposes and appears in job logs and accounting records."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. It determines the scheduling priority and resource allocation rules applied by JES when selecting the job for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listing, allocation/termination messages, and system messages. It controls where the job log is routed after job completion."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP15",
+        "purpose": "Processes the transaction category balance file to compute interest and fees for credit card accounts, and writes the resulting transaction records to a new generation of the transaction output file.",
+        "programs": "CBACT04C",
+        "inputs": "TCATBALF (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS), XREFFILE (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS), XREFFIL1 (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH), ACCTFILE (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS), DISCGRP (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS); PARM='2022071800'",
+        "outputs": "TRANSACT (AWS.M2.CARDDEMO.SYSTRAN(+1), new GDG generation, RECFM=F, LRECL=350); SYSPRINT, SYSOUT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Load library accessed to load and execute program CBACT04C"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Transaction category balance file read via DD TCATBALF to retrieve transaction balance data for interest and fee computation"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Card cross-reference VSAM KSDS file read via DD XREFFILE to look up card-to-account cross-reference data"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+        "operations": "READ",
+        "description": "Alternate index path for card cross-reference file accessed via DD XREFFIL1 to support alternate key lookups"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+        "operations": "READ, UPDATE",
+        "description": "Account data VSAM KSDS file accessed via DD ACCTFILE to read and update account balances, interest, and fee information"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Discount group VSAM KSDS file read via DD DISCGRP to retrieve interest rate and fee group definitions for accounts"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.SYSTRAN(+1)",
+        "operations": "WRITE",
+        "description": "New GDG generation of the transaction output file created and written via DD TRANSACT with RECFM=F, LRECL=350, allocated on SYSDA with space of 1 cylinder"
+      }
+    ]
+  }
+}

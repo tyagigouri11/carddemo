@@ -1,0 +1,68 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "SORTTEST.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job filters and sorts credit card transaction records from a backup dataset for a specific processing date. It extracts all transactions processed on June 2, 2022, sorts them in ascending order by card number, and writes the results to a new generation of a daily transaction dataset. The job serves a business purpose of producing a date-specific, organized subset of transaction data, likely for daily reconciliation or reporting purposes within the CardDemo application.",
+      "parameters": [
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input class) that determines which job queue the job is placed in. Class A typically indicates a standard batch job class, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log). Class 0 determines where the system messages and job output are routed, such as to a printer, held queue, or sysout dataset."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) specifies that all JCL statements including cataloged procedures are printed. The second value (1) specifies that all system messages including allocation/termination messages are printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. A value of 0M indicates that the job is allowed to use the maximum available region size, removing memory constraints for the entire job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending a completion notification message to that user."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. A value of 1440 minutes (24 hours) sets the upper limit on total CPU time, preventing the job from running indefinitely and protecting against infinite loops or runaway processing."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05R",
+        "purpose": "Filters transaction records from the current generation of the transaction backup dataset where the processing date equals '2022-06-02', then sorts the matching records in ascending order by transaction card number, writing the results to the next generation of the daily transaction dataset.",
+        "programs": "SORT*",
+        "inputs": "SORTIN: AWS.M2.CARDDEMO.TRANSACT.BKUP(0); SYMNAMES: TRAN-CARD-NUM (position 263, length 16, ZD), TRAN-PROC-DT (position 305, length 10, CH), PARM-DATE (constant C'2022-06-02'); SYSIN: SORT FIELDS=(TRAN-CARD-NUM,A), INCLUDE COND=(TRAN-PROC-DT,EQ,PARM-DATE)",
+        "outputs": "SORTOUT: AWS.M2.CARDDEMO.TRANSACT.DALY(+1), new generation cataloged on SYSDA, DCB copied from SORTIN, SPACE=(CYL,(1,1),RLSE); SYSOUT: job log"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(0)",
+        "operations": "READ",
+        "description": "SORT reads the current generation (0) of the transaction backup GDS as input via SORTIN DD"
+      },
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.DALY(+1)",
+        "operations": "WRITE",
+        "description": "SORT writes filtered and sorted records to the next generation (+1) of the daily transaction GDS via SORTOUT DD; dataset is newly cataloged on SYSDA with DCB attributes inherited from SORTIN and space of 1 cylinder with 1 secondary, released on completion"
+      }
+    ]
+  }
+}

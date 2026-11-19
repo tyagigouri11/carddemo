@@ -1,0 +1,54 @@
+{
+    "created_on": "2026-11-05",
+    "name": "UNLDPADB.JCL",
+    "file_path": "carddemo-v2-main/app/app-authorization-ims-db2-mq/jcl/UNLDPADB.JCL",
+    "type": "jcl",
+    "description": "This JCL job (UNLDPADB) unloads data from an IMS database (Payment Authorization Database - PAUTDB) into two sequential output files: a root segment file and a child segment file. The job first cleans up any previously existing output files, then executes the IMS DL/I batch program (PAUDBUNL/PAUTBUNL) to extract and write the IMS database records into flat files for downstream processing or migration purposes.Key Functionalities:\nDeletes any pre-existing output files (root and child) before the unload process begins, ensuring a clean slate for the new extraction run.\nUnloads IMS Payment Authorization Database (PAUTDB) root segment records into a sequential output file (AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO) with a fixed-block record length of 100 bytes.\nUnloads IMS Payment Authorization Database (PAUTDB) child segment records into a sequential output file (AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO) with a fixed-block record length of 206 bytes.\nAccesses the IMS Payment Authorization Database (PAUTHDB) and its index (PAUTHDBX) as source data for the unload operation.\nUses IMS DL/I batch execution environment (DFSRRC00) with Program Specification Block (PSB) and Database Definition (DBD) libraries to navigate and read the IMS database hierarchy.",
+    "rules": [
+        {
+            "Rule_Id": "R-UNLDPADB-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Root Payment Authorization Output File (AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO) exists in the system catalog from a prior execution",
+                "When": "The Payment Authorization Database Unload job (UNLDPADB) is initiated and the cleanup step (STEP0) executes",
+                "Then": "The Root Payment Authorization Output File must be permanently deleted under ALL circumstances \u2014 both when the cleanup step completes successfully AND when the cleanup step encounters a failure \u2014 ensuring no previously extracted root-level Payment Authorization data remains available before the new extraction begins"
+            },
+            "Rule_Name": "STEP0 - IEFBR14 - Delete Existing Root Payment Authorization Output File Before Fresh Extraction",
+            "Rule_Description": "Before generating a new extract of Payment Authorization root-level records, any previously existing Root Payment Authorization Output File must be unconditionally removed \u2014 regardless of whether the cleanup step itself succeeds or fails \u2014 to ensure no stale or outdated data persists for downstream consumption.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDPADB-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Child Payment Authorization Output File (AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO) exists in the system catalog from a prior execution",
+                "When": "The Payment Authorization Database Unload job (UNLDPADB) is initiated and the cleanup step (STEP0) executes",
+                "Then": "The Child Payment Authorization Output File must be permanently deleted under ALL circumstances \u2014 both when the cleanup step completes successfully AND when the cleanup step encounters a failure \u2014 ensuring no previously extracted child-level Payment Authorization data remains available before the new extraction begins"
+            },
+            "Rule_Name": "STEP0 - IEFBR14 - Delete Existing Child Payment Authorization Output File Before Fresh Extraction",
+            "Rule_Description": "Before generating a new extract of Payment Authorization child-level records, any previously existing Child Payment Authorization Output File must be unconditionally removed \u2014 regardless of whether the cleanup step itself succeeds or fails \u2014 to ensure no stale or outdated data persists for downstream consumption.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDPADB-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "Both the Root Payment Authorization Output File (AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO) and the Child Payment Authorization Output File (AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO) exist in the system from a prior execution",
+                "When": "The cleanup step (STEP0) executes as the first step of the Payment Authorization Database Unload job",
+                "Then": "Both the Root Payment Authorization Output File AND the Child Payment Authorization Output File must be deleted together as a paired set \u2014 neither file is selectively retained \u2014 guaranteeing that the subsequent extraction step always writes to freshly created output files with no residual data from any prior run"
+            },
+            "Rule_Name": "STEP0 - IEFBR14 - Enforce Clean State for Both Payment Authorization Output Files Prior to Extraction",
+            "Rule_Description": "The cleanup step enforces a data integrity policy requiring that both the Root and Child Payment Authorization Output Files are always cleared together as a paired set before any new extraction run begins. Neither file should carry forward data from a previous run into a new extraction cycle.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDPADB-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The IMS Payment Authorization Primary Database (DDPAUTP0) and its associated Index Database (DDPAUTX0) are available and accessible in shared read mode, AND the Root Payment Authorization Output File (OUTFIL1) and Child Payment Authorization Output File (OUTFIL2) are newly allocated and ready to receive extracted records",
+                "When": "The Payment Authorization Database Unload program (PAUDBUNL) is executed via the IMS Batch DL/I interface to read and extract all records from the IMS Payment Authorization hierarchical database",
+                "Then": "1. All root-level (parent/header/summary) Payment Authorization records are extracted from the IMS database and written to the Root Payment Authorization Output File (OUTFIL1) with a fixed record length of 100 bytes per record; AND 2. All child-level (detail/transaction) Payment Authorization records are extracted from the IMS database and written to the Child Payment Authorization Output File (OUTFIL2) with a fixed record length of 206 bytes per record; AND 3. If the unload program completes successfully, both output files (OUTFIL1 and OUTFIL2) are permanently cataloged and retained for downstream consumption; AND 4. If the unload program fails for any reason, both output files (OUTFIL1 and OUTFIL2) are automatically and permanently deleted \u2014 ensuring no incomplete, partial, or corrupt Payment Authorization data is ever retained or made available to downstream processes"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00/PAUDBUNL - Payment Authorization Database Unload",
+            "Rule_Description": "Invokes the Payment Authorization Database Unload program (PAUDBUNL) through the IMS Batch DL/I interface to extract all Payment Authorization records from the IMS hierarchical database and write them into two separate sequential output files \u2014 one for root-level (header/summary) records and one for child-level (detail/transaction) records. Output data is permanently retained only upon fully successful completion; any failure results in automatic deletion of both output files to enforce data integrity.",
+            "Rule_Type": "Action Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    A([Job Start:\nPayment Authorization Database Unload Job]):::start\n\n    STEP0[STEP0 - IEFBR14\nFile Housekeeping\nUnconditionally Delete Stale Payment Authorization\nOutput Files to Prepare for Fresh Data Extraction]:::process\n\n    OPFILE1[(OPFILE1\nRoot Payment Authorization Output File\nAWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO\nFixed Length - 100 Bytes per Record)]:::datasource\n\n    OPFILE2[(OPFILE2\nChild Payment Authorization Output File\nAWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO\nFixed Length - 206 Bytes per Record)]:::datasource\n\n    STEP01[STEP01 - DFSRRC00 - IMS Batch DL/I Mode\nPayment Authorization Database Unload\nExtract Root-Level and Child-Level Payment\nAuthorization Records from IMS Database]:::process\n\n    D{STEP01\nCompleted\nSuccessfully?}:::decision\n\n    SUCCESS([Job End - Success\nRoot and Child Payment Authorization Output Files\nRetained and Available for Downstream Processing]):::success\n\n    ERROR([Job End - Error\nOutput Files Automatically Deleted\nNo Partial or Incomplete Data Retained]):::error\n\n    A --> STEP0\n    STEP0 -.->|Delete Existing Stale File\nUnconditionally - Regardless of Step Outcome| OPFILE1\n    STEP0 -.->|Delete Existing Stale File\nUnconditionally - Regardless of Step Outcome| OPFILE2\n    STEP0 --> STEP01\n    STEP01 -.->|Write Root-Level Payment Authorization Records\nParent Segment - 100 Bytes per Record| OPFILE1\n    STEP01 -.->|Write Child-Level Payment Authorization Records\nDetail Segment - 206 Bytes per Record| OPFILE2\n    STEP01 --> D\n    D -->|Yes - Files Cataloged and Retained| SUCCESS\n    D -->|No - Files Automatically Purged| ERROR"
+}

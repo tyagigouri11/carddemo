@@ -1,0 +1,76 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANREPT.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANREPT.jcl",
+    "type": "jcl",
+    "description": "This JCL job (TRANREPT) generates a Transaction Report by first backing up the VSAM transaction file, then filtering and sorting transactions within a specific date range (January 1, 2022 to July 6, 2022), and finally producing a formatted report by cross-referencing card, transaction type, and transaction category data.Key Functionalities:\nBacks up the VSAM transaction file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) into a new generation of a Generation Data Group (GDG) dataset for archival purposes.\nFilters transactions with a processing date between 2022-01-01 and 2022-07-06 (inclusive) from the backup, and sorts the qualifying records in ascending order by Card Number (16-digit field starting at position 263).\nStores the filtered and sorted transaction records into a new GDG generation dataset (AWS.M2.CARDDEMO.TRANSACT.DALY) for use in report generation.\nExecutes the report program (CBTRN03C) which reads the filtered transactions and cross-references them against the Card Cross-Reference (CARDXREF), Transaction Type (TRANTYPE), and Transaction Category (TRANCATG) VSAM files to enrich the data.\nReads date parameters from a date parameter file (AWS.M2.CARDDEMO.DATEPARM) to control the reporting period.\nProduces a formatted Transaction Report (LRECL=133, fixed-block format) stored as a new GDG generation in AWS.M2.CARDDEMO.TRANREPT for business review.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The live Transaction Master File (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) is available and accessible in shared mode, containing all current production transaction records with a fixed record length of 350 characters",
+                "When": "The Transaction Backup job step (PRC001) is initiated using the REPRO utility to copy all records from the live Transaction Master File to a new generation of the Transaction Backup File (AWS.M2.CARDDEMO.TRANSACT.BKUP(+1))",
+                "Then": "1. Every transaction record from the live Transaction Master File is copied completely and without any filtering or transformation to the new generation of the Transaction Backup File\n2. The new backup generation is permanently cataloged and made available for downstream processing steps\n3. The backup file is created with a fixed record length of 350 characters, matching the source Transaction Master File\n4. If the backup copy operation fails for any reason, the incomplete backup generation is automatically discarded and deleted \u2014 no partial or corrupt backup is retained\n5. Each execution creates a new versioned generation (+1) of the backup file, preserving all previously created backup generations"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Create Versioned Backup of Live Transaction Master File",
+            "Rule_Description": "Before any transaction reporting or processing begins, the entire live Transaction Master File (VSAM) must be fully copied to a new versioned generation of the Transaction Backup File. This ensures a complete and recoverable snapshot of all transaction records exists prior to downstream processing.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Backup File (TRANSACT.BKUP) contains transaction records, each carrying a Transaction Processing Date (TRAN-PROC-DT) at character position 305 with a length of 10 characters in YYYY-MM-DD format, and the reporting window is defined as Start Date = 2022-01-01 and End Date = 2022-07-06",
+                "When": "Each transaction record is evaluated against the condition: Transaction Processing Date is greater than or equal to 2022-01-01 AND Transaction Processing Date is less than or equal to 2022-07-06",
+                "Then": "Only transaction records where the Transaction Processing Date satisfies BOTH conditions (on or after January 1, 2022 AND on or before July 6, 2022) are included in the output Daily Transaction File (TRANSACT.DALY); all other records are excluded"
+            },
+            "Rule_Name": "STEP05R - SORT - Transaction Date Range Filtering",
+            "Rule_Description": "Only transactions whose Processing Date falls within the defined reporting window (January 1, 2022 to July 6, 2022, inclusive) are selected from the Transaction Backup File for further reporting. Transactions outside this date range are excluded.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records have been filtered to include only those within the reporting date window (January 1, 2022 to July 6, 2022), and each record contains a Card Number (TRAN-CARD-NUM) at character position 263 with a length of 16 digits",
+                "When": "The filtered transaction records are arranged for output to the Daily Transaction File",
+                "Then": "All qualifying transaction records are sorted in ascending order by Card Number (TRAN-CARD-NUM), so that transactions belonging to the same card appear consecutively in the Daily Transaction File"
+            },
+            "Rule_Name": "STEP05R - SORT - Transaction Sorting by Card Number",
+            "Rule_Description": "All transactions that pass the date range filter are sorted in ascending order by Card Number, ensuring that all transactions belonging to the same card are grouped together sequentially in the Daily Transaction File.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records have been filtered by the reporting date range (January 1, 2022 to July 6, 2022) and sorted in ascending order by Card Number",
+                "When": "The SORT step completes processing of all qualifying transaction records",
+                "Then": "A new generation of the Daily Transaction File (TRANSACT.DALY(+1)) is created with the same record structure as the Transaction Backup File; if the step succeeds, the file is permanently cataloged and made available for the Transaction Report generation step; if the step fails, the output file is automatically deleted and no data is passed to the next step"
+            },
+            "Rule_Name": "STEP05R - SORT - Daily Transaction File Generation",
+            "Rule_Description": "The filtered and sorted transactions are written to a new versioned generation of the Daily Transaction File. The file is permanently retained only if the step completes successfully; if the step fails, the file is automatically discarded to prevent incomplete data from being used downstream.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The SORT step is initiated to prepare transactions for the Transaction Report",
+                "When": "The date boundary parameters are applied to evaluate each transaction record",
+                "Then": "The reporting period is defined as starting on January 1, 2022 (PARM-START-DATE = 2022-01-01) and ending on July 6, 2022 (PARM-END-DATE = 2022-07-06); transactions processed exactly on either boundary date are included in scope"
+            },
+            "Rule_Name": "STEP05R - SORT - Reporting Period Boundary Definition",
+            "Rule_Description": "The reporting period is explicitly defined with a fixed start date of January 1, 2022 and a fixed end date of July 6, 2022. These boundary values govern which transactions are in scope for the Transaction Report.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANREPT-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Transaction File (TRANFILE) containing filtered and date-range-qualified transactions sorted by Card Number is available; AND the Card Cross-Reference file (CARDXREF) mapping Card Numbers to Account Numbers is available; AND the Transaction Type reference file (TRANTYPE) mapping Transaction Type codes to their descriptions is available; AND the Transaction Category reference file (TRANCATG) mapping Transaction Category codes to their descriptions is available; AND the Date Parameters file (DATEPARM) defining the reporting period start and end dates is available",
+                "When": "The CBTRN03C program is executed to generate the Transaction Report",
+                "Then": "A new versioned generation of the Transaction Report (TRANREPT) is produced where each transaction line is enriched with its associated Account Number retrieved from CARDXREF using the Card Number, its Transaction Type description retrieved from TRANTYPE using the Transaction Type code, and its Transaction Category description retrieved from TRANCATG using the Transaction Category code; AND the report header reflects the reporting period dates sourced from DATEPARM; AND the report is formatted to 133 characters per line suitable for print output; AND if the report generation completes successfully, the new report generation is permanently cataloged and made available for distribution or printing; AND if the report generation fails, the output report file is automatically discarded to prevent any incomplete or corrupt report from being retained"
+            },
+            "Rule_Name": "STEP10R - CBTRN03C - Transaction Report Generation",
+            "Rule_Description": "This step invokes the external program CBTRN03C to generate a fully enriched, formatted Transaction Report for a defined reporting period. The program reads the filtered and sorted daily transactions, enriches each record with Account Number, Transaction Type description, and Transaction Category description by performing lookups against reference files, and produces a new versioned print-ready report. The report is permanently retained if generation succeeds and automatically discarded if it fails.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#fff\n\n    START([Job Start\nTransaction Report Generation]):::start\n\n    %% VSAM Datasources\n    DS1[(Transaction Master File\nAWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS)]:::datasource\n    DS2[(Card Cross-Reference Master\nAWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS)]:::datasource\n    DS3[(Transaction Type Master\nAWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS)]:::datasource\n    DS4[(Transaction Category Master\nAWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS)]:::datasource\n\n    %% Sequential File Datasources\n    DS5[(Transaction Backup File\nTRANSACT-BKUP)]:::datasource\n    DS6[(Daily Transaction File\nTRANSACT-FILE)]:::datasource\n    DS7[(Card Cross-Reference File\nXREF-FILE)]:::datasource\n    DS8[(Transaction Type File\nTRANTYPE-FILE)]:::datasource\n    DS9[(Transaction Category File\nTRANCATG-FILE)]:::datasource\n    DS10[(Date Parameters File\nDATE-PARMS-FILE)]:::datasource\n    DS11[(Transaction Report Output\nREPORT-FILE)]:::datasource\n\n    %% Job Steps\n    PRC001[PRC001 - IDCAMS\nBackup All Transaction Records\nfrom VSAM to Sequential Backup File]:::process\n    STEP05R[STEP05R - SORT\nFilter Transactions by Date Range\nJan 1 2022 to Jul 6 2022\nSort by Card Number Ascending]:::process\n    STEP10R[STEP10R - CBTRN03C\nGenerate Detailed Transaction Report\nEnrich with Account Type and Category Details]:::process\n\n    %% Decision Nodes\n    D1{PRC001\nBackup\nSuccessful?}:::decision\n    D2{STEP05R\nFilter and Sort\nSuccessful?}:::decision\n    D3{STEP10R\nReport Generation\nSuccessful?}:::decision\n\n    %% End Nodes\n    END_SUCCESS([Job Completed Successfully\nTransaction Report is Ready for Distribution]):::success\n    END_ERR1([Job Aborted\nTransaction Backup Step Failed]):::error\n    END_ERR2([Job Aborted\nTransaction Filter and Sort Step Failed]):::error\n    END_ERR3([Job Aborted\nTransaction Report Generation Failed]):::error\n\n    %% \u2500\u2500 Main Control Flow \u2500\u2500\n    START --> PRC001\n\n    %% \u2500\u2500 PRC001 Data Flow \u2500\u2500\n    DS1 -.->|Read All Transaction Records| PRC001\n    PRC001 -.->|Write Full Backup Copy of All Transactions| DS5\n    PRC001 --> D1\n    D1 -->|Yes - Backup Created Successfully| STEP05R\n    D1 -->|No - Backup Failed| END_ERR1\n\n    %% \u2500\u2500 STEP05R Data Flow \u2500\u2500\n    DS5 -.->|Read Transaction Backup Records| STEP05R\n    STEP05R -.->|Write Filtered and Sorted Daily Transactions| DS6\n    STEP05R --> D2\n    D2 -->|Yes - Filter and Sort Completed| STEP10R\n    D2 -->|No - Filter and Sort Failed| END_ERR2\n\n    %% \u2500\u2500 STEP10R Data Flow \u2500\u2500\n    DS6 -.->|Read Daily Transaction Records| STEP10R\n    DS2 -.->|Provide Card-to-Account\nCross-Reference Source Data| DS7\n    DS7 -.->|Lookup Account Number\nby Card Number| STEP10R\n    DS3 -.->|Provide Transaction\nType Source Data| DS8\n    DS8 -.->|Lookup Transaction\nType Description| STEP10R\n    DS4 -.->|Provide Transaction\nCategory Source Data| DS9\n    DS9 -.->|Lookup Transaction\nCategory Description| STEP10R\n    DS10 -.->|Read Reporting\nStart and End Date Parameters| STEP10R\n    STEP10R -.->|Write Formatted\nTransaction Report| DS11\n    STEP10R --> D3\n    D3 -->|Yes - Report Generated Successfully| END_SUCCESS\n    D3 -->|No - Report Generation Failed| END_ERR3"
+}

@@ -1,0 +1,252 @@
+{
+    "created_on": "2026-11-05",
+    "name": "ESDSRRDS.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/ESDSRRDS.jcl",
+    "type": "jcl",
+    "description": "This JCL job initializes and loads user security data for the CardDemo application by creating two VSAM files \u2014 an Entry Sequenced Dataset (ESDS) and a Relative Record Dataset (RRDS) \u2014 and populating both with 10 user records (5 administrators and 5 regular users), each containing user ID, first name, last name, and password information in an 80-byte fixed format.Key Functionalities:\nCreates a temporary sequential flat file containing 10 user security records: 5 administrator accounts (ADMIN001\u2013ADMIN005) and 5 regular user accounts (USER0001\u2013USER0005), each with first name, last name, and an associated password.\nDeletes any pre-existing VSAM ESDS cluster (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS) and redefines it as a new Non-Indexed (Entry Sequenced) VSAM cluster with 80-byte fixed records, allocated at 45 primary and 15 secondary tracks, then loads all 10 user records into it.\nDeletes any pre-existing VSAM RRDS cluster (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) and redefines it as a new Numbered (Relative Record) VSAM cluster with 80-byte fixed records, allocated at 45 primary and 15 secondary tracks, then loads all 10 user records into it.\nEnsures a clean initialization by first removing any prior version of the temporary sequential file before recreating it, preventing stale or duplicate data from being loaded into the VSAM files.",
+    "rules": [
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security initialization job is about to begin, and the User Security staging file (AWS.M2.CARDDEMO.ESDSRRDS.PS) may or may not exist from a previous run",
+                "When": "The pre-deletion step executes at the start of the initialization job",
+                "Then": "The User Security staging file must be deleted under ALL of the following conditions: (1) If the file exists and the step completes successfully \u2014 the file is deleted; (2) If the file exists and the step encounters an error \u2014 the file is still deleted; (3) If the file does not exist \u2014 no error is raised and the step completes silently, allowing the job to continue; ensuring that in every scenario, no residual staging data from any prior execution remains before the new initialization begins"
+            },
+            "Rule_Name": "PREDEL - IEFBR14 - Unconditional Deletion of User Security Staging File Before Initialization",
+            "Rule_Description": "Before the CardDemo User Security initialization process begins, the staging file used to seed user security data must be completely removed \u2014 regardless of whether it exists, and regardless of whether the deletion step itself succeeds or fails \u2014 to ensure no stale data from a prior run can contaminate the current initialization.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security initialization job is being executed to establish the initial set of user accounts",
+                "When": "The system prepares the user security seed data for loading",
+                "Then": "Exactly 10 user security records must be defined: 5 Administrator accounts (ADMIN001 through ADMIN005) and 5 Standard User accounts (USER0001 through USER0005), each record being exactly 80 characters in fixed-length format containing User ID, First Name, Last Name, and Password fields"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Define Initial User Security Seed Records",
+            "Rule_Description": "The CardDemo application requires a fixed set of 10 initial user security accounts \u2014 5 Administrators and 5 Standard Users \u2014 to be defined as seed data for the User Security data stores. Each account must carry a User ID, First Name, Last Name, and Password within a fixed 80-character record structure.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "A user security record is being created for the CardDemo User Security data store",
+                "When": "The record is written to the staging file",
+                "Then": "The record must be exactly 80 characters long with the following fixed-position layout: User ID in positions 1\u20138 (8 characters), First Name in positions 9\u201328 (20 characters, space-padded), Last Name in positions 29\u201348 (20 characters, space-padded), Password in positions 49\u201357 (9 characters), and remaining positions 58\u201380 left as trailing spaces"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - User Security Record Layout Definition",
+            "Rule_Description": "Every user security record in the CardDemo application must conform to a fixed 80-character layout with four defined fields occupying specific positions. This structure is mandatory for all user accounts regardless of account type.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "A user security record is being defined as an Administrator account in the CardDemo application",
+                "When": "The record is written to the User Security staging file",
+                "Then": "The User ID field (positions 1\u20138) must begin with the prefix 'ADMIN' followed by a 3-digit sequential number (ADMIN001, ADMIN002, ADMIN003, ADMIN004, ADMIN005), AND the Password field must be set to 'PASSWORDA' \u2014 where the suffix 'A' designates Administrator-level access"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Administrator Account Identification Rule",
+            "Rule_Description": "Administrator accounts in CardDemo are distinguished from Standard User accounts by specific patterns in both the User ID and the Password fields. These patterns must be consistently applied across all Administrator seed records.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A user security record is being defined as a Standard User account in the CardDemo application",
+                "When": "The record is written to the User Security staging file",
+                "Then": "The User ID field (positions 1\u20138) must begin with the prefix 'USER' followed by a 4-digit sequential number (USER0001, USER0002, USER0003, USER0004, USER0005), AND the Password field must be set to 'PASSWORDU' \u2014 where the suffix 'U' designates Standard User-level access"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Standard User Account Identification Rule",
+            "Rule_Description": "Standard User accounts in CardDemo are distinguished from Administrator accounts by specific patterns in both the User ID and the Password fields. These patterns must be consistently applied across all Standard User seed records.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security initialization job is preparing Administrator seed accounts",
+                "When": "The 5 Administrator records are written to the User Security staging file",
+                "Then": "The following 5 Administrator records must be created exactly as specified: (1) ADMIN001 \u2014 First Name: MARGARET, Last Name: GOLD, Password: PASSWORDA; (2) ADMIN002 \u2014 First Name: RUSSELL, Last Name: RUSSELL, Password: PASSWORDA; (3) ADMIN003 \u2014 First Name: RAYMOND, Last Name: WHITMORE, Password: PASSWORDA; (4) ADMIN004 \u2014 First Name: EMMANUEL, Last Name: CASGRAIN, Password: PASSWORDA; (5) ADMIN005 \u2014 First Name: GRANVILLE, Last Name: LACHAPELLE, Password: PASSWORDA"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Seed Administrator Account Records",
+            "Rule_Description": "The CardDemo application must be initialized with exactly 5 Administrator accounts with predefined identities. These accounts represent the initial administrative users of the system and their details are fixed at initialization time.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security initialization job is preparing Standard User seed accounts",
+                "When": "The 5 Standard User records are written to the User Security staging file",
+                "Then": "The following 5 Standard User records must be created exactly as specified: (1) USER0001 \u2014 First Name: LAWRENCE, Last Name: THOMAS, Password: PASSWORDU; (2) USER0002 \u2014 First Name: AJITH, Last Name: KUMAR, Password: PASSWORDU; (3) USER0003 \u2014 First Name: LAURITZ, Last Name: ALME, Password: PASSWORDU; (4) USER0004 \u2014 First Name: AVERARDO, Last Name: MAZZI, Password: PASSWORDU; (5) USER0005 \u2014 First Name: LEE, Last Name: TING, Password: PASSWORDU"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Seed Standard User Account Records",
+            "Rule_Description": "The CardDemo application must be initialized with exactly 5 Standard User accounts with predefined identities. These accounts represent the initial standard users of the system and their details are fixed at initialization time.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security staging file is being populated with the 10 seed records",
+                "When": "All 10 records are written to the staging file",
+                "Then": "Records must be written in the following strict order: first the 5 Administrator records in sequence (ADMIN001, ADMIN002, ADMIN003, ADMIN004, ADMIN005), followed by the 5 Standard User records in sequence (USER0001, USER0002, USER0003, USER0004, USER0005) \u2014 resulting in Administrators occupying positions 1\u20135 and Standard Users occupying positions 6\u201310"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Record Ordering Rule for User Security Staging File",
+            "Rule_Description": "The order in which user security records are written to the staging file determines their slot positions in the RRDS and their sequential positions in the ESDS. Administrator records must precede Standard User records to ensure consistent positional assignment.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security initialization job is writing the 10 seed records to the staging file",
+                "When": "The staging file creation completes \u2014 either successfully or with a failure",
+                "Then": "If the file is created successfully, it must be catalogued and retained for use in the downstream ESDS and RRDS loading steps; AND if the file creation fails for any reason, the incomplete staging file must be automatically deleted to prevent corrupt or partial data from being carried forward to the VSAM loading steps"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - User Security Staging File Creation and Integrity Rule",
+            "Rule_Description": "The User Security staging file must be created as a new, catalogued file to serve as the single source of truth for seeding both VSAM data stores. If the file creation fails for any reason, the incomplete file must be automatically discarded to prevent partial or corrupt data from being used in downstream loading steps.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The 10 hardcoded user security seed records are being written to the User Security staging file",
+                "When": "The copy operation is performed by the system",
+                "Then": "All 10 records must be written to the staging file exactly as defined in the source data \u2014 with no field modifications, no record filtering, no data reformatting, and no record reordering \u2014 ensuring the staging file is an exact replica of the seed data"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - No Transformation Policy for Seed Data",
+            "Rule_Description": "The user security seed records must be copied to the staging file exactly as defined \u2014 without any modification, filtering, reformatting, or transformation. The data must reach the VSAM data stores in its original form.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The User Security ESDS (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS) may or may not exist in the system catalog",
+                "When": "The User Security initialization job is executed",
+                "Then": "The existing User Security ESDS (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS) and its data component (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS.DAT) must be deleted from the system catalog before any new data is loaded"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Delete Existing User Security ESDS Before Reinitialization",
+            "Rule_Description": "Before recreating the User Security Entry-Sequenced Dataset (ESDS), any previously existing version must be removed to ensure the initialization always starts with a clean, empty data store.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The DELETE operation for the User Security ESDS (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS) has been attempted",
+                "When": "The DELETE operation raises an error because the User Security ESDS does not exist in the system catalog (first-time run or file was previously removed)",
+                "Then": "The error condition must be reset to zero (MAXCC = 0) so that the subsequent User Security ESDS creation step is not blocked, and the initialization process continues successfully without requiring manual intervention"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Suppress Deletion Failure for First-Time User Security ESDS Initialization",
+            "Rule_Description": "The initialization process must be run-safe \u2014 it must succeed regardless of whether the User Security ESDS already exists or is being created for the very first time. If the deletion fails because the file does not exist, the failure must be suppressed so that the creation step can proceed without interruption.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The existing User Security ESDS has been deleted (or confirmed as non-existent) and the error condition has been reset to zero",
+                "When": "The User Security ESDS creation is executed",
+                "Then": "A new User Security ESDS cluster named AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS must be created with ALL of the following properties: (1) Each user security record must be exactly 80 characters in both minimum and maximum length (RECORDSIZE 80,80); (2) The dataset must be Entry-Sequenced (NONINDEXED) so that records are stored and retrieved in the exact order they are written, supporting sequential batch processing of all user accounts; (3) The dataset must be flagged as reusable (REUSE) so it can be reloaded with fresh data in future initialization runs without requiring deletion and recreation; (4) Storage must be allocated with 45 primary tracks and 15 secondary tracks (TRACKS 45,15) to accommodate the initial 10 user records and future growth; (5) Free space must be reserved at 10% per Control Interval and 15% per Control Area (FREESPACE 10,15) to allow for future record insertions without reorganization; (6) The Control Interval size must be set to 8192 bytes (CISZ 8192) for optimal read/write performance; (7) The physical data component must be named AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS.DAT"
+            },
+            "Rule_Name": "STEP02 - IDCAMS - Define User Security ESDS with Fixed Record Structure and Sequential Access",
+            "Rule_Description": "A new User Security Entry-Sequenced Dataset (ESDS) must be created with a precisely defined structure that supports fixed-length 80-character user security records and sequential batch processing. The dataset must be reusable across multiple initialization runs.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The User Security staging file (AWS.M2.CARDDEMO.ESDSRRDS.PS) exists and contains all 10 user security records (5 Administrator accounts and 5 Standard User accounts), AND the User Security ESDS (AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS) has been freshly created and is empty",
+                "When": "The system copies all records from the User Security staging file into the User Security ESDS without any modification, filtering, or transformation, preserving the exact order and content of every record",
+                "Then": "All 10 user security records are loaded into the User Security ESDS in the same sequential order as they appear in the staging file \u2014 5 Administrator accounts (ADMIN001\u2013ADMIN005) followed by 5 Standard User accounts (USER0001\u2013USER0005) \u2014 and the User Security ESDS is fully populated and ready for sequential batch access by the CardDemo application"
+            },
+            "Rule_Name": "STEP03 - IDCAMS REPRO - Load All User Security Records into User Security ESDS",
+            "Rule_Description": "All user security records from the staging sequential file are copied as-is into the User Security Entry-Sequenced Dataset (ESDS), making them available for sequential batch processing by the CardDemo application.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo User Security RRDS dataset (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) may or may not exist in the system catalog from a prior initialization run",
+                "When": "The User Security data layer initialization process is triggered",
+                "Then": "The system must attempt to delete the existing User Security RRDS dataset (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) along with its data component (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS.DAT) to clear all previously loaded user security records before reinitialization begins"
+            },
+            "Rule_Name": "STEP04 - IDCAMS - Delete Existing User Security RRDS Before Reinitialization",
+            "Rule_Description": "Before creating a fresh User Security Relative Record Dataset (RRDS), any previously existing version of the dataset must be removed to ensure no stale or duplicate user security data persists across initialization runs.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of the User Security RRDS (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) has been attempted AND the dataset did not exist, causing the delete operation to raise a non-zero error condition",
+                "When": "The error condition from the failed delete is evaluated",
+                "Then": "The error condition must be reset to zero (MAXCC = 0) so that the subsequent User Security RRDS creation step is not blocked, allowing the initialization to proceed successfully on both first-time runs and re-runs"
+            },
+            "Rule_Name": "STEP04 - IDCAMS - Suppress Delete Failure to Ensure First-Time Run Safety",
+            "Rule_Description": "The initialization process must succeed even when the User Security RRDS does not yet exist in the system \u2014 such as during the very first execution. Any error raised by the delete attempt must be suppressed so that the dataset creation step is not blocked.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The existing User Security RRDS has been deleted (or confirmed not to exist) AND the error condition has been reset to zero",
+                "When": "The User Security RRDS creation is executed",
+                "Then": "A new VSAM Relative Record Dataset named AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS must be created with the following business specifications: (1) Dataset organized as NUMBERED (Relative Record) to support direct positional access to individual user security records by slot number; (2) Each user security record must be exactly 80 characters in both minimum and maximum length to match the fixed-length user security record structure; (3) The dataset must be REUSE-enabled so it can be reloaded with refreshed user security data without requiring deletion and recreation; (4) A data component named AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS.DAT must be created to physically store the user security records"
+            },
+            "Rule_Name": "STEP04 - IDCAMS - Define User Security RRDS for Direct Positional Access",
+            "Rule_Description": "A new User Security Relative Record Dataset (RRDS) must be created as the primary data store for online user authentication in the CardDemo application. The RRDS enables the application to retrieve any individual user's security record instantly by its assigned slot number, without scanning through all records.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The User Security RRDS (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) is being defined for the CardDemo application",
+                "When": "The storage parameters are applied during dataset creation",
+                "Then": "The dataset must be allocated with: (1) A primary storage allocation of 45 tracks to hold the initial user security records with room for growth; (2) A secondary storage allocation of 15 tracks to automatically extend storage if the primary allocation is exhausted; (3) A free space reservation of 10% within each Control Interval and 15% within each Control Area to allow efficient insertion of new user security records without immediate reorganization; (4) A Control Interval size of 8192 bytes (8KB) to optimize read and write performance for user security record access"
+            },
+            "Rule_Name": "STEP04 - IDCAMS - Allocate Sufficient Storage for User Security RRDS",
+            "Rule_Description": "The User Security RRDS must be allocated with sufficient storage capacity to hold the initial set of user security records and accommodate future growth, while reserving free space to allow efficient record insertion and updates without reorganization.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The User Security staging file (AWS.M2.CARDDEMO.ESDSRRDS.PS) exists and contains 10 user security records \u2014 5 Administrator accounts (ADMIN001\u2013ADMIN005) followed by 5 Standard User accounts (USER0001\u2013USER0005) \u2014 and the User Security RRDS (AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS) has been freshly created and is empty",
+                "When": "The REPRO operation is executed to copy all records from the staging file into the User Security RRDS",
+                "Then": "All 10 user security records must be written into the User Security RRDS without any modification to their content, each record occupying a fixed sequential slot number determined by its position in the staging file \u2014 Administrator accounts are assigned slots 1 through 5 and Standard User accounts are assigned slots 6 through 10 \u2014 so that any individual user security record can be retrieved directly by its slot number during online CardDemo application use"
+            },
+            "Rule_Name": "STEP05 - IDCAMS REPRO - Load All User Security Records into RRDS",
+            "Rule_Description": "All user security records from the staging sequential file are copied as-is into the User Security Relative Record Dataset (RRDS), assigning each record a sequential slot number based on its position in the input file. This enables the CardDemo application to perform direct positional access to individual user security records during online authentication.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The User Security staging file contains fixed 80-character records, each holding a User ID, First Name, Last Name, and Password for a CardDemo user account",
+                "When": "The REPRO operation copies each record from the staging file to the User Security RRDS",
+                "Then": "Every record written to the User Security RRDS must be identical in content to its corresponding record in the staging file \u2014 no fields may be modified, truncated, padded differently, or reordered \u2014 and the total record count in the RRDS must exactly match the total record count in the staging file"
+            },
+            "Rule_Name": "STEP05 - IDCAMS REPRO - Preserve User Security Record Integrity During Load",
+            "Rule_Description": "Each user security record copied from the staging file into the RRDS must retain its exact original content \u2014 User ID, First Name, Last Name, and Password \u2014 without any alteration, ensuring the RRDS is a faithful replica of the seed data.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00021",
+            "Acceptance_Criteria": {
+                "Given": "The User Security staging file contains 10 records in a defined order \u2014 ADMIN001 (MARGARET GOLD) first, followed by ADMIN002 (RUSSELL RUSSELL), ADMIN003 (RAYMOND WHITMORE), ADMIN004 (EMMANUEL CASGRAIN), ADMIN005 (GRANVILLE LACHAPELLE), USER0001 (LAWRENCE THOMAS), USER0002 (AJITH KUMAR), USER0003 (LAURITZ ALME), USER0004 (AVERARDO MAZZI), and USER0005 (LEE TING) last \u2014 and the User Security RRDS is empty and ready to receive records",
+                "When": "The REPRO operation loads all records sequentially from the staging file into the User Security RRDS",
+                "Then": "Each user security record must be assigned a slot number that corresponds to its position in the staging file: ADMIN001 receives slot 1, ADMIN002 receives slot 2, ADMIN003 receives slot 3, ADMIN004 receives slot 4, ADMIN005 receives slot 5, USER0001 receives slot 6, USER0002 receives slot 7, USER0003 receives slot 8, USER0004 receives slot 9, and USER0005 receives slot 10 \u2014 ensuring that the CardDemo application can directly retrieve any user's security record by referencing its assigned slot number"
+            },
+            "Rule_Name": "STEP05 - IDCAMS REPRO - Assign Sequential Slot Numbers to User Security Records in RRDS",
+            "Rule_Description": "The RRDS assigns a fixed positional slot number to each user security record based on the order in which it is loaded from the staging file. This slot number becomes the permanent direct-access key for that user's security record in the CardDemo application.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ESDSRRDS-jcl-00022",
+            "Acceptance_Criteria": {
+                "Given": "The User Security RRDS has been successfully populated with all 10 user security records, each assigned a unique sequential slot number (1 through 10)",
+                "When": "The CardDemo application needs to authenticate or retrieve the security details of a specific user",
+                "Then": "The CardDemo application must be able to access that user's security record \u2014 containing their User ID, First Name, Last Name, and Password \u2014 directly by their assigned slot number without reading any other records in the RRDS, enabling fast and efficient online user authentication"
+            },
+            "Rule_Name": "STEP05 - IDCAMS REPRO - Enable Direct Positional Access for Online User Authentication",
+            "Rule_Description": "By loading user security records into the RRDS, the CardDemo application gains the ability to authenticate any individual user instantly by accessing their record directly via slot number, without scanning through all other user records.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    START([Job Start\nInitialize CardDemo User Security Data]):::start\n\n    PREDEL[PREDEL - IEFBR14\nCleanup: Delete Stale\nUser Security Staging File]:::process\n\n    STEP01[STEP01 - IEBGENER\nCreate and Populate User Security Staging File\n10 Records: 5 Administrators + 5 Standard Users]:::process\n\n    STAGING[(User Security Staging File\nAWS.M2.CARDDEMO.ESDSRRDS.PS\n10 Hardcoded User Security Records)]:::datasource\n\n    STEP02_DEC{STEP02 - IDCAMS\nDoes User Security ESDS\nAlready Exist?}:::decision\n\n    STEP02_DEL[Delete Existing\nUser Security ESDS]:::process\n\n    STEP02_RESET[Reset Processing Error\nContinue to Create ESDS]:::process\n\n    STEP02_DEF[STEP02 - IDCAMS\nCreate New Empty\nUser Security ESDS]:::process\n\n    ESDS[(AWS.M2.CARDDEMO.USRSEC.VSAM.ESDS\nUser Security Entry-Sequenced Dataset\nESDS)]:::datasource\n\n    STEP03[STEP03 - IDCAMS REPRO\nLoad 10 User Security Records\ninto User Security ESDS]:::process\n\n    STEP04_DEC{STEP04 - IDCAMS\nDoes User Security RRDS\nAlready Exist?}:::decision\n\n    STEP04_DEL[Delete Existing\nUser Security RRDS]:::process\n\n    STEP04_RESET[Reset Processing Error\nContinue to Create RRDS]:::process\n\n    STEP04_DEF[STEP04 - IDCAMS\nCreate New Empty\nUser Security RRDS]:::process\n\n    RRDS[(AWS.M2.CARDDEMO.USRSEC.VSAM.RRDS\nUser Security Relative Record Dataset\nRRDS)]:::datasource\n\n    STEP05[STEP05 - IDCAMS REPRO\nLoad 10 User Security Records\ninto User Security RRDS]:::process\n\n    END_SUCCESS([Job Complete\nCardDemo User Security Initialization Successful\nESDS and RRDS Fully Populated]):::final\n\n    START --> PREDEL\n    PREDEL --> STEP01\n    STEP01 -->|Write 10 User Security Records| STAGING\n    STEP01 --> STEP02_DEC\n    STEP02_DEC -->|Yes - File Exists| STEP02_DEL\n    STEP02_DEC -->|No - First Time Run| STEP02_RESET\n    STEP02_DEL --> STEP02_DEF\n    STEP02_RESET --> STEP02_DEF\n    STEP02_DEF -->|Create Empty ESDS| ESDS\n    STAGING -.->|Read 10 User Security Records| STEP03\n    ESDS -.->|Empty ESDS Ready for Loading| STEP03\n    STEP03 -->|Load 10 User Security Records| ESDS\n    STEP03 --> STEP04_DEC\n    STEP04_DEC -->|Yes - File Exists| STEP04_DEL\n    STEP04_DEC -->|No - First Time Run| STEP04_RESET\n    STEP04_DEL --> STEP04_DEF\n    STEP04_RESET --> STEP04_DEF\n    STEP04_DEF -->|Create Empty RRDS| RRDS\n    STAGING -.->|Read 10 User Security Records| STEP05\n    RRDS -.->|Empty RRDS Ready for Loading| STEP05\n    STEP05 -->|Load 10 User Security Records| RRDS\n    STEP05 --> END_SUCCESS"
+}

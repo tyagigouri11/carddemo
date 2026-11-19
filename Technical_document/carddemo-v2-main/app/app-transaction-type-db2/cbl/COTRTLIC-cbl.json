@@ -1,0 +1,477 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COTRTLIC.cbl",
+        "type": "cobol",
+        "transaction_id": "CTLI"
+      },
+      "overview": "This program operates within a credit card management system (CardDemo) as part of the administrative business logic layer, handling the maintenance of transaction type reference data. It serves as the list/selection screen in a CRUD workflow, allowing administrators to view, search, and select transaction type records for subsequent update or deletion operations. The program manages the TRANSACTION_TYPE table in Db2, providing a paginated list interface within a CICS terminal environment where users can filter records by type code or description, then mark individual rows for update or delete actions that are confirmed via function key.",
+      "key_features": [
+        {
+          "feature": "Paginated Record Listing",
+          "description": "Displays up to 7 transaction type records per screen page, supporting forward (PF8) and backward (PF7) navigation using bidirectional Db2 cursors (C-TR-TYPE-FORWARD and C-TR-TYPE-BACKWARD)."
+        },
+        {
+          "feature": "Filter by Type Code",
+          "description": "Allows users to filter the displayed list by entering a 2-digit numeric transaction type code, with validation ensuring the value is numeric."
+        },
+        {
+          "feature": "Filter by Description",
+          "description": "Supports partial-match filtering on transaction type descriptions using a SQL LIKE clause with wildcard wrapping of the entered search text."
+        },
+        {
+          "feature": "Row-Level Delete",
+          "description": "Users can mark a row with 'D' to request deletion; the program highlights the row and requires PF10 confirmation before executing the DELETE SQL statement, with referential integrity error handling."
+        },
+        {
+          "feature": "Row-Level Update",
+          "description": "Users can mark a row with 'U' to request an update to the transaction description; the field becomes editable and PF10 saves the change via an UPDATE SQL statement with deadlock and not-found error handling."
+        },
+        {
+          "feature": "Input Validation and Cross-Edits",
+          "description": "Validates that only one action is selected at a time, that action codes are valid ('U' or 'D'), that updated descriptions contain only alphanumeric characters, and that filter criteria return at least one matching record."
+        },
+        {
+          "feature": "CICS Commarea State Management",
+          "description": "Persists paging state, filter values, selected row, and action flags across CICS pseudo-conversational interactions using a structured commarea passed between transactions."
+        },
+        {
+          "feature": "Navigation to Add and Admin Screens",
+          "description": "PF2 transfers control to the transaction type add/update program (COTRTUPC), and PF3 returns the user to the admin menu (COADM01C), with proper commarea handoff."
+        },
+        {
+          "feature": "Db2 Connectivity Check",
+          "description": "Performs a priming query before any screen processing to verify Db2 availability, displaying a diagnostic message and halting processing if the database is unreachable."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDEMO.TRANSACTION_TYPE",
+        "type": "Read/Write",
+        "description": "Db2 table containing transaction type codes and descriptions. Read via forward and backward cursors for paginated listing. Updated via SQL UPDATE when user selects 'U' action. Deleted via SQL DELETE when user selects 'D' action and confirms with F10."
+      },
+      {
+        "name": "SYSIBM.SYSDUMMY1",
+        "type": "Read",
+        "description": "Db2 system dummy table used in a priming query to verify Db2 connectivity before any main processing occurs."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Initializes working storage, communication area, and sets program context. On first entry (EIBCALEN=0), initializes CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA with default values and sets first-page indicators.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "WS-CA-SCREEN-NUM",
+            "WS-CA-FIRST-TR-CODE"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Restore Communication Area",
+          "description": "On subsequent entries, restores CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA from DFHCOMMAREA passed by CICS, preserving paging state, filter values, and row selections across pseudo-conversational cycles.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "WS-CA-LAST-TR-CODE",
+            "WS-CA-FIRST-TR-CODE",
+            "WS-CA-SCREEN-NUM"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "PF Key Mapping",
+          "description": "Calls CSSTRPFY copybook routine to map and store the attention identifier (AID) key pressed by the user into a normalized CCARD-AID flag for downstream decision logic.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK02",
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK07",
+            "CCARD-AID-PFK08",
+            "CCARD-AID-PFK10"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Receive Screen Input",
+          "description": "Executes CICS RECEIVE MAP to read user input from the CTRTLIA map into CTRTLIAI. Extracts type code filter, description filter, row selection flags, and per-row transaction codes and descriptions into working storage arrays.",
+          "records": [
+            "CTRTLIAI",
+            "WS-IN-TYPE-CD",
+            "WS-IN-TYPE-DESC",
+            "WS-EDIT-SELECT",
+            "WS-ROW-TR-CODE-IN",
+            "WS-ROW-TR-DESC-IN"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Edit Row Selection Array",
+          "description": "Validates the selection column for each of the 7 screen rows. Counts delete (D) and update (U) requests, detects invalid action codes, enforces single-action rule, and tracks which row was selected via I-SELECTED.",
+          "records": [
+            "WS-EDIT-SELECT-FLAGS",
+            "WS-DELETES-REQUESTED",
+            "WS-UPDATES-REQUESTED",
+            "WS-ACTIONS-REQUESTED",
+            "WS-VALID-ACTIONS-SELECTED",
+            "I-SELECTED",
+            "WS-CA-ROW-SELECTED"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Edit Row Description for Update",
+          "description": "When an update is requested on a row, compares the screen-entered description against the commarea-stored description to detect changes. Validates the new description is alphanumeric and non-blank.",
+          "records": [
+            "WS-ROW-TR-DESC-IN",
+            "WS-CA-ROW-TR-DESC-OUT",
+            "WS-EDIT-ALPHANUM-ONLY",
+            "WS-ARRAY-DESCRIPTION-FLGS",
+            "WS-DATACHANGED-FLAG"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Edit Type Code Filter",
+          "description": "Validates the type code filter field entered by the user. Ensures it is numeric if supplied. Detects changes from the previously stored filter value and resets paging variables if the filter has changed.",
+          "records": [
+            "WS-IN-TYPE-CD",
+            "WS-TYPE-CD-FILTER",
+            "WS-CA-TYPE-CD",
+            "WS-EDIT-TYPE-FLAG",
+            "WS-CA-PAGING-VARIABLES"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Edit Description Filter",
+          "description": "Validates the description filter field. If supplied, wraps the trimmed value with SQL LIKE wildcards (%) and stores it. Detects changes from the previously stored filter and resets paging variables accordingly.",
+          "records": [
+            "WS-IN-TYPE-DESC",
+            "WS-TYPE-DESC-FILTER",
+            "WS-CA-TYPE-DESC",
+            "WS-EDIT-DESC-FLAG",
+            "WS-CA-PAGING-VARIABLES"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Cross-Edit Filter Validation",
+          "description": "Executes a COUNT SQL query against CARDDEMO.TRANSACTION_TYPE using the active filter conditions to verify at least one matching record exists. Sets INPUT-ERROR and protects selection rows if no records are found.",
+          "records": [
+            "WS-RECORDS-COUNT",
+            "WS-TYPE-CD-FILTER",
+            "WS-TYPE-DESC-FILTER",
+            "WS-EDIT-TYPE-FLAG",
+            "WS-EDIT-DESC-FLAG"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "DB2 Connectivity Check",
+          "description": "Performs a priming query via the CSDB2RWY/CSDB2RPY routines to verify DB2 connectivity before any main processing. If a DB2 error is detected, sends a long error text and returns immediately.",
+          "records": [
+            "WS-DB2-ERROR",
+            "WS-LONG-MSG",
+            "WS-DISP-SQLCODE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "PF3 Navigation to Admin Menu",
+          "description": "When PF3 is pressed, sets the target program to COADM01C (or the originating program if applicable), issues a CICS SYNCPOINT, and transfers control via XCTL passing CARDDEMO-COMMAREA.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-TO-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "PF2 Navigation to Add/Update Screen",
+          "description": "When PF2 is pressed, sets the target program to COTRTUPC and transfers control via CICS XCTL, passing the communication area to allow adding a new transaction type.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CCARD-NEXT-MAPSET",
+            "CCARD-NEXT-MAP",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Forward Page Read (PF8 / Enter / Initial)",
+          "description": "Opens the C-TR-TYPE-FORWARD DB2 cursor and fetches up to 7 rows from CARDDEMO.TRANSACTION_TYPE ordered by TR_TYPE ascending from WS-START-KEY. Stores results in WS-CA-SCREEN-ROWS-OUT array and sets first/last key and next-page indicators.",
+          "records": [
+            "WS-START-KEY",
+            "WS-CA-FIRST-TR-CODE",
+            "WS-CA-LAST-TR-CODE",
+            "WS-CA-ROW-TR-CODE-OUT",
+            "WS-CA-ROW-TR-DESC-OUT",
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION-TEXT",
+            "WS-CA-NEXT-PAGE-IND",
+            "WS-CA-SCREEN-NUM"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Backward Page Read (PF7)",
+          "description": "Opens the C-TR-TYPE-BACKWARD DB2 cursor and fetches up to 7 rows ordered by TR_TYPE descending from WS-CA-FIRST-TR-CODE. Fills the screen array in reverse order to display the previous page correctly.",
+          "records": [
+            "WS-CA-FIRST-TR-CODE",
+            "WS-CA-LAST-TR-CODE",
+            "WS-CA-ROW-TR-CODE-OUT",
+            "WS-CA-ROW-TR-DESC-OUT",
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION-TEXT",
+            "WS-ROW-NUMBER"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Delete Record Confirmation (PF10 + Delete)",
+          "description": "Executes a DELETE SQL statement against CARDDEMO.TRANSACTION_TYPE for the selected TR_TYPE. On success, issues CICS SYNCPOINT and sets CA-DELETE-SUCCEEDED. Handles referential integrity violation (SQLCODE -532) and other errors.",
+          "records": [
+            "DCL-TR-TYPE",
+            "WS-ROW-TR-CODE-IN",
+            "I-SELECTED",
+            "CA-DELETE-SUCCEEDED",
+            "CA-DELETE-REQUESTED",
+            "WS-DISP-SQLCODE"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Update Record Confirmation (PF10 + Update)",
+          "description": "Executes an UPDATE SQL statement on CARDDEMO.TRANSACTION_TYPE setting TR_DESCRIPTION for the selected TR_TYPE. On success, issues CICS SYNCPOINT and sets CA-UPDATE-SUCCEEDED. Handles deadlock (SQLCODE -911), not-found (SQLCODE +100), and other errors.",
+          "records": [
+            "DCL-TR-TYPE",
+            "DCL-TR-DESCRIPTION",
+            "WS-ROW-TR-DESC-IN",
+            "I-SELECTED",
+            "CA-UPDATE-SUCCEEDED",
+            "CA-UPDATE-REQUESTED",
+            "WS-DISP-SQLCODE"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Screen Output Preparation",
+          "description": "Initializes the output map CTRTLIAO, sets screen titles, current date/time, page number, and info messages. Configures BMS attribute bytes for each row (protected/unprotected, color, cursor position) based on action state and error flags.",
+          "records": [
+            "CTRTLIAO",
+            "TRTTYPO",
+            "TRTYPDO",
+            "TRTSELO",
+            "TRTSELC",
+            "TRTTYPC",
+            "TRTYPDC",
+            "TRTSELA",
+            "TRTTYPA",
+            "TRTYPDA",
+            "WS-INFO-MSG",
+            "WS-RETURN-MSG",
+            "WS-CA-SCREEN-NUM"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Send Screen to Terminal",
+          "description": "Executes CICS SEND MAP to display the populated CTRTLIAO map to the user terminal with ERASE and FREEKB options, positioning the cursor as determined by the attribute setup phase.",
+          "records": [
+            "CTRTLIAO",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 19,
+          "process": "Pseudo-Conversational Return",
+          "description": "Packages CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA into WS-COMMAREA and issues CICS RETURN with TRANSID CTLI and the combined commarea, suspending the program until the next user interaction.",
+          "records": [
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-LAST-MAP"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN First-Entry Detection",
+          "description": "The program uses EIBCALEN = 0 to detect first entry and initialize all commarea fields. If EIBCALEN > 0, it restores state from DFHCOMMAREA. All subsequent logic depends on this initialization being correct."
+        },
+        {
+          "dependency": "Commarea Layout Offset Dependency",
+          "description": "WS-THIS-PROGCOMMAREA is stored in WS-COMMAREA starting at offset LENGTH OF CARDDEMO-COMMAREA + 1. Both the storing and restoring logic must use identical offset calculations or data corruption will occur across pseudo-conversational cycles."
+        },
+        {
+          "dependency": "Filter Change Detection Before Paging",
+          "description": "Paging variables (WS-CA-PAGING-VARIABLES including WS-CA-FIRST-TR-CODE and WS-CA-LAST-TR-CODE) are reset to initial values whenever the type code or description filter changes. Forward/backward reads depend on these keys being valid for the current filter context."
+        },
+        {
+          "dependency": "WS-START-KEY Dependency for Cursor Queries",
+          "description": "Both DB2 cursors C-TR-TYPE-FORWARD and C-TR-TYPE-BACKWARD use WS-START-KEY as a host variable boundary condition. WS-START-KEY must be set from WS-CA-FIRST-TR-CODE or WS-CA-LAST-TR-CODE before opening any cursor."
+        },
+        {
+          "dependency": "WS-EDIT-TYPE-FLAG and WS-EDIT-DESC-FLAG Host Variable Dependency",
+          "description": "The SQL cursor WHERE clauses use WS-EDIT-TYPE-FLAG and WS-EDIT-DESC-FLAG as conditional switches to activate or bypass filter predicates. These flags must be correctly set during input editing before any cursor is opened."
+        },
+        {
+          "dependency": "Single Action Enforcement Before DML",
+          "description": "Delete and update operations are only executed when WS-ONLY-1-VALID-ACTION is true and FLG-BAD-ACTIONS-SELECTED-NO is set. Multiple action selections must be rejected during input editing before any DB2 DML is attempted."
+        },
+        {
+          "dependency": "I-SELECTED Index for DML Operations",
+          "description": "The 9200-UPDATE-RECORD and 9300-DELETE-RECORD paragraphs use I-SELECTED as the array subscript to identify which row's TR_TYPE to use in the WHERE clause. I-SELECTED must be correctly set during 1210-EDIT-ARRAY before DML execution."
+        },
+        {
+          "dependency": "CA-DELETE-REQUESTED / CA-UPDATE-REQUESTED State Flags",
+          "description": "PF10 confirmation logic checks CA-DELETE-REQUESTED or CA-UPDATE-REQUESTED flags from the commarea to determine whether to execute DML. These flags are set during screen array initialization and must persist correctly across the pseudo-conversational cycle."
+        },
+        {
+          "dependency": "DB2 Cursor Open/Close Sequencing",
+          "description": "Each cursor (C-TR-TYPE-FORWARD, C-TR-TYPE-BACKWARD) must be opened before fetching and closed after the read loop completes. The program does not use WITH HOLD, so cursors are implicitly closed on SYNCPOINT; explicit close calls are required after each read loop."
+        },
+        {
+          "dependency": "SYNCPOINT Before XCTL and After DML",
+          "description": "CICS SYNCPOINT is issued after successful DELETE and UPDATE operations to commit DB2 changes before returning to the user. A SYNCPOINT is also issued before XCTL to PF3 navigation to ensure no uncommitted work is carried forward."
+        },
+        {
+          "dependency": "WS-CA-SCREEN-NUM Paging Counter",
+          "description": "WS-CA-SCREEN-NUM tracks the current page number. It is incremented on PF8 (page forward) and decremented on PF7 (page backward). CA-FIRST-PAGE (value 1) is used to prevent backward navigation past the first page."
+        },
+        {
+          "dependency": "WS-CA-ALL-ROWS-OUT Array Initialization",
+          "description": "WS-CA-ALL-ROWS-OUT is set to LOW-VALUES at the start of each read operation. Screen display logic checks for LOW-VALUES to determine empty rows and suppress output. Failure to initialize would cause stale data from a previous page to appear."
+        },
+        {
+          "dependency": "Referential Integrity on Delete",
+          "description": "The DELETE operation on CARDDEMO.TRANSACTION_TYPE may fail with SQLCODE -532 if child records referencing the TR_TYPE exist in other tables. The program handles this by preserving CA-DELETE-REQUESTED and displaying an error message."
+        },
+        {
+          "dependency": "WS-TYPE-DESC-FILTER LIKE Pattern Construction",
+          "description": "The description filter is wrapped with % wildcards using a STRING statement before being used in the SQL LIKE predicate. The filter must be constructed in 1230-EDIT-DESC before the cursor is opened or the 9100-CHECK-FILTERS count query is executed."
+        },
+        {
+          "dependency": "FLG-TYPEFILTER-CHANGED / FLG-DESCFILTER-CHANGED Before PF10 Processing",
+          "description": "PF10 confirmation is only honored if both FLG-TYPEFILTER-CHANGED-NO and FLG-DESCFILTER-CHANGED-NO are set, ensuring the user has not altered filter criteria between the action selection and the confirmation keypress."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction Processing Monitor",
+          "purpose": "Provides pseudo-conversational transaction management via CICS RETURN with TRANSID and COMMAREA, screen I/O via CICS RECEIVE MAP and SEND MAP using BMS maps COTRTLI/CTRTLIA, program-to-program transfer via CICS XCTL, and transaction synchronization via CICS SYNCPOINT."
+        },
+        {
+          "system": "IBM Db2",
+          "type": "Relational Database Management System",
+          "purpose": "Provides persistent storage for transaction type data in the CARDDEMO.TRANSACTION_TYPE table. Used for paginated SELECT via scrollable cursors (C-TR-TYPE-FORWARD, C-TR-TYPE-BACKWARD), COUNT queries for filter validation, UPDATE of TR_DESCRIPTION, and DELETE of transaction type records by TR_TYPE."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COTRTUPC.cbl",
+          "purpose": "This program is part of the CardDemo application, a credit card management system that maintains reference data supporting transaction processing. It operates within the administrative layer, allowing authorized users to manage the transaction type reference table — a foundational dataset that categorizes and describes the types of transactions processed by the system. COTRTUPC is a CICS interactive program that handles the full lifecycle of transaction type record maintenance, including searching for existing records, displaying details, validating user input, and performing create, update, and delete operations against the DB2 TRANSACTION_TYPE table. It solves the need for a controlled, user-friendly interface to keep transaction type reference data accurate and current."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validated in paragraphs 1200-1290. Flags like INPUT-ERROR, FLG-TYPEFILTER-NOT-OK, FLG-DESCFILTER-NOT-OK are set. Error messages are placed in WS-RETURN-MSG and moved to CCARD-ERROR-MSG for screen display. Cursor is repositioned to the offending field using DFHRED color and -1 length. Invalid action codes (not D or U) set WS-MESG-INVALID-ACTION-CODE. Multiple simultaneous row selections set WS-MESG-MORE-THAN-1-ACTION. Blank required fields trigger descriptive messages via STRING construction."
+      },
+      {
+        "category": "DB2 Connectivity and Priming Query Errors",
+        "description": "Paragraph 9998-PRIMING-QUERY is called at program entry to verify DB2 access. If WS-DB2-ERROR is set, the program calls SEND-LONG-TEXT to display WS-LONG-MSG and immediately exits via GO TO COMMON-RETURN, preventing any further database operations from executing."
+      },
+      {
+        "category": "DB2 Cursor Open Errors",
+        "description": "Paragraphs 9400-OPEN-FORWARD-CURSOR and 9500-OPEN-BACKWARD-CURSOR evaluate SQLCODE after OPEN. Non-zero SQLCODE sets WS-DB2-ERROR flag and calls 9999-FORMAT-DB2-MESSAGE to format a diagnostic message into WS-DB2-CURRENT-ACTION. The read loop is then bypassed via the WS-DB2-ERROR check after the open call."
+      },
+      {
+        "category": "DB2 Cursor Fetch Errors",
+        "description": "Within read loops in 8000-READ-FORWARD and 8100-READ-BACKWARDS, SQLCODE is evaluated after each FETCH. SQLCODE=0 is success, SQLCODE=+100 signals end-of-data and sets CA-NEXT-PAGE-NOT-EXISTS or WS-MESG-NO-RECORDS-FOUND. Any other SQLCODE sets READ-LOOP-EXIT and WS-DB2-ERROR, calls 9999-FORMAT-DB2-MESSAGE with context string identifying the failing cursor and operation."
+      },
+      {
+        "category": "DB2 Cursor Close Errors",
+        "description": "Paragraphs 9450-CLOSE-FORWARD-CURSOR and 9550-CLOSE-BACK-CURSOR evaluate SQLCODE after CLOSE. Non-zero SQLCODE sets WS-DB2-ERROR and calls 9999-FORMAT-DB2-MESSAGE with the cursor name as context. WS-RETURN-MSG-OFF guard prevents overwriting an already-set error message."
+      },
+      {
+        "category": "DB2 Update Errors",
+        "description": "Paragraph 9200-UPDATE-RECORD handles four SQLCODE cases: ZERO triggers CICS SYNCPOINT and sets CA-UPDATE-SUCCEEDED; +100 (not found) sets CA-UPDATE-REQUESTED with message 'Record not found. Deleted by others?'; -911 (deadlock) sets CA-UPDATE-REQUESTED and INPUT-ERROR with deadlock message; any other negative SQLCODE sets CA-UPDATE-REQUESTED and formats a generic failure message via 9999-FORMAT-DB2-MESSAGE."
+      },
+      {
+        "category": "DB2 Delete Errors",
+        "description": "Paragraph 9300-DELETE-RECORD handles three SQLCODE cases: ZERO triggers CICS SYNCPOINT and sets CA-DELETE-SUCCEEDED; -532 (referential integrity violation) sets CA-DELETE-REQUESTED with message prompting deletion of child records first; any OTHER SQLCODE formats a generic 'Delete failed' message via 9999-FORMAT-DB2-MESSAGE. Both error cases exit via GO TO 9300-DELETE-RECORD-EXIT."
+      },
+      {
+        "category": "DB2 Filter Check Errors",
+        "description": "Paragraph 9100-CHECK-FILTERS executes a COUNT query to validate filter criteria. SQLCODE=0 with zero count sets INPUT-ERROR, marks filter flags as NOT-OK, sets FLG-PROTECT-SELECT-ROWS-YES, and places 'No Records found' in WS-RETURN-MSG. Non-zero SQLCODE sets INPUT-ERROR and calls 9999-FORMAT-DB2-MESSAGE with 'Error reading TRANSACTION_TYPE table' as context."
+      },
+      {
+        "category": "CICS PF Key Validation Errors",
+        "description": "Invalid PF keys are handled by setting PFK-INVALID and then defaulting to CCARD-AID-ENTER behavior, effectively ignoring unrecognized keys. PF10 pressed with changed filter criteria is also demoted to ENTER behavior. This prevents undefined navigation states without displaying an explicit error message."
+      },
+      {
+        "category": "Screen Receive Errors",
+        "description": "Paragraph 1100-RECEIVE-SCREEN captures RESP into WS-RESP-CD after CICS RECEIVE MAP but does not explicitly evaluate it. Error handling relies on downstream input validation detecting missing or malformed data rather than checking the CICS response code directly."
+      },
+      {
+        "category": "Error Message Formatting and Display",
+        "description": "Centralized via 9999-FORMAT-DB2-MESSAGE (included via CSDB2RPY copybook) which formats DB2 diagnostic information into WS-LONG-MSG or WS-RETURN-MSG. A WS-RETURN-MSG-OFF guard (88-level condition) prevents overwriting the first error message with subsequent ones. Messages are surfaced to the user via ERRMSGO on the map or via SEND-LONG-TEXT for fatal DB2 errors."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COTRTLI",
+        "map_name": "CTRTLIA",
+        "business_function": "Provides a paginated list interface for maintaining Transaction Types in the CardDemo application. Users can browse transaction type records (code + description) fetched from the CARDDEMO.TRANSACTION_TYPE DB2 table, filter by type code or description, and select individual records for update (U) or delete (D) operations. Supports forward and backward paging via DB2 cursors, with a maximum of 7 records displayed per page."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COTRTLI - Transaction Type Listing</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ffff;width:80ch;font-size:16px;line-height:1.4;padding:4px;border:1px solid #444;white-space:pre;} .blue{color:#4444ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .green{color:#00ff00;} .red{color:#ff0000;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;} .prot-field{color:#aaaaaa;} .row-sel{background:#000;border:none;border-bottom:1px solid #aaaaaa;color:#aaaaaa;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;width:1ch;} .row-desc{background:#000;border:none;color:#aaaaaa;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;width:50ch;}</style></head><body><div class='terminal'><span class='blue'>Tran: </span><span class='blue'>CTLI</span>            <span class='yellow'>CardDemo - Transaction Type Listing     </span>   <span class='blue'>Date: </span><span class='blue'>07/15/25</span>\n<span class='blue'>Prog: </span><span class='blue'>COTRTLIC</span>        <span class='yellow'>                                        </span>   <span class='blue'>Time: </span><span class='blue'>10:30:00</span>\n\n                           <span class='neutral'>Maintain Transaction Type</span>                    <span class='neutral'>Page </span><span class='neutral'>  1</span>\n\n              <span class='turquoise'>Type Filter:</span> <input class='input-field underline' type='text' maxlength='2' size='2' value='  '>\n\n<span class='turquoise'>Description Filter:</span>      <input class='input-field underline' type='text' maxlength='50' size='50' value='                                                  '>\n\n<span class='neutral'>Select    </span>     <span class='neutral'>Type</span>                      <span class='neutral'>Description</span>\n<span class='neutral'>------</span>         <span class='neutral'>-----</span>    <span class='neutral'>--------------------------------------------------</span>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>01</span>       <input class='row-desc' type='text' maxlength='50' value='Regular Payment                                   '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>02</span>       <input class='row-desc' type='text' maxlength='50' value='Cash Advance                                      '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>03</span>       <input class='row-desc' type='text' maxlength='50' value='Balance Transfer                                  '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>04</span>       <input class='row-desc' type='text' maxlength='50' value='Purchase                                          '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>05</span>       <input class='row-desc' type='text' maxlength='50' value='Refund                                            '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>06</span>       <input class='row-desc' type='text' maxlength='50' value='Fee                                               '>\n     <input class='row-sel' type='text' maxlength='1' value=' '>       <span class='prot-field'>07</span>       <input class='row-desc' type='text' maxlength='50' value='Interest Charge                                   '>\n\n                  <span class='neutral'>     Type U to update, D to delete any record      </span>\n\n<span class='red'>                                                                              </span>\n<span class='turquoise'>F2=Add </span>  <span class='turquoise'>F3=Exit</span>  <span class='turquoise'>F7=Page Up</span>  <span class='turquoise'>F8=Page Dn</span>  <span class='turquoise'>F10=Save</span></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "F2",
+          "action": "Transfer to the Add Transaction Type screen (COTRTUPC / COTRTUP mapset) to add a new transaction type record"
+        },
+        {
+          "key": "F3",
+          "action": "Exit the screen and return to the calling program or the Admin menu (COADM01C / CA00 transaction)"
+        },
+        {
+          "key": "F7",
+          "action": "Page Up - navigate to the previous page of transaction type records using the backward DB2 cursor; if already on the first page, remains on page 1"
+        },
+        {
+          "key": "F8",
+          "action": "Page Down - navigate to the next page of transaction type records using the forward DB2 cursor; displays message if no more pages exist"
+        },
+        {
+          "key": "F10",
+          "action": "Confirm and execute a pending Delete (after D is entered and Enter pressed) or Save an Update (after U is entered and Enter pressed) for the highlighted/selected row"
+        },
+        {
+          "key": "Enter",
+          "action": "Submit filter criteria and/or row action selections (U=Update, D=Delete); validates inputs, re-reads data, and refreshes the list; initiates the delete or update confirmation workflow for the selected row"
+        }
+      ]
+    }
+  }
+}

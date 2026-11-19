@@ -1,0 +1,230 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "BMSCMP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job compiles a CICS BMS (Basic Mapping Support) map named CICSMAP and generates the associated copybook used for screen layout definitions in CICS applications. It executes the BUILDBMS procedure from a utility proclib to perform the assembly/compilation, using AWS.M2 as the high-level qualifier for dataset references. After compilation, it issues a CEMT NEWCOPY command via SDSF to refresh the compiled map program in the active CICS region, making the updated map immediately available without requiring a CICS restart.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Compile BMS Map'",
+          "description": "The accounting information or job description string passed to the system. Here it provides a descriptive label 'Compile BMS Map' identifying the purpose of the job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted. CLASS=A routes the job to job class A, which determines scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (JES message log). MSGCLASS=H routes the system messages and job log to output class H, which controls how and where the job log is printed or held."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including allocation/termination messages to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job is allowed to use. REGION=0M means the job can use the maximum available region size, effectively removing memory constraints for the entire job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a system symbolic that resolves to the user ID of the person who submitted the job, so that user receives a completion notification message."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. TIME=1440 sets the limit to 1440 minutes (24 hours), effectively allowing the job to run without a practical CPU time restriction."
+        }
+      ],
+      "procedures": [
+        "BUILDBMS"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PRINT",
+        "purpose": "Copies the BMS map source member CICSMAP from the partitioned dataset into a temporary sequential dataset (&&TEMPM) to be used as input for subsequent assembly steps.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.BMS(CICSMAP)",
+        "outputs": "SYSUT2: &&TEMPM (temporary dataset, passed to next steps); SYSPRINT: system messages to SYSOUT"
+      },
+      {
+        "step": "MAP",
+        "purpose": "Assembles the BMS map source using the SYSPARM(MAP) option to generate the physical map object deck, producing a temporary punch dataset (&&MAP) for subsequent link-editing.",
+        "programs": "ASMA90*",
+        "inputs": "SYSIN: &&TEMPM (temporary BMS source); SYSLIB: OEM.CICSTS.V05R06M0.CICS.SDFHMAC, SYS1.MACLIB, CEE.SCEEMAC",
+        "outputs": "SYSPUNCH: &&MAP (assembled object deck, passed to LKED); SYSUT1, SYSUT2, SYSUT3: temporary work datasets on 3390; SYSPRINT: assembly listing to SYSOUT"
+      },
+      {
+        "step": "LKED",
+        "purpose": "Link-edits the assembled BMS map object deck into an executable load module, storing the resulting load module in the CARDDEMO load library under member CICSMAP.",
+        "programs": "HEWL*",
+        "inputs": "SYSLIN: &&MAP (assembled object deck from MAP step)",
+        "outputs": "SYSLMOD: AWS.M2.CARDDEMO.LOADLIB(CICSMAP) (linked load module); SYSUT1: temporary work dataset on 3390; SYSPRINT: link-edit listing to SYSOUT"
+      },
+      {
+        "step": "DSECT",
+        "purpose": "Assembles the BMS map source using the SYSPARM(DSECT) option to generate the symbolic map (DSECT/copybook), writing the output punch deck directly to the CARDDEMO copybook library member CICSMAP and the assembly listing to the LST library.",
+        "programs": "ASMA90*",
+        "inputs": "SYSIN: &&TEMPM (temporary BMS source); SYSLIB: OEM.CICSTS.V05R06M0.CICS.SDFHMAC, SYS1.MACLIB, CEE.SCEEMAC",
+        "outputs": "SYSPUNCH: AWS.M2.CARDDEMO.CPY(CICSMAP) (generated copybook/DSECT); SYSPRINT: AWS.M2.CARDDEMO.LST(CICSMAP) (assembly listing); SYSUT1, SYSUT2, SYSUT3: temporary work datasets on 3390"
+      },
+      {
+        "step": "DISPLIST",
+        "purpose": "Replicates the assembly listing from the LST library member CICSMAP to SYSOUT so that the listing is visible in the job output for review.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.LST(CICSMAP)",
+        "outputs": "SYSUT2: SYSOUT (listing printed to job output); SYSPRINT: system messages to SYSOUT"
+      },
+      {
+        "step": "DELTEMP",
+        "purpose": "Deletes the temporary sequential dataset &&TEMPM that was created in the PRINT step and passed through subsequent steps, performing cleanup of temporary resources.",
+        "programs": "IEFBR14*",
+        "inputs": "TEMPM DD: &&TEMPM (temporary dataset to be deleted)",
+        "outputs": "N/A"
+      },
+      {
+        "step": "SDSF1",
+        "purpose": "Issues a CICS CEMT SET PROG(CICSMAP) NEWCOPY command via SDSF to instruct CICS to load a fresh copy of the newly compiled CICSMAP program into memory, replacing any previously cached version.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN: inline CEMT command '/MODIFY CICSAWSA,\\'CEMT SET PROG(CICSMAP) NEWCOPY\\''",
+        "outputs": "ISFOUT: SYSOUT (SDSF command output); CMDOUT: SYSOUT (command response output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PRINT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.BMS(CICSMAP)",
+        "operations": "READ",
+        "description": "IEBGENER reads the BMS map source member CICSMAP from the partitioned dataset AWS.M2.CARDDEMO.BMS as input (SYSUT1)"
+      },
+      {
+        "step": "PRINT",
+        "type": "Dataset",
+        "objects": "&&TEMPM",
+        "operations": "WRITE",
+        "description": "IEBGENER writes a copy of the BMS map source to temporary dataset &&TEMPM (SYSUT2), passed to subsequent steps"
+      },
+      {
+        "step": "MAP",
+        "type": "Dataset",
+        "objects": "&&TEMPM",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads the BMS map source from temporary dataset &&TEMPM (SYSIN) for assembly with SYSPARM(MAP)"
+      },
+      {
+        "step": "MAP",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHMAC",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads CICS macro library as part of SYSLIB concatenation for macro resolution during assembly"
+      },
+      {
+        "step": "MAP",
+        "type": "Dataset",
+        "objects": "SYS1.MACLIB",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads system macro library as part of SYSLIB concatenation for macro resolution during assembly"
+      },
+      {
+        "step": "MAP",
+        "type": "Dataset",
+        "objects": "CEE.SCEEMAC",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads Language Environment macro library as part of SYSLIB concatenation for macro resolution during assembly"
+      },
+      {
+        "step": "MAP",
+        "type": "Dataset",
+        "objects": "&&MAP",
+        "operations": "WRITE",
+        "description": "ASMA90 assembler writes the assembled object deck (DECK output) to temporary dataset &&MAP (SYSPUNCH), passed to LKED step"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&MAP",
+        "operations": "READ",
+        "description": "Linkage editor HEWL reads the assembled object deck from temporary dataset &&MAP (SYSLIN) as input for link-editing"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB(CICSMAP)",
+        "operations": "WRITE",
+        "description": "Linkage editor HEWL writes the linked load module CICSMAP into the load library AWS.M2.CARDDEMO.LOADLIB (SYSLMOD)"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "&&TEMPM",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads the BMS map source from temporary dataset &&TEMPM (SYSIN) for DSECT generation with SYSPARM(DSECT)"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHMAC",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads CICS macro library as part of SYSLIB concatenation for macro resolution during DSECT assembly"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "SYS1.MACLIB",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads system macro library as part of SYSLIB concatenation for macro resolution during DSECT assembly"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "CEE.SCEEMAC",
+        "operations": "READ",
+        "description": "ASMA90 assembler reads Language Environment macro library as part of SYSLIB concatenation for macro resolution during DSECT assembly"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(CICSMAP)",
+        "operations": "WRITE",
+        "description": "ASMA90 assembler writes the assembly listing for CICSMAP to the listing partitioned dataset AWS.M2.CARDDEMO.LST (SYSPRINT)"
+      },
+      {
+        "step": "DSECT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CPY(CICSMAP)",
+        "operations": "WRITE",
+        "description": "ASMA90 assembler writes the generated DSECT copybook for CICSMAP to AWS.M2.CARDDEMO.CPY (SYSPUNCH)"
+      },
+      {
+        "step": "DISPLIST",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(CICSMAP)",
+        "operations": "READ",
+        "description": "IEBGENER reads the assembly listing member CICSMAP from AWS.M2.CARDDEMO.LST (SYSUT1) to replicate it to SYSOUT"
+      },
+      {
+        "step": "DELTEMP",
+        "type": "Dataset",
+        "objects": "&&TEMPM",
+        "operations": "DELETE",
+        "description": "IEFBR14 deletes the temporary dataset &&TEMPM by specifying DISP=(OLD,DELETE), cleaning up the temporary BMS source copy"
+      },
+      {
+        "step": "SDSF1",
+        "type": "Dataset",
+        "objects": "CICSMAP (CICS program resource)",
+        "operations": "OPEN",
+        "description": "SDSF issues CEMT SET PROG(CICSMAP) NEWCOPY command via ISFIN DD to instruct CICS region CICSAWSA to reload the newly linked CICSMAP program"
+      }
+    ]
+  }
+}

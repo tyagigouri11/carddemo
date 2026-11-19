@@ -1,0 +1,153 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANCATG.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANCATG.jcl",
+    "type": "jcl",
+    "description": "This JCL job sets up the Transaction Category reference data store for the CardDemo application. It recreates the Transaction Category VSAM indexed file from scratch by deleting any existing version, defining a new structured file, and loading it with current transaction category data from a sequential source file.Key Functionalities:\nDeletes the existing Transaction Category VSAM indexed file (AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS) to ensure a clean setup, suppressing any errors if the file does not exist.\nCreates a new Transaction Category VSAM indexed file with a fixed record size of 60 bytes, a 6-byte key starting at position 0, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders, configured for indexed access with erase-on-delete and controlled sharing.\nLoads the newly created Transaction Category VSAM file with transaction category records sourced from the sequential flat file (AWS.M2.CARDDEMO.TRANCATG.PS), making the reference data available for the CardDemo application.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File refresh process has been initiated",
+                "When": "The system attempts to delete the existing Transaction Category Master File (AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS) including both its data records and its index",
+                "Then": "If the Transaction Category Master File exists, it must be completely removed \u2014 both its data and index components must be deleted; AND if the Transaction Category Master File does not exist, the deletion step must be treated as successful and the refresh process must continue to the next step without any failure or interruption; AND in both cases, the outcome of this step must always be reported as successful so that the file creation and data reload steps are never blocked"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Transaction Category Master File Before Refresh",
+            "Rule_Description": "Before recreating the Transaction Category Master File, any existing version of the file must be removed. This ensures the subsequent creation step always starts with a clean slate. The deletion must be treated as a safe operation \u2014 if the file does not exist, the overall refresh process must continue without interruption.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "A request is made to create the Transaction Category Master File",
+                "When": "The system creates the file",
+                "Then": "The Transaction Category Master File must be created with the unique name 'AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS' and must be organized as an indexed, key-sequenced file so that records can be retrieved directly by Transaction Category Code"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Category Master File Identity",
+            "Rule_Description": "Establishes the unique name and identity of the Transaction Category Master File as a Key-Sequenced indexed file, ensuring it is registered and accessible under a defined, consistent name within the system.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File is being defined",
+                "When": "The file structure is established",
+                "Then": "The first 6 characters of every record must be designated as the unique Transaction Category Code key, starting at position 0 (the very beginning of the record), and no two records may share the same Transaction Category Code"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Category Code as Unique Record Identifier",
+            "Rule_Description": "Establishes that the Transaction Category Code \u2014 the first 6 characters of every record \u2014 is the mandatory unique key that identifies each Transaction Category entry in the Master File.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File is being defined",
+                "When": "A Transaction Category record is written to the file",
+                "Then": "The record must be exactly 60 characters long; records shorter than 60 characters or longer than 60 characters must not be accepted into the Transaction Category Master File"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed Transaction Category Record Size",
+            "Rule_Description": "Enforces that every Transaction Category record stored in the Master File must be exactly 60 characters in length \u2014 no more and no less \u2014 ensuring a consistent, fixed-length record format.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File exists and contains Transaction Category records",
+                "When": "The Transaction Category Master File is deleted",
+                "Then": "All Transaction Category data must be physically erased from the storage medium \u2014 the data must not be recoverable after deletion under any circumstance"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Physical Erasure of Transaction Category Data on Deletion",
+            "Rule_Description": "Enforces a data security policy that when the Transaction Category Master File is deleted, all its contents must be physically wiped from storage and cannot be recovered, protecting sensitive transaction category information.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File has been created and is available for use",
+                "When": "Multiple jobs or systems attempt to access the Transaction Category Master File at the same time",
+                "Then": "The file must allow multiple concurrent readers at the same time (SHAREOPTIONS 2), and cross-system sharing must be controlled to prevent data corruption (SHAREOPTIONS 3); exclusive write access must be enforced to protect data integrity during update operations"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Control Concurrent Access to Transaction Category Master File",
+            "Rule_Description": "Defines the rules governing how multiple jobs or systems may simultaneously access the Transaction Category Master File, balancing availability for business operations against data integrity protection.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File is being created",
+                "When": "The system allocates physical storage for the file",
+                "Then": "The Transaction Category Master File must be placed on storage volume 'AWSHJ1'; the file must not be created on any other storage volume"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Assign Transaction Category Master File to Designated Storage Location",
+            "Rule_Description": "Ensures the Transaction Category Master File is created on the designated storage volume, controlling where the business-critical data physically resides for storage management and recovery purposes.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File is being created on storage volume 'AWSHJ1'",
+                "When": "The system allocates disk space for the file",
+                "Then": "The system must allocate 1 primary cylinder of storage immediately upon creation; if the Transaction Category data grows beyond the initial allocation, the system must automatically acquire up to 5 additional cylinders of secondary storage to prevent the file from running out of space"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Allocate Storage Capacity for Transaction Category Master File",
+            "Rule_Description": "Defines the initial and overflow storage capacity rules for the Transaction Category Master File, ensuring sufficient space is pre-allocated for current data and that the file can automatically expand to accommodate growth.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Master File is being created",
+                "When": "The system creates the physical file components",
+                "Then": "The actual Transaction Category records must be stored in a dedicated data component named 'AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.DATA', and the Transaction Category Code lookup index must be stored in a separate index component named 'AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.INDEX'; both components must be created together as part of the same file definition"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Separate Data and Index Storage for Transaction Category Master File",
+            "Rule_Description": "Establishes that the Transaction Category Master File must maintain its data records and its lookup index as two separately named and managed components, ensuring the integrity of indexed access to Transaction Category records.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "A sequential flat file named Transaction Category Source File (AWS.M2.CARDDEMO.TRANCATG.PS) exists and contains one or more Transaction Category records, AND the Transaction Category VSAM Master File (AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS) has been created and is available for exclusive access",
+                "When": "The Transaction Category load process is initiated, reading every record from the Transaction Category Source File and writing each record into the Transaction Category VSAM Master File",
+                "Then": "ALL records from the Transaction Category Source File are copied in their entirety \u2014 without filtering, transformation, or selection \u2014 into the Transaction Category VSAM Master File, AND each record is automatically stored in Transaction Category Code sequence within the VSAM Master File, AND the Transaction Category VSAM Master File remains exclusively locked throughout the entire load operation so no other business process can read or write to it until loading is fully complete, AND the Transaction Category Source File remains accessible in shared mode so other business processes can continue reading it simultaneously without interruption"
+            },
+            "Rule_Name": "STEP15 - IDCAMS - Load All Transaction Category Records into VSAM Master File",
+            "Rule_Description": "This step populates the Transaction Category VSAM Master File by copying all Transaction Category records from the sequential source flat file. The source file is accessed in shared mode to avoid disrupting other business processes, while the VSAM Master File is locked exclusively to ensure data integrity during the load.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category load process is running in STEP15, AND the Transaction Category Source File (AWS.M2.CARDDEMO.TRANCATG.PS) is referenced with shared access (DISP=SHR)",
+                "When": "STEP15 reads records from the Transaction Category Source File",
+                "Then": "The Transaction Category Source File must remain available for simultaneous read access by other jobs or business processes during the entire duration of the load, AND the load process must NOT place an exclusive lock on the source file at any point"
+            },
+            "Rule_Name": "STEP15 - IDCAMS - Shared Access Control on Transaction Category Source File During Load",
+            "Rule_Description": "During the Transaction Category data load, the sequential source file must remain accessible to other business processes. The source file is opened in shared mode, ensuring no business disruption to any concurrent readers of Transaction Category reference data.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category VSAM Master File (AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS) exists and is available, AND it is referenced with exclusive access (DISP=OLD) in STEP15",
+                "When": "The Transaction Category load process begins writing records into the Transaction Category VSAM Master File",
+                "Then": "The Transaction Category VSAM Master File must be exclusively locked for the entire duration of the load operation, AND no other job or business process may read from or write to the Transaction Category VSAM Master File until all records have been successfully loaded and the step completes, AND upon successful completion the exclusive lock is released making the fully populated Transaction Category VSAM Master File available to all authorized business processes"
+            },
+            "Rule_Name": "STEP15 - IDCAMS - Exclusive Lock on Transaction Category VSAM Master File During Load",
+            "Rule_Description": "The Transaction Category VSAM Master File must be exclusively reserved during the data load to prevent any other business process from reading incomplete or partially loaded Transaction Category data, ensuring full data integrity.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANCATG-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Source File (AWS.M2.CARDDEMO.TRANCATG.PS) contains the current complete set of Transaction Category records, AND the Transaction Category VSAM Master File (AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS) is empty and ready to receive records",
+                "When": "The REPRO operation executes, transferring records from the Transaction Category Source File to the Transaction Category VSAM Master File",
+                "Then": "Every single record present in the Transaction Category Source File must be written to the Transaction Category VSAM Master File, AND no record must be omitted, filtered, or altered during the transfer, AND the total number of Transaction Category records in the VSAM Master File after the load must equal the total number of records in the Transaction Category Source File, AND if the Transaction Category Source File contains zero records the VSAM Master File will remain empty after the load"
+            },
+            "Rule_Name": "STEP15 - IDCAMS - Complete and Unfiltered Transfer of Transaction Category Records",
+            "Rule_Description": "The Transaction Category data load must always transfer the complete set of Transaction Category records from the source file to the VSAM Master File. No records are skipped, filtered, or modified during this process \u2014 the VSAM Master File must be a full and exact reflection of the source file after the load.",
+            "Rule_Type": "Validation Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start:\nTransaction Category\nVSAM File Refresh Process]):::start\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Transaction\nCategory VSAM Master File]:::process\n\n    DS_VSAM[(AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS\nTransaction Category VSAM Master File)]:::datasource\n\n    D1{Was Transaction\nCategory File Found\nand Deleted?}:::decision\n\n    OVERRIDE[Return Code Forced to Zero\nJob Continues Regardless\nof Delete Outcome\nSafe for First-Time Run]:::process\n\n    STEP10[STEP10 - IDCAMS\nCreate New Empty Transaction\nCategory VSAM Master File\nwith Indexed Key Structure]:::process\n\n    D2{Was New Transaction\nCategory File Created\nSuccessfully?}:::decision\n\n    STEP15[STEP15 - IDCAMS\nLoad All Transaction Category\nRecords from Source File\ninto VSAM Master File]:::process\n\n    SEQ1[(TRANCATG-FILE\nTransaction Category\nSequential Source File)]:::datasource\n\n    D3{Were All Transaction\nCategory Records Loaded\nSuccessfully?}:::decision\n\n    SUCCESS([Job Completed Successfully\nTransaction Category Master File\nFully Refreshed and Ready\nfor Business Use]):::success\n\n    ERROR1([Job Failed\nUnable to Create Transaction\nCategory VSAM Master File\nManual Intervention Required]):::error\n\n    ERROR2([Job Failed\nUnable to Load Transaction\nCategory Records into VSAM File\nManual Intervention Required]):::error\n\n    A --> STEP05\n    STEP05 -.->|Attempt to Delete\nExisting File| DS_VSAM\n    STEP05 --> D1\n    D1 -->|Yes - File Existed\nand Was Deleted RC=0| OVERRIDE\n    D1 -->|No - File Did Not\nExist RC=8| OVERRIDE\n    OVERRIDE -->|Job Continues to\nFile Creation Step| STEP10\n    STEP10 -.->|Create New Empty\nIndexed File Structure\nKeyed by Category Code| DS_VSAM\n    STEP10 --> D2\n    D2 -->|Yes RC=0| STEP15\n    D2 -->|No RC Greater Than 0| ERROR1\n    SEQ1 -.->|Read All Transaction\nCategory Records\nSequentially| STEP15\n    STEP15 -.->|Write All Records\nIndexed by 6-Character\nTransaction Category Code| DS_VSAM\n    STEP15 --> D3\n    D3 -->|Yes RC=0| SUCCESS\n    D3 -->|No RC Greater Than 0| ERROR2\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

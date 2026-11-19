@@ -1,0 +1,21 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TXT2PDF1.JCL",
+    "file_path": "carddemo-v2-main/app/jcl/TXT2PDF1.JCL",
+    "type": "jcl",
+    "description": "This JCL job converts a text-based card statement file into a PDF document. It executes the TXT2PDF utility to read an input sequential file containing card demo statements and produces a PDF output file, enabling business users to view and distribute statements in a portable document format.Key Functionalities:\nReads the input card statement file (AWS.M2.CARDDEMO.STATEMNT.PS) in browse mode to convert its text content into PDF format.\nGenerates a PDF output file named AWS.M2.CARDDEMO.STATEMNT.PS.PDF containing the converted statement data.\nUtilizes the TXT2PDF rexx/exec utility loaded from dedicated libraries (AWS.M2.LBD.TXT2PDF.LOAD and AWS.M2.LBD.TXT2PDF.EXEC) to perform the text-to-PDF conversion.",
+    "rules": [
+        {
+            "Rule_Id": "R-TXT2PDF1-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The job has been initiated AND all prior job steps have completed successfully with a Return Code equal to 0 (no prior step failures), AND the plain-text Customer Account Statement file (AWS.M2.CARDDEMO.STATEMNT.PS) is available for read access",
+                "When": "The TXT2PDF conversion utility is invoked with the following parameters: (1) BROWSE mode set to YES \u2014 enabling formatted/preview-style rendering for the PDF output, (2) Input source set to the Customer Account Statement plain-text file via the INDD file reference, (3) Output destination set to 'AWS.M2.CARDDEMO.STATEMNT.PS.PDF' as the target PDF file location",
+                "Then": "The plain-text Customer Account Statement is fully converted into a formatted PDF document and saved to 'AWS.M2.CARDDEMO.STATEMNT.PS.PDF', AND the original plain-text Customer Account Statement file remains unchanged (read-only access was used), AND if any prior job step had failed (Return Code not equal to 0), this conversion step is skipped entirely and no PDF is generated"
+            },
+            "Rule_Name": "TXT2PDF - TXT2PDF REXX - Customer Account Statement Text-to-PDF Conversion",
+            "Rule_Description": "This step invokes the TXT2PDF external REXX utility to convert the Customer Account Statement from plain text format into a formatted PDF document. The step is conditionally executed based on the success of all prior job steps, and the conversion is performed with formatted/preview rendering enabled to ensure the PDF output is properly structured.",
+            "Rule_Type": "Action Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#fff\n\n    A([Job Start]):::start\n\n    B{Prior Step\nCompleted\nSuccessfully?\nReturn Code = 0?}:::decision\n\n    SKIP([Step Skipped\nPrior Step Did Not\nComplete Successfully]):::error\n\n    C[TXT2PDF - IKJEFT1B\nConvert Customer Account Statement\nfrom Plain Text Format to PDF Document]:::process\n\n    DS1[(AWS.M2.CARDDEMO.STATEMNT.PS\nCustomer Account Statement\nPlain Text File)]:::datasource\n\n    DS2[(AWS.M2.CARDDEMO.STATEMNT.PS.PDF\nCustomer Account Statement\nPDF Document)]:::datasource\n\n    F([Job End\nCustomer Account Statement\nSuccessfully Converted to PDF]):::success\n\n    A --> B\n    B -->|Yes - RC = 0\nProceed with PDF Conversion| C\n    B -->|No - RC \u2260 0\nBypass PDF Conversion| SKIP\n\n    DS1 -.->|Read Plain Text\nCustomer Statement| C\n    C -.->|Write Converted\nPDF Statement| DS2\n\n    C --> F"
+}

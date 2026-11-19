@@ -1,0 +1,98 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANIDX.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANIDX.jcl",
+    "type": "jcl",
+    "description": "This JCL job (TRANIDX) sets up an Alternate Index (AIX) on the Transaction Master VSAM file to enable searching and accessing transaction records by a secondary key (26 characters long, starting at position 304), allowing multiple transactions to share the same alternate key value. The job completes the full AIX setup in three sequential steps: defining the index structure, creating an access path, and populating the index with existing transaction data.Key Functionalities:\nDefines an Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) on the Transaction Master KSDS file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS), using a 26-character secondary key at position 304, with non-unique key support (multiple transactions can share the same alternate key value), allocated on volume AWSHJ1 with 5 cylinders primary and 1 cylinder secondary space, and a fixed record size of 350 bytes.\nCreates an access Path (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH) linked to the Alternate Index, enabling application programs to read and process transaction records via the alternate key in addition to the primary key.\nBuilds and populates the Alternate Index by reading all existing records from the Transaction Master KSDS (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) and generating the corresponding index entries in the Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX), ensuring the index is synchronized with current transaction data.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) exists and is accessible",
+                "When": "The Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) is defined and permanently linked to the Transaction Master file",
+                "Then": "The Transaction Master file supports secondary access by Card Number, with a dedicated data component (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA) and a dedicated index component (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX) created to support this access path"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Transaction Alternate Index for Card Number Access",
+            "Rule_Description": "The Transaction Master file must support a secondary access structure linked to the Card Number field, enabling application programs to retrieve transactions by Card Number in addition to the primary Transaction ID.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "A transaction record exists in the Transaction Master file",
+                "When": "The Alternate Index is used to search for transactions",
+                "Then": "Transactions can be retrieved using the Card Number, which is a 26-character field located starting at byte position 304 within each transaction record"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Card Number as Alternate Key for Transaction Lookup",
+            "Rule_Description": "The Card Number field within each Transaction record must be designated as the alternate search key, enabling retrieval of transactions using Card Number as the lookup criterion.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "Multiple transaction records exist in the Transaction Master file sharing the same Card Number",
+                "When": "The Alternate Index is queried using that Card Number",
+                "Then": "All transaction records associated with that Card Number are returned, because the Alternate Index is defined to allow non-unique (duplicate) Card Number keys \u2014 a single Card Number entry in the index can point to many transactions"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Allow Multiple Transactions per Card Number",
+            "Rule_Description": "The relationship between Card Number and Transactions is one-to-many \u2014 a single Card Number may be associated with multiple Transaction records, and the Alternate Index must support this business reality.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Alternate Index is defined with automatic upgrade (UPGRADE) enabled",
+                "When": "Any transaction record is added, updated, or deleted in the Transaction Master file",
+                "Then": "The Alternate Index is automatically and immediately updated to reflect the change, ensuring that Card Number lookups always return accurate and current transaction data"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Automatic Synchronization of Transaction Alternate Index",
+            "Rule_Description": "The Card Number Alternate Index must always reflect the current state of the Transaction Master file. Any change to a transaction must be automatically propagated to the Alternate Index without requiring a manual rebuild.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Alternate Index is defined with a fixed record size specification",
+                "When": "An entry is written to the Alternate Index",
+                "Then": "Each Alternate Index entry must be exactly 350 bytes in size \u2014 both the minimum and maximum record size are set to 350 bytes, enforcing a uniform fixed-length structure"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Transaction Alternate Index Fixed Record Size",
+            "Rule_Description": "Each entry stored in the Transaction Alternate Index must conform to a fixed record size to ensure consistent storage and retrieval of Card Number index entries.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Alternate Index is being created on storage volume AWSHJ1",
+                "When": "Storage is allocated for the Alternate Index",
+                "Then": "An initial allocation of 5 cylinders is reserved on volume AWSHJ1 for the Alternate Index, and 1 additional cylinder is automatically allocated each time the current space is exhausted, allowing the index to grow as transaction volume increases"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Storage Allocation for Transaction Alternate Index",
+            "Rule_Description": "Sufficient disk storage must be pre-allocated for the Transaction Alternate Index, with provision for automatic expansion when the initial allocation is exhausted.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) has been successfully defined and exists on the system as a valid secondary access structure over the Transaction Master file",
+                "When": "The system registers a new named access route called AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH and associates it with the Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)",
+                "Then": "A permanent, named access path (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH) must be available on the system, enabling any application program to retrieve Transaction records by Card Number using this single, stable access name \u2014 without needing to reference the internal Alternate Index name directly"
+            },
+            "Rule_Name": "STEP25 - IDCAMS - Register Card Number Access Path for Transaction Lookup",
+            "Rule_Description": "This step registers a named access route (Path) that links application programs to the Card Number Alternate Index on the Transaction Master file. By defining this Path, any application that needs to retrieve transactions by Card Number uses a single, stable access name rather than referencing the internal Alternate Index structure directly. This decouples application logic from the underlying storage structure of the Transaction file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANIDX-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Master file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) exists and contains transaction records, AND the Card Number Alternate Index structure (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) has already been defined and is ready to receive index entries",
+                "When": "The system reads ALL records sequentially from the Transaction Master file without any filtering or selection criteria, extracts the Card Number key (26 characters at byte position 304) from every transaction record, and writes the corresponding Card Number-to-Transaction ID index entries into the Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)",
+                "Then": "The Card Number Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) is fully populated with index entries for every transaction record present in the Transaction Master file, such that every existing transaction is now retrievable by its associated Card Number, AND multiple transaction entries may exist under the same Card Number reflecting the one-to-many relationship between a Card and its Transactions"
+            },
+            "Rule_Name": "STEP30 - IDCAMS BLDINDEX - Build Card Number Index from Existing Transaction Records",
+            "Rule_Description": "This step populates the Card Number Alternate Index by reading all existing records from the Transaction Master file and extracting the Card Number key from each transaction. This enables the Transaction Master file to be searched and retrieved by Card Number going forward.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nTransaction VSAM Alternate Index Setup]):::start\n\n    KSDS[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\nTransaction VSAM Base File)]:::datasource\n    AIX[(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX\nTransaction Alternate Index - Card Number)]:::datasource\n\n    A --> STEP20\n\n    %% \u2500\u2500 STEP20 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    STEP20[STEP20 - IDCAMS\nDefine Alternate Index Structure\nEnable Card Number Based Transaction Lookup]:::process\n\n    KSDS -.->|Referenced as Base Cluster\nfor Alternate Index| STEP20\n    STEP20 -.->|Creates Empty Alternate\nIndex Structure| AIX\n\n    STEP20 --> D20{STEP20\nCompleted\nSuccessfully?}:::decision\n    D20 -->|No - RC Greater Than 0| ERR20[Alternate Index Structure\nNot Created\nCard Number Lookup Unavailable]:::error\n    D20 -->|Yes - RC Equal 0| STEP25\n\n    %% \u2500\u2500 STEP25 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    STEP25[STEP25 - IDCAMS\nDefine Access Path for Alternate Index\nCreate Simplified Application Access Route\nto Transaction File via Card Number]:::process\n\n    AIX -.->|Referenced as\nPath Entry Target| STEP25\n\n    STEP25 --> D25{STEP25\nCompleted\nSuccessfully?}:::decision\n    D25 -->|No - RC Greater Than 0| ERR25[Access Path Not Created\nApplication Programs Cannot\nSearch Transactions by Card Number]:::error\n    D25 -->|Yes - RC Equal 0| STEP30\n\n    %% \u2500\u2500 STEP30 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    STEP30[STEP30 - IDCAMS\nBuild and Populate Transaction Alternate Index\nExtract Card Number Keys from All Transaction Records]:::process\n\n    KSDS -.->|Read All Existing\nTransaction Records\nExtract Card Number Keys| STEP30\n    STEP30 -.->|Write Card Number Keys\nPaired with Transaction IDs\nInto Alternate Index| AIX\n\n    STEP30 --> D30{STEP30\nCompleted\nSuccessfully?}:::decision\n    D30 -->|No - RC Greater Than 0| ERR30[Alternate Index Not Populated\nCard Number Searches\nWill Return No Results]:::error\n    D30 -->|Yes - RC Equal 0| SUCCESS\n\n    SUCCESS[Transaction Alternate Index Fully Built\nAll Card Number Keys Indexed\nMultiple Transactions per Card Supported\nReal-Time Index Sync Enabled]:::success\n    SUCCESS --> Z([JOB END\nTransaction VSAM Alternate Index\nSetup Complete and Operational]):::final\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

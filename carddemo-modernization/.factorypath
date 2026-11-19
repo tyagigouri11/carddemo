@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<factorypath>
+	<factorypathentry kind="PLUGIN" id="org.eclipse.jdt.apt.core.aptMarkdownProcessor" enabled="true"/>
+	<factorypathentry kind="EXTJAR" id="C:\Users\gouri.pravesh.tyagi\.m2\repository\org\projectlombok\lombok\1.18.30\lombok-1.18.30.jar" enabled="true"/>
+	<factorypathentry kind="EXTJAR" id="C:\Users\gouri.pravesh.tyagi\.m2\repository\org\mapstruct\mapstruct-processor\1.5.5.Final\mapstruct-processor-1.5.5.Final.jar" enabled="true"/>
+</factorypath>

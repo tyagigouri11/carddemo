@@ -1,0 +1,153 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TCATBALF.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TCATBALF.jcl",
+    "type": "jcl",
+    "description": "This JCL job initializes the Transaction Category Balance (TCATBALF) VSAM file by first removing any existing version, recreating it with defined storage parameters, and then loading it with data from a sequential flat file. The job ensures a fresh, properly structured VSAM dataset is available for storing transaction category balance records with a fixed record size of 50 bytes and a 17-byte key.Key Functionalities:\nDeletes the existing Transaction Category Balance VSAM KSDS file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) to ensure a clean slate, suppressing any errors if the file does not exist.\nRecreates the Transaction Category Balance VSAM KSDS cluster with 1 primary and 5 secondary cylinder allocations on volume AWSHJ1, with a fixed record size of 50 bytes, a 17-byte key starting at position 0, and share options (2 3).\nLoads the newly created VSAM KSDS file with transaction category balance records sourced from the sequential flat file (AWS.M2.CARDDEMO.TCATBALF.PS) using a REPRO operation.",
+    "rules": [
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) may or may not exist in the system at the time the rebuild process is initiated",
+                "When": "The Transaction Category Balance file rebuild process is triggered and the system attempts to delete the existing Transaction Category Balance VSAM cluster along with all its components (data component and index component)",
+                "Then": "The entire Transaction Category Balance VSAM cluster, including its data component (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS.DATA) and index component (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS.INDEX), must be fully removed from the system so that no residual or stale Transaction Category Balance data from any prior processing cycle remains"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Transaction Category Balance VSAM File Before Rebuild",
+            "Rule_Description": "Before rebuilding the Transaction Category Balance file, the existing VSAM cluster (including its data and index components) must be completely removed from the system to ensure a clean and conflict-free recreation.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) does not exist in the system at the time the rebuild process is initiated \u2014 for example, during a first-time setup or after a prior cleanup",
+                "When": "The system attempts to delete the Transaction Category Balance VSAM file and the delete operation fails because the file is not found",
+                "Then": "The failure from the delete attempt must be suppressed and treated as a successful outcome, so that the subsequent steps \u2014 creating the new Transaction Category Balance VSAM file structure and loading Transaction Category Balance records \u2014 are always allowed to proceed without interruption regardless of whether the file previously existed"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Allow Rebuild to Continue When Transaction Category Balance File Does Not Exist",
+            "Rule_Description": "The Transaction Category Balance file rebuild process must never be blocked or terminated due to the absence of the file at the start of the job. This ensures the rebuild works correctly on both first-time executions and subsequent runs.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file does not currently exist and needs to be created for the current processing cycle",
+                "When": "The system creates the Transaction Category Balance file",
+                "Then": "The file must be created as an indexed (key-sequenced) file named AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS, with a separate data component named AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS.DATA and a separate index component named AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS.INDEX, enabling direct key-based access to any Transaction Category Balance record"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Category Balance File Structure",
+            "Rule_Description": "The Transaction Category Balance file must be defined as an indexed, key-accessible data store to support efficient retrieval of balance records by a unique identifier.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file is being defined for storing balance records",
+                "When": "A Transaction Category Balance record is written to the file",
+                "Then": "Every record must be exactly 50 bytes in length \u2014 neither more nor less \u2014 as both the minimum and maximum record size are set to 50 bytes, ensuring a uniform fixed-length structure for all Transaction Category Balance records"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed-Length Record Size for Transaction Category Balance Records",
+            "Rule_Description": "Every Transaction Category Balance record stored in the VSAM file must conform to a strict fixed-length size to ensure consistent data storage and retrieval across all processing cycles.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file is being defined with an indexed structure",
+                "When": "The key definition is applied to the file",
+                "Then": "The unique identifier for each Transaction Category Balance record must be exactly 17 bytes in length and must start at the very first byte (position 0) of the record, and no two records in the file may share the same 17-byte key value"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Unique Key Identification for Transaction Category Balance Records",
+            "Rule_Description": "Each Transaction Category Balance record must be uniquely identifiable by a key field located at the beginning of the record, enabling precise and efficient lookups by downstream processes.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file is being created on the storage system",
+                "When": "The file storage is allocated on volume AWSHJ1",
+                "Then": "The file must be initially allocated 1 cylinder of primary storage on volume AWSHJ1, and if the primary space is exhausted, the file must automatically expand by acquiring up to 5 additional cylinders of secondary storage to accommodate growth in Transaction Category Balance records"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Storage Allocation for Transaction Category Balance File",
+            "Rule_Description": "The Transaction Category Balance file must be allocated with sufficient primary storage and must be capable of automatically expanding when the volume of balance records grows beyond the initial allocation.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file has been defined with the ERASE option",
+                "When": "The Transaction Category Balance file is deleted at any future point",
+                "Then": "All data stored in the Transaction Category Balance file must be physically overwritten and permanently erased from the disk, ensuring that sensitive transaction category balance data cannot be recovered or accessed after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Secure Erasure of Transaction Category Balance Data Upon Deletion",
+            "Rule_Description": "When the Transaction Category Balance file is deleted, all data must be physically and securely erased from the storage medium to protect sensitive credit card transaction balance information from unauthorized recovery.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM file is active and being accessed by one or more processes",
+                "When": "Multiple processes attempt to access the Transaction Category Balance file concurrently within the same system or across different systems",
+                "Then": "Within the same region or system, multiple processes must be permitted to read the file simultaneously but write access must be controlled to prevent conflicts (SHAREOPTIONS cross-region = 2); and across different systems, the file must allow full shared access for reading while the system is responsible for managing data integrity (SHAREOPTIONS cross-system = 3)"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Concurrent Access Policy for Transaction Category Balance File",
+            "Rule_Description": "The Transaction Category Balance file must enforce a controlled concurrent access policy that allows multiple processes to read the file simultaneously while restricting write access to prevent data corruption.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "A flat sequential source file (AWS.M2.CARDDEMO.TCATBALF.PS) containing Transaction Category Balance records exists and is available for reading, AND a newly created empty VSAM indexed file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) exists as the target destination",
+                "When": "The Transaction Category Balance file load process is initiated using the REPRO operation",
+                "Then": "Every Transaction Category Balance record from the flat sequential source file must be copied into the VSAM indexed file in its entirety, with no records filtered out, modified, or skipped during the transfer"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Full Load of Transaction Category Balance Records into Indexed File",
+            "Rule_Description": "All Transaction Category Balance records from the flat sequential source file must be fully transferred into the operational VSAM indexed file without any filtering or transformation, making the data available for key-based retrieval by downstream processes.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance flat sequential source file (AWS.M2.CARDDEMO.TCATBALF.PS) is referenced during the load operation",
+                "When": "The REPRO operation reads records from the Transaction Category Balance source file",
+                "Then": "The source file must be accessed in shared read-only mode, meaning the original source data must remain unchanged after the load, AND other processes must be permitted to read the same source file concurrently without being blocked"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Read-Only Shared Access to Transaction Category Balance Source File",
+            "Rule_Description": "During the load operation, the flat sequential source file containing Transaction Category Balance records must remain unmodified and accessible to other processes simultaneously, ensuring the integrity of the original source data.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM indexed file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) is the target destination for the load operation",
+                "When": "The REPRO operation writes Transaction Category Balance records into the VSAM indexed file",
+                "Then": "The VSAM indexed file must be exclusively locked for the entire duration of the load operation, meaning no other process \u2014 whether reading or writing \u2014 must be permitted to access the Transaction Category Balance VSAM file until the load is fully complete"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Exclusive Lock on Transaction Category Balance VSAM File During Load",
+            "Rule_Description": "The target Transaction Category Balance VSAM indexed file must be exclusively reserved during the load operation to prevent concurrent access that could result in incomplete or corrupted balance data.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM indexed file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) is defined with a unique 17-byte key starting at position 0 of each record, AND the REPRO operation is loading records from the flat sequential source file",
+                "When": "A Transaction Category Balance record being loaded has a 17-byte key that is identical to a key already present in the VSAM indexed file",
+                "Then": "That duplicate Transaction Category Balance record must be rejected and must NOT be written into the VSAM indexed file, AND all non-duplicate records must continue to be loaded successfully, AND the rejection must be reported in the processing log for audit purposes"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Rejection of Duplicate Transaction Category Balance Records",
+            "Rule_Description": "The Transaction Category Balance VSAM indexed file enforces uniqueness of records by their key. Any source record whose key already exists in the target file must be rejected to maintain data integrity of the balance file.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TCATBALF-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance VSAM indexed file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) has been freshly created and is empty, AND the flat sequential source file (AWS.M2.CARDDEMO.TCATBALF.PS) contains the current cycle's Transaction Category Balance records",
+                "When": "The REPRO operation successfully completes the transfer of all Transaction Category Balance records from the flat source file to the VSAM indexed file",
+                "Then": "The Transaction Category Balance VSAM indexed file must be fully populated with all balance records from the current processing cycle, AND the file must be available for downstream programs to retrieve individual Transaction Category Balance records directly by their unique 17-byte key"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Activation of Operational Transaction Category Balance Indexed File",
+            "Rule_Description": "The successful completion of the REPRO load operation marks the Transaction Category Balance VSAM indexed file as fully populated and operationally ready, enabling downstream programs to perform key-based lookups of transaction category balances.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start\nTransaction Category Balance File Rebuild Cycle]):::start\n\n    STEP05[_STEP05 - IDCAMS\nDelete Existing Transaction Category Balance File_]:::process\n\n    D1{_Was Transaction Category\nBalance File Found\nand Deleted?_}:::decision\n\n    STEP05_RESET[_Return Code Forced to Zero\nJob Continues Regardless of Delete Outcome_]:::process\n\n    STEP10[_STEP10 - IDCAMS\nCreate New Empty Transaction Category Balance File\nFixed 50-Byte Records with 17-Byte Unique Key_]:::process\n\n    D2{_Transaction Category\nBalance File Created\nSuccessfully?_}:::decision\n\n    STEP15[_STEP15 - IDCAMS\nLoad Transaction Category Balance Records\ninto VSAM Indexed File_]:::process\n\n    D3{_All Transaction Category\nBalance Records Loaded\nSuccessfully?_}:::decision\n\n    TCATBALF[(_AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS\nTransaction Category Balance File\nVSAM Key-Sequenced Dataset_)]:::datasource\n\n    TCATBALF_PS[(_AWS.M2.CARDDEMO.TCATBALF.PS\nTransaction Category Balance\nFlat Sequential Source File_)]:::datasource\n\n    SUCCESS([Job Completed Successfully\nTransaction Category Balance File\nFully Rebuilt and Ready for Use]):::success\n\n    ERROR_STEP10([Job Failed at STEP10\nTransaction Category Balance File\nCould Not Be Created]):::error\n\n    ERROR_STEP15([Job Failed at STEP15\nTransaction Category Balance Records\nCould Not Be Loaded]):::error\n\n    A --> STEP05\n    TCATBALF -.->|Delete Entire File\nIndex and Data Components| STEP05\n    STEP05 --> D1\n    D1 -->|Yes - File Existed\nand Was Deleted| STEP05_RESET\n    D1 -->|No - File Did Not Exist\nReturn Code Overridden| STEP05_RESET\n    STEP05_RESET --> STEP10\n    STEP10 -.->|Create New Empty File\nwith Defined Structure| TCATBALF\n    STEP10 --> D2\n    D2 -->|Yes - Empty File\nReady for Loading| STEP15\n    D2 -->|No - File Definition\nFailed| ERROR_STEP10\n    TCATBALF_PS -.->|Read All Balance Records\nSequentially| STEP15\n    STEP15 -.->|Write and Index All\nBalance Records by Key| TCATBALF\n    STEP15 --> D3\n    D3 -->|Yes - All Records\nLoaded Successfully| SUCCESS\n    D3 -->|No - Duplicate Key\nor Load Error| ERROR_STEP15\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

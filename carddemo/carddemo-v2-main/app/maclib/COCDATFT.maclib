@@ -1,0 +1,58 @@
+******************************************************************
+* Copyright Amazon.com, Inc. or its affiliates.
+* All Rights Reserved.
+*
+* Licensed under the Apache License, Version 2.0 (the "License").
+* You may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*    http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+* either express or implied. See the License for the specific
+* language governing permissions and limitations under the License
+******************************************************************
+COCDATFT        DSECT
+COREC           EQU *                 CODATECN-REC
+COINREC         EQU *                 CODATECN-IN-REC
+COINTYPE        DS    CL1             CODATECN-INP-DATE
+*                                     '1' = YYYYMMDD-IN
+*                                     '2' = YYYY-MM-DD-IN
+COINPDT         DS    CL20            CODATECN-INP-DATE
+                ORG   COINPDT         REDIFINE CODATECN-INP-DATE
+CO1INP          EQU *                 CODATECN-1INP
+CO1YYYY         DS    CL4             CODATECN-1YYYY
+CO1MM           DS    CL2             CODATECN-1MM
+CO1DD           DS    CL2             CODATECN-1DD
+CO1FIL          DS    CL12            CODATECN-1FIL
+                ORG   COINPDT         REDIFINE CODATECN-INP-DATE
+CO2INP          EQU *                 CODATECN-2INP
+CO2IYYYY        DS    CL4             CODATECN-2I-YYYY
+CO2IS1          DS    CL1             CODATECN-2I-S1
+CO2MM           DS    CL2             CODATECN-2MM
+CO2IS2          DS    CL1             CODATECN-2I-S2
+CO2YY           DS    CL2             CODATECN-2YY
+CO2FIL          DS    CL10            CODATECN-2FIL
+COOUREC         EQU *                 CODATECN-OUT-REC
+COOUTYPE        DS    CL1             CODATECN-OUTTYPE
+*                                     '1'=YYYY-MM-DD-OP
+*                                     '2'=YYYYMMDD-OP
+COOUTDT         DS    CL20            CODATECN-0UT-DATE
+                ORG COOUTDT           REDIFINES CODATECN-0UT-DATE
+CO1OUT          EQU *                 CODATECN-1OUT
+CO1OYYYY        DS    CL4             CODATECN-1O-YYYY
+CO1OS1          DS    CL1             CODATECN-1O-S1
+CO1OMM          DS    CL2             CODATECN-1O-MM
+CO1OS2          DS    CL1             CODATECN-1O-S2
+CO1ODD          DS    CL2             CODATECN-1O-DD
+CO1OFIl         DS    CL10            CODATECN-1OFIl
+CO2OUT          EQU *                 CODATECN-2OUT
+                ORG COOUTDT           REDIFINES CODATECN-0UT-DATE
+CO2OYYYY        DS    CL4             CODATECN-2O-YYYY
+CO2OMM          DS    CL2             CODATECN-2O-MM
+CO2ODD          DS    CL2             CODATECN-2O-DD
+CO2OFIl         DS    CL12            CODATECN-2OFIl
+*
+COERMSG         DS    CL38            CODATECN-ERROR-MSG

@@ -1,0 +1,142 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANTYPE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANTYPE.jcl",
+    "type": "jcl",
+    "description": "This JCL job initializes the Transaction Type reference data store by recreating the VSAM KSDS file and loading it with transaction type records. It performs a three-step process: deleting any existing Transaction Type VSAM cluster, defining a fresh VSAM KSDS cluster with fixed 60-byte records keyed on a 2-byte transaction type code, and loading the data from a sequential flat file into the newly created VSAM file.Key Functionalities:\nDeletes the existing Transaction Type VSAM KSDS cluster (AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS) to ensure a clean slate, suppressing any errors if the file does not exist (MAXCC set to 0).\nDefines a new VSAM KSDS cluster with fixed-length 60-byte records, a 2-byte key starting at position 0, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders, configured for indexed access with erase-on-delete enabled.\nLoads transaction type reference records from the sequential flat file (AWS.M2.CARDDEMO.TRANTYPE.PS) into the newly created VSAM KSDS file (AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS) using a REPRO copy operation.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type reference data refresh process has been initiated",
+                "When": "The system attempts to delete the Transaction Type VSAM file (AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS) along with all its components (data records and index)",
+                "Then": "The entire Transaction Type VSAM file cluster \u2014 including all stored Transaction Type records and its index \u2014 must be completely removed from storage, making way for a fresh file to be created in the next step"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Transaction Type Reference Data File",
+            "Rule_Description": "Before refreshing the Transaction Type reference data, the existing Transaction Type VSAM file must be completely removed, including all its data and index components. This ensures a clean state before the new file structure is created and new data is loaded.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to delete the Transaction Type VSAM file",
+                "When": "The delete operation completes \u2014 either successfully (file existed and was deleted) OR with an error (file did not exist)",
+                "Then": "The overall process result must be set to successful (condition code forced to 0) so that the subsequent steps to create and reload the Transaction Type reference data are always executed, regardless of whether the Transaction Type file previously existed or not"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Allow Transaction Type Refresh Process to Continue Regardless of File Existence",
+            "Rule_Description": "The Transaction Type reference data refresh job must be safe to run at any time \u2014 including the very first time when no Transaction Type file exists yet, or after a failed previous run. The process must never halt due to the absence of the file being deleted.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The previous step (STEP05) has completed and the old Transaction Type VSAM file has been removed, and the system is ready to create a new Transaction Type reference data store",
+                "When": "The Transaction Type VSAM file creation process is initiated",
+                "Then": "A new Transaction Type reference data store named 'AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS' must be created with the following rules enforced: (1) The file must be organized as an indexed (key-sequenced) structure so that any Transaction Type record can be directly retrieved by its Transaction Type Code; (2) The Transaction Type Code must be exactly 2 characters long and must start at the very first byte (position 0) of every record, serving as the unique identifier for each transaction type; (3) Every Transaction Type record must be exactly 60 bytes in fixed length \u2014 no shorter, no longer; (4) Only one process is permitted to update the Transaction Type file at any given time to prevent data conflicts; (5) When the Transaction Type file is deleted in any future run, all its data must be physically erased from storage for data security compliance; (6) The file must have two separately named internal components: a DATA component ('AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.DATA') that holds the actual Transaction Type records, and an INDEX component ('AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.INDEX') that enables fast lookup by Transaction Type Code; (7) If the file creation fails for any reason (e.g., insufficient storage, file already exists), the job must report an error and the subsequent data load step will also fail"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Transaction Type Reference Data Store",
+            "Rule_Description": "Creates the Transaction Type VSAM file structure that serves as the reference data store for all card transaction type classifications in the CardDemo application. This step establishes the data organization rules, key structure, record size, and access policies for the Transaction Type file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type VSAM file is being defined and the key structure is being established",
+                "When": "The key definition is applied to the Transaction Type file",
+                "Then": "The Transaction Type Code must be defined as exactly 2 characters in length, positioned at byte 0 (the very beginning) of each record; every Transaction Type record must be uniquely identifiable by its Transaction Type Code; no two records in the Transaction Type file may have the same Transaction Type Code; any attempt to load a duplicate Transaction Type Code during the subsequent data load step must be rejected"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Transaction Type Code as Unique Record Identifier",
+            "Rule_Description": "Enforces that the Transaction Type Code is the unique key for every record in the Transaction Type reference data store, ensuring no two transaction types can share the same code.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type VSAM file structure is being defined",
+                "When": "The record size definition is applied",
+                "Then": "Every Transaction Type record stored in the file must be exactly 60 bytes \u2014 both the minimum and maximum record size are set to 60 bytes, meaning variable-length records are not permitted; the CardDemo application must always read and write Transaction Type records in exactly 60-byte blocks"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Fixed-Length Transaction Type Record Structure",
+            "Rule_Description": "Enforces a strict fixed-length record format for all Transaction Type reference data records, ensuring consistent data layout for the CardDemo application.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type VSAM file is being defined with security attributes",
+                "When": "The ERASE attribute is applied to the file definition",
+                "Then": "Whenever the Transaction Type VSAM file is deleted (including during future refresh runs of this job), all data stored in the file must be physically overwritten and erased from storage; logical deletion alone is not sufficient \u2014 the data must be unrecoverable after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Transaction Type Data Security on Deletion",
+            "Rule_Description": "Enforces a data security policy requiring that Transaction Type reference data is physically erased from storage whenever the file is deleted, preventing unauthorized recovery of sensitive transaction classification data.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type VSAM file is being defined with sharing and access control attributes",
+                "When": "The share options are applied to the file definition",
+                "Then": "Only one process (job or program) is permitted to open the Transaction Type file for update or write operations at any given time within the same system; multiple processes may read the file simultaneously; if a second process attempts to open the file for update while another process already has it open for update, the second process must be denied access until the first process releases the file"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Single-Writer Access Control for Transaction Type File",
+            "Rule_Description": "Enforces concurrent access rules for the Transaction Type reference data store, ensuring data integrity by allowing only one process to perform updates at any given time.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type source flat file (AWS.M2.CARDDEMO.TRANTYPE.PS) is available for shared read access, AND the Transaction Type VSAM file (AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS) has been created and is available for exclusive write access",
+                "When": "The Transaction Type data load process is initiated",
+                "Then": "ALL records from the Transaction Type source flat file are copied into the Transaction Type VSAM file without any filtering, transformation, or selection \u2014 every Transaction Type record from the source becomes a retrievable indexed record in the VSAM file, keyed by its unique 2-character Transaction Type Code"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Load Transaction Type Reference Data into VSAM File",
+            "Rule_Description": "This step loads all Transaction Type reference records from the source sequential flat file into the Transaction Type VSAM indexed file, making the data available for lookup by Transaction Type Code within the CardDemo application.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type data load process is initiated",
+                "When": "The system opens the Transaction Type source flat file (AWS.M2.CARDDEMO.TRANTYPE.PS) for reading",
+                "Then": "The source file must be opened in shared read-only mode, meaning other processes and jobs are permitted to read the same file simultaneously without being blocked"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Shared Read Access on Transaction Type Source File",
+            "Rule_Description": "The Transaction Type source flat file is designated as a shared read-only resource during the data load, allowing other processes to access it concurrently without interference.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type data load process is initiated",
+                "When": "The system opens the Transaction Type VSAM file (AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS) for writing",
+                "Then": "The Transaction Type VSAM file must be opened in exclusive mode \u2014 no other process or job is permitted to read from or write to the Transaction Type VSAM file until the data load is fully completed"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Exclusive Write Access on Transaction Type VSAM File During Load",
+            "Rule_Description": "The Transaction Type VSAM file must be exclusively locked during the data load to prevent concurrent access and ensure data integrity of the reference dataset.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "Records from the Transaction Type source flat file are being loaded into the Transaction Type VSAM file",
+                "When": "Each Transaction Type record is written to the VSAM file using its 2-character Transaction Type Code as the key",
+                "Then": "Each Transaction Type Code must be unique across all records \u2014 if a duplicate Transaction Type Code is encountered in the source file, the load operation must fail and the Transaction Type VSAM file will not contain a complete or reliable dataset"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Unique Transaction Type Code Enforcement During Load",
+            "Rule_Description": "Since the Transaction Type VSAM file is an indexed file keyed by the 2-character Transaction Type Code, every record loaded from the source file must have a unique Transaction Type Code. Any duplicate code in the source file will cause the load to fail.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANTYPE-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type VSAM file has been freshly created (empty) in the prior step AND the Transaction Type source flat file contains the current set of valid Transaction Type records",
+                "When": "The REPRO data load operation executes",
+                "Then": "Every single record present in the Transaction Type source flat file must be loaded into the Transaction Type VSAM file \u2014 the resulting VSAM file must contain exactly the same number of Transaction Type records as the source flat file, with no records omitted, filtered, or modified"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Complete Transaction Type Dataset Replacement",
+            "Rule_Description": "The data load process performs a full replacement of Transaction Type reference data \u2014 all records from the source are loaded with no partial updates, filters, or conditional selections applied.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000,font-weight:bold\n    classDef process fill:#6699ff,stroke:#333,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,stroke:#333,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,stroke:#333,color:#000,font-weight:bold\n    classDef final fill:#ae74de,stroke:#333,color:#fff,font-weight:bold\n    classDef success fill:#22c55e,stroke:#333,color:#000,font-weight:bold\n    classDef error fill:#ef4444,stroke:#333,color:#fff,font-weight:bold\n\n    START([\ud83d\ude80 JOB START\nTransaction Type Reference File\nInitialization & Refresh]):::start\n\n    START --> STEP05[STEP05 - IDCAMS\nDelete Existing Transaction Type VSAM File\nClean Slate for Fresh Data Load]:::process\n\n    STEP05 --> D1{Transaction Type\nVSAM File\nCurrently Exists?}:::decision\n\n    DS1[(AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS\nExisting Transaction Type VSAM File)]:::datasource\n\n    D1 -->|\u2705 File Found| DS1\n    DS1 -.->|\ud83d\uddd1\ufe0f Delete Existing File| MAXCC0\n\n    D1 -->|\u274c File Not Found\nFirst-Time Run| MAXCC0[Force Job Continuation\nSET MAXCC = 0\nOverride Any Errors \u2014 Proceed Regardless]:::process\n\n    MAXCC0 --> STEP10[STEP10 - IDCAMS\nCreate New Transaction Type VSAM File Structure\nDefine Empty VSAM File with Transaction Type Code as Key]:::process\n\n    STEP10 --> D2{VSAM File\nStructure Created\nSuccessfully?}:::decision\n\n    DS2[(AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS\nNewly Created Empty VSAM File\nReady to Receive Transaction Type Records)]:::datasource\n\n    D2 -->|\u2705 Yes \u2014 Structure Ready| DS2\n    D2 -->|\u274c No \u2014 Creation Failed| ERR1([\u26d4 STEP10 FAILED\nUnable to Create Transaction Type VSAM File\nInsufficient Space or File Conflict\nJob Ends with Error]):::error\n\n    DS2 --> STEP15[STEP15 - IDCAMS REPRO\nLoad Transaction Type Reference Data\nCopy All Records from Source File into VSAM File]:::process\n\n    SF1[(TRANTYPE-FILE\nTransaction Type Sequential Source File\nContains All Transaction Type Codes & Descriptions)]:::datasource\n\n    SF1 -.->|\ud83d\udce5 Read All Transaction\nType Reference Records| STEP15\n\n    STEP15 --> D3{All Transaction Type\nRecords Loaded\nSuccessfully?}:::decision\n\n    DS3[(AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS\nFully Populated Transaction Type VSAM File\nAll Transaction Type Codes & Descriptions Loaded)]:::datasource\n\n    D3 -->|\u2705 Yes \u2014 All Records Loaded| DS3\n    D3 -->|\u274c No \u2014 Load Failed\nDuplicate Key or I/O Error| ERR2([\u26d4 STEP15 FAILED\nTransaction Type Data Load Error\nVSAM File Partially or Not Loaded\nJob Ends with Error]):::error\n\n    DS3 --> END([\u2705 JOB COMPLETE\nTransaction Type Reference Data\nSuccessfully Refreshed & Available\nfor CardDemo Application Use]):::success"
+}

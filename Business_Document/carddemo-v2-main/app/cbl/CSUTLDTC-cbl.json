@@ -1,0 +1,1547 @@
+{
+    "name": "CSUTLDTC.cbl",
+    "program_name": "CSUTLDTC.cbl",
+    "generated_at": "2026-11-05T08:34:12Z",
+    "overview": {
+        "total_key_functionalities": 9,
+        "total_rules": 60,
+        "main_flow_diagram": "flowchart TD\n    A([Start]):::start\n    B[1: Initialize Message Output\nClear and reset output message\nstructure and date fields]:::process\n    C[2: Accept Input Parameters\nReceive date value and date\nformat mask from calling program]:::process\n    D[3: Prepare Date for Validation\nSet input date and its length\ninto date structure]:::process\n    E[4: Prepare Date Format Mask\nSet date format string and its\nlength into format structure]:::process\n    F[5: Convert Date to Lillian Format\nCall CEEDAYS API to convert\ndate string using format mask]:::process\n    G[6: Capture Validation Feedback\nRetrieve severity code and message\nnumber from API response]:::process\n    H{7: Evaluate Date\nValidation Result\nWhat is the feedback code?}:::decision\n    I[Valid Date]:::process\n    J[Insufficient Data]:::process\n    K[Bad Date Value]:::process\n    L[Invalid Era]:::process\n    M[Unsupported Range]:::process\n    N[Invalid Month]:::process\n    O[Bad Picture String]:::process\n    P[Non-Numeric Data]:::process\n    Q[Year In Era is Zero]:::process\n    R[Otherwise Invalid]:::process\n    S[8: Set Human-Readable Result Message\nAssign descriptive result message\nbased on validation outcome]:::process\n    T[9: Return Validation Result to Caller\nPackage full message with severity,\nmessage code, result, date and format mask]:::process\n    Z([End]):::final\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E\n    E --> F\n    F --> G\n    G --> H\n\n    H -->|Date is Valid| I\n    H -->|Insufficient Data| J\n    H -->|Bad Date Value| K\n    H -->|Invalid Era| L\n    H -->|Unsupported Range| M\n    H -->|Invalid Month| N\n    H -->|Bad Picture String| O\n    H -->|Non-Numeric Data| P\n    H -->|Year In Era is Zero| Q\n    H -->|Other Invalid| R\n\n    I --> S\n    J --> S\n    K --> S\n    L --> S\n    M --> S\n    N --> S\n    O --> S\n    P --> S\n    Q --> S\n    R --> S\n\n    S --> T\n    T --> Z\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Initialize Output Before Date Validation",
+                "rule_description": "Before any date validation processing begins, all output message structures and date fields must be cleared to ensure no residual data from prior executions contaminates the current validation result.",
+                "sub_graph_node_text": "1: Initialize Message Output\nClear and reset output message\nstructure and date fields",
+                "acceptance_criteria": {
+                    "Given": "The date validation program is invoked by a calling program",
+                    "When": "The program starts execution",
+                    "Then": "The output message structure (WS-MESSAGE) must be fully initialized to its default empty state, and the working date field (WS-DATE) must be cleared to spaces, ensuring a clean slate before any validation logic is applied"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "Accept Date Value and Format Mask as Input Parameters",
+                "rule_description": "The program must receive two mandatory input parameters from the calling program: the date value to be validated and the date format mask that defines how the date string should be interpreted.",
+                "sub_graph_node_text": "2: Accept Input Parameters\nReceive date value and date\nformat mask from calling program",
+                "acceptance_criteria": {
+                    "Given": "The calling program invokes the date validation service",
+                    "When": "Input parameters are passed to the program",
+                    "Then": "The program must receive and store the date value (LS-DATE) into the working date field (WS-DATE) and the date format mask (LS-DATE-FORMAT) into the working format field (WS-DATE-FMT), making both available for subsequent validation processing"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00003",
+                "rule_type": "Process Rules",
+                "rule_name": "Prepare Date Value with Its Length for Validation",
+                "rule_description": "The date value to be validated must be packaged into a structured format that includes both the date string content and its exact character length, so the validation service can correctly parse the date boundaries.",
+                "sub_graph_node_text": "3: Prepare Date for Validation\nSet input date and its length\ninto date structure",
+                "acceptance_criteria": {
+                    "Given": "A date value (LS-DATE) has been received from the calling program",
+                    "When": "The program prepares the date for validation",
+                    "Then": "The exact character length of the date value must be recorded in the date structure's length field (VSTRING-LENGTH of WS-DATE-TO-TEST), and the date string content must be placed in the date structure's text field (VSTRING-TEXT of WS-DATE-TO-TEST), forming a complete variable-length date structure ready for the validation service"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00004",
+                "rule_type": "Process Rules",
+                "rule_name": "Prepare Date Format Mask with Its Length for Validation",
+                "rule_description": "The date format mask must be packaged into a structured format that includes both the format string content and its exact character length, so the validation service can correctly interpret the expected date pattern.",
+                "sub_graph_node_text": "4: Prepare Date Format Mask\nSet date format string and its\nlength into format structure",
+                "acceptance_criteria": {
+                    "Given": "A date format mask (LS-DATE-FORMAT) has been received from the calling program",
+                    "When": "The program prepares the format mask for validation",
+                    "Then": "The exact character length of the format mask must be recorded in the format structure's length field (VSTRING-LENGTH of WS-DATE-FORMAT), and the format string content must be placed in the format structure's text field (VSTRING-TEXT of WS-DATE-FORMAT) as well as in the working format field (WS-DATE-FMT), forming a complete variable-length format structure ready for the validation service"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00005",
+                "rule_type": "Action Rules",
+                "rule_name": "Invoke Date Conversion Service to Validate Date Against Format",
+                "rule_description": "The program must invoke the CEEDAYS date conversion service, passing the prepared date structure and format mask structure, to attempt conversion of the date string into a Lilian day number. A successful conversion confirms the date is valid; any failure produces a specific feedback code identifying the nature of the invalidity.",
+                "sub_graph_node_text": "5: Convert Date to Lillian Format\nCall CEEDAYS API to convert\ndate string using format mask",
+                "acceptance_criteria": {
+                    "Given": "The date value structure (WS-DATE-TO-TEST) and the date format structure (WS-DATE-FORMAT) have been prepared with their respective content and lengths, and the Lilian output field (OUTPUT-LILLIAN) has been initialized to zero",
+                    "When": "The CEEDAYS date conversion service is called with the date structure, format structure, Lilian output field, and feedback code as parameters",
+                    "Then": "The service attempts to convert the date string to a Lilian day number using the provided format mask; if successful, OUTPUT-LILLIAN is populated with the numeric day count and the feedback code indicates success; if unsuccessful, OUTPUT-LILLIAN remains zero and the feedback code carries the specific reason for failure"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00006",
+                "rule_type": "Process Rules",
+                "rule_name": "Capture Severity and Message Code from Validation Feedback",
+                "rule_description": "After the date conversion service returns, the program must extract and store the severity level and message number from the feedback code, as these values represent the outcome of the validation and will be returned to the calling program.",
+                "sub_graph_node_text": "6: Capture Validation Feedback\nRetrieve severity code and message\nnumber from API response",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has completed execution and returned a feedback code",
+                    "When": "The program processes the feedback code",
+                    "Then": "The severity level from the feedback code (SEVERITY of FEEDBACK-CODE) must be stored in the working severity field (WS-SEVERITY-N), and the message number from the feedback code (MSG-NO of FEEDBACK-CODE) must be stored in the working message number field (WS-MSG-NO-N), making both available for result determination and return to the caller"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00007",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Valid When Conversion Succeeds",
+                "rule_description": "When the date conversion service feedback indicates a successful conversion (FC-INVALID-DATE condition, which in the CEEDAYS API context signals a valid, well-formed date), the validation result must be set to confirm the date is valid.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-INVALID-DATE condition (indicating successful date conversion with no errors)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Date is valid'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00008",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Insufficient Data",
+                "rule_description": "When the date conversion service feedback indicates that the date string does not contain enough information to fully determine a complete date (e.g., missing required day, month, or year components as required by the format mask), the validation result must reflect insufficient data.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-INSUFFICIENT-DATA condition (indicating the date string lacks enough data to satisfy the format mask)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Insufficient'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00009",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Bad Date Value",
+                "rule_description": "When the date conversion service feedback indicates that a numeric component of the date (such as day or month) contains a value that is out of the acceptable range for that component, the validation result must reflect a bad date value error.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-BAD-DATE-VALUE condition (indicating a date component contains an out-of-range numeric value, such as day 32 or month 13)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Datevalue error'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00010",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Unrecognized Era",
+                "rule_description": "When the date conversion service feedback indicates that the date string references a calendar era designation that is not recognized or not valid within the supported calendar system, the validation result must reflect an invalid era.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-INVALID-ERA condition (indicating the date contains an unrecognized or unsupported era designation)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Invalid Era'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00011",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Unsupported Calendar Range",
+                "rule_description": "When the date conversion service feedback indicates that the date falls outside the supported calendar range (dates prior to October 15, 1582, the start of the Gregorian calendar, are not supported), the validation result must reflect an unsupported range.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-UNSUPP-RANGE condition (indicating the date falls outside the supported Gregorian calendar range)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Unsupp. Range'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00012",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Invalid Month",
+                "rule_description": "When the date conversion service feedback indicates that the month value in the date string does not correspond to a valid calendar month (e.g., month 0 or any value greater than 12), the validation result must reflect an invalid month.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-INVALID-MONTH condition (indicating the date contains a month value that does not exist in the calendar)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Invalid month'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00013",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Malformed Format Mask",
+                "rule_description": "When the date conversion service feedback indicates that the date format mask itself is malformed or contains unrecognized tokens that cannot be interpreted as a valid date pattern, the validation result must reflect a bad picture string error.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-BAD-PIC-STRING condition (indicating the date format mask contains invalid or unrecognized pattern tokens)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Bad Pic String'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00014",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Non-Numeric Characters",
+                "rule_description": "When the date conversion service feedback indicates that the date string contains non-numeric characters in positions where the format mask requires numeric digits, the validation result must reflect a non-numeric data error.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-NON-NUMERIC-DATA condition (indicating the date string contains alphabetic or special characters where numeric digits are required by the format mask)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Nonnumeric data'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00015",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid Due to Zero Year Within Era",
+                "rule_description": "When the date conversion service feedback indicates that the year value within the specified era is zero, which is not a valid year in standard calendar systems, the validation result must reflect a year-in-era-is-zero error.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code matches the FC-YEAR-IN-ERA-ZERO condition (indicating the date specifies a year value of zero within its era, which is not a valid calendar year)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'YearInEra is 0'"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00016",
+                "rule_type": "Decision Rules",
+                "rule_name": "Determine Date is Invalid for Any Other Unclassified Reason",
+                "rule_description": "When the date conversion service feedback code does not match any of the specifically handled validation failure conditions, the validation result must default to a general date invalid message to ensure all failure scenarios are covered.",
+                "sub_graph_node_text": "7: Evaluate Date\nValidation Result\nWhat is the feedback code?",
+                "acceptance_criteria": {
+                    "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                    "When": "The feedback code does not match any of the specifically handled conditions (FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, FC-NON-NUMERIC-DATA, or FC-YEAR-IN-ERA-ZERO)",
+                    "Then": "The validation result message (WS-RESULT) must be set to 'Date is invalid' as a catch-all general failure indicator"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00017",
+                "rule_type": "Decision Rules",
+                "rule_name": "Assign Human-Readable Result Message Based on Validation Outcome",
+                "rule_description": "Based on the specific validation outcome determined from the feedback code evaluation, a descriptive human-readable result message must be assigned to clearly communicate the validation result to the calling program and its end users.",
+                "sub_graph_node_text": "8: Set Human-Readable Result Message\nAssign descriptive result message\nbased on validation outcome",
+                "acceptance_criteria": {
+                    "Given": "The date validation feedback code has been evaluated and a specific validation outcome has been identified",
+                    "When": "The result message is being set",
+                    "Then": "The working result field (WS-RESULT) must contain exactly one of the following descriptive messages corresponding to the identified outcome: 'Date is valid' for a successful validation, 'Insufficient' for missing date components, 'Datevalue error' for out-of-range date component values, 'Invalid Era' for unrecognized era designations, 'Unsupp. Range' for dates outside the supported calendar range, 'Invalid month' for invalid month values, 'Bad Pic String' for malformed format masks, 'Nonnumeric data' for non-numeric characters in numeric positions, 'YearInEra is 0' for a zero year-in-era value, or 'Date is invalid' for any other unclassified failure"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CSUTLDTC-cbl-00018",
+                "rule_type": "Process Rules",
+                "rule_name": "Return Complete Validation Result and Severity to Calling Program",
+                "rule_description": "Upon completion of all validation processing, the program must package and return the full validation outcome \u2014 including the descriptive result message and the severity level \u2014 back to the calling program so it can take appropriate downstream action.",
+                "sub_graph_node_text": "9: Return Validation Result to Caller\nPackage full message with severity,\nmessage code, result, date and format mask",
+                "acceptance_criteria": {
+                    "Given": "All date validation processing has completed and the result message (WS-RESULT) and severity level (WS-SEVERITY-N) have been determined",
+                    "When": "The program returns control to the calling program",
+                    "Then": "The complete output message structure (WS-MESSAGE, which contains the result message, date value, date format mask, and message number) must be transferred to the caller's result field (LS-RESULT), and the severity level (WS-SEVERITY-N) must be set as the program's return code so the calling program can assess the overall severity of the validation outcome"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "initialize-message-output",
+            "title": "Initialize Message Output",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Initialize Message Output])\n    B[Clear and reset the\\noutput message structure\\nWS-MESSAGE to default values]\n    C[Reset the date field\\nto blank spaces]\n    D([Proceed to Accept\\nInput Parameters])\n\n    A --> B\n    B --> C\n    C --> D",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00019",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Reset Output Message Structure Before Processing",
+                    "rule_description": "Before any date validation processing begins, the output message structure must be cleared and reset to its default state to ensure no residual data from previous executions influences the current result.",
+                    "sub_graph_node_text": "Clear and reset the output message structure WS-MESSAGE to default values",
+                    "acceptance_criteria": {
+                        "Given": "The date validation program has been invoked by a calling program with a date value and a date format pattern as inputs",
+                        "When": "The program begins its execution cycle",
+                        "Then": "The output message structure (WS-MESSAGE) must be fully cleared and reset to its initial default values, ensuring no previously stored result messages or data remnants are carried forward into the current validation process"
+                    },
+                    "key_functionality_id": "initialize-message-output"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00020",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Reset Date Field to Blank Before Processing",
+                    "rule_description": "Immediately after the output message structure is cleared, the internal date working field must also be reset to blank spaces to ensure a clean state before the input date value is loaded and validated.",
+                    "sub_graph_node_text": "Reset the date field to blank spaces",
+                    "acceptance_criteria": {
+                        "Given": "The output message structure has already been cleared and reset to default values",
+                        "When": "The program continues its initialization sequence prior to accepting input parameters",
+                        "Then": "The internal date working field (WS-DATE) must be set to blank spaces, ensuring it contains no residual date data from any prior execution before the new input date value is received and processed"
+                    },
+                    "key_functionality_id": "initialize-message-output"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Initialize Message Output"
+        },
+        {
+            "id": "accept-input-parameters",
+            "title": "Accept Input Parameters",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Accept Input Parameters])\n    B[Receive Date Value\\nfrom Calling Program]\n    C[Receive Date Format Mask\\nfrom Calling Program]\n    D{Are Both\\nInputs Received?}\n    E([End: Input Parameters Ready\\nfor Processing])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes - Date Value and\\nFormat Mask Available| E\n    D -->|No - Missing\\nInput| E",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00021",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Receive Date Value from Calling Program",
+                    "rule_description": "The date validation service must accept the date value submitted by the calling program and make it available for subsequent validation processing. The date value is received as a text string along with its length.",
+                    "sub_graph_node_text": "Receive Date Value\nfrom Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A calling program submits a date value string (LS-DATE) to the date validation service",
+                        "When": "The date validation service receives the date value input parameter from the calling program",
+                        "Then": "The date value string and its length are captured and stored internally so that the date value is ready to be passed to the date validation engine for processing"
+                    },
+                    "key_functionality_id": "accept-input-parameters"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00022",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Receive Date Format Mask from Calling Program",
+                    "rule_description": "The date validation service must accept the date format mask submitted by the calling program. The format mask defines the expected structure and pattern of the date value (e.g., YYYYMMDD, MM/DD/YYYY) and is required to correctly interpret and validate the date value.",
+                    "sub_graph_node_text": "Receive Date Format Mask\nfrom Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A calling program submits a date format mask string (LS-DATE-FORMAT) alongside the date value to the date validation service",
+                        "When": "The date validation service receives the date format mask input parameter from the calling program",
+                        "Then": "The date format mask string and its length are captured and stored internally so that the format mask is ready to be passed to the date validation engine for processing"
+                    },
+                    "key_functionality_id": "accept-input-parameters"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00023",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Both Input Parameters Must Be Available Before Validation Proceeds",
+                    "rule_description": "The date validation process requires both the date value and the date format mask to be present and available before date validation can be initiated. Both inputs are mandatory for the validation engine to correctly interpret and validate the submitted date.",
+                    "sub_graph_node_text": "Are Both\nInputs Received?",
+                    "acceptance_criteria": {
+                        "Given": "The date validation service has been invoked by a calling program",
+                        "When": "The service checks whether both the date value (LS-DATE) and the date format mask (LS-DATE-FORMAT) have been received from the calling program",
+                        "Then": "If both the date value and the date format mask are available, the service proceeds to invoke the date validation engine with both parameters; if either input is missing or not provided, the service still proceeds to the validation engine, which will return an appropriate validation failure result (such as Insufficient data or Bad Picture String) based on the missing input"
+                    },
+                    "key_functionality_id": "accept-input-parameters"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00024",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Date Value and Format Mask Are Paired for Validation",
+                    "rule_description": "The date value and the date format mask must be treated as a paired set of inputs. The date value can only be correctly validated when interpreted against its corresponding format mask. Both parameters together define the complete input contract for the date validation service.",
+                    "sub_graph_node_text": "End: Input Parameters Ready\nfor Processing",
+                    "acceptance_criteria": {
+                        "Given": "Both the date value (LS-DATE) and the date format mask (LS-DATE-FORMAT) have been received from the calling program",
+                        "When": "The date validation service prepares the inputs for the date validation engine",
+                        "Then": "The date value and the date format mask are both bound together and made available as a paired input set, with the Lilian date output initialized to zero, so that the date validation engine can evaluate the date value strictly according to the rules defined by the provided format mask"
+                    },
+                    "key_functionality_id": "accept-input-parameters"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Accept Input Parameters"
+        },
+        {
+            "id": "prepare-date-for-validation",
+            "title": "Prepare Date for Validation",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Prepare Date for Validation])\n    B[Measure the length of\\nthe input date value]\n    C[Store the date length\\ninto the date structure]\n    D[Store the actual input date value\\ninto the date structure]\n    E([End: Date Structure Ready\\nfor API Call])\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00025",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Measure Input Date Length for Validation Preparation",
+                    "rule_description": "Before submitting a date for validation, the system must determine the exact length of the input date value so that the date conversion service can correctly interpret the date string.",
+                    "sub_graph_node_text": "Measure the length of the input date value",
+                    "acceptance_criteria": {
+                        "Given": "An input date value (LS-DATE) has been received by the program",
+                        "When": "The system prepares the date for submission to the date conversion service",
+                        "Then": "The system measures the length of the input date value (LS-DATE) and records it as the date length within the date validation structure (VSTRING-LENGTH of WS-DATE-TO-TEST)"
+                    },
+                    "key_functionality_id": "prepare-date-for-validation"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00026",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Store Date Length into Date Validation Structure",
+                    "rule_description": "The measured length of the input date value must be stored into the date structure that will be passed to the date conversion service, ensuring the service knows how many characters to process.",
+                    "sub_graph_node_text": "Store the date length into the date structure",
+                    "acceptance_criteria": {
+                        "Given": "The length of the input date value (LS-DATE) has been measured",
+                        "When": "The system loads the date structure for the date conversion service",
+                        "Then": "The measured date length is stored into the length field (VSTRING-LENGTH) of the date-to-test structure (WS-DATE-TO-TEST)"
+                    },
+                    "key_functionality_id": "prepare-date-for-validation"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00027",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Store Input Date Value into Date Validation Structure",
+                    "rule_description": "The actual input date value must be stored into both the date validation structure for the conversion service and the working date field, so the date string is available for processing and result tracking.",
+                    "sub_graph_node_text": "Store the actual input date value into the date structure",
+                    "acceptance_criteria": {
+                        "Given": "The input date value (LS-DATE) has been received and its length has been recorded in the date structure",
+                        "When": "The system finalizes preparation of the date structure for the date conversion service",
+                        "Then": "The input date value (LS-DATE) is stored into both the text field (VSTRING-TEXT) of the date-to-test structure (WS-DATE-TO-TEST) and the working date field (WS-DATE), making the date string ready for submission to the date conversion service"
+                    },
+                    "key_functionality_id": "prepare-date-for-validation"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Prepare Date for Validation"
+        },
+        {
+            "id": "prepare-date-format-mask",
+            "title": "Prepare Date Format Mask",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Prepare Date Format Mask])\n    B[Determine the length of the\\nDate Format Mask received\\nfrom the calling program]\n    C[Store the Format Mask length\\ninto the Format Structure]\n    D[Store the Format Mask string\\ninto the Format Structure]\n    E([End: Format Structure Ready\\nfor API Call])\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00028",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Determine Date Format Mask Length from Calling Program",
+                    "rule_description": "The program must determine the exact length of the Date Format Mask string as supplied by the calling program, so that the format structure used for date conversion is correctly sized and does not include extraneous characters.",
+                    "sub_graph_node_text": "Determine the length of the Date Format Mask received from the calling program",
+                    "acceptance_criteria": {
+                        "Given": "A Date Format Mask string (LS-DATE-FORMAT) has been received from the calling program",
+                        "When": "The program prepares the Date Format Structure for the date conversion API call",
+                        "Then": "The length of the Date Format Mask (LS-DATE-FORMAT) is measured and made available for storage into the Format Structure"
+                    },
+                    "key_functionality_id": "prepare-date-format-mask"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00029",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Store Date Format Mask Length into Format Structure",
+                    "rule_description": "The measured length of the Date Format Mask must be stored into the length field of the Format Structure (VSTRING-LENGTH of WS-DATE-FORMAT) so that the date conversion API can correctly interpret the boundaries of the format string.",
+                    "sub_graph_node_text": "Store the Format Mask length into the Format Structure",
+                    "acceptance_criteria": {
+                        "Given": "The length of the Date Format Mask (LS-DATE-FORMAT) has been determined",
+                        "When": "The Format Structure (WS-DATE-FORMAT) is being populated in preparation for the date conversion API call",
+                        "Then": "The determined length value is stored into the length component (VSTRING-LENGTH) of the Date Format Structure (WS-DATE-FORMAT)"
+                    },
+                    "key_functionality_id": "prepare-date-format-mask"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00030",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Store Date Format Mask String into Format Structure",
+                    "rule_description": "The actual Date Format Mask string received from the calling program must be stored into both the text field of the Format Structure (VSTRING-TEXT of WS-DATE-FORMAT) and the working format field (WS-DATE-FMT), ensuring the date conversion API has the complete format pattern available for date validation.",
+                    "sub_graph_node_text": "Store the Format Mask string into the Format Structure",
+                    "acceptance_criteria": {
+                        "Given": "The Date Format Mask string (LS-DATE-FORMAT) has been received from the calling program and the Format Structure length has already been populated",
+                        "When": "The Format Structure (WS-DATE-FORMAT) is being fully populated in preparation for the date conversion API call",
+                        "Then": "The Date Format Mask string (LS-DATE-FORMAT) is stored into both the text component (VSTRING-TEXT) of the Date Format Structure (WS-DATE-FORMAT) and into the working Date Format field (WS-DATE-FMT), making the Format Structure fully ready for the API call"
+                    },
+                    "key_functionality_id": "prepare-date-format-mask"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Prepare Date Format Mask"
+        },
+        {
+            "id": "convert-date-to-lillian-format",
+            "title": "Convert Date to Lillian Format",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Convert Date to Lillian Format])\n    B[Reset Lillian Date Number to Zero\\nClear any previously held date value]\n    C[Submit Date Conversion Request\\nPass the prepared date string,\\nformat mask, Lillian output holder,\\nand feedback receiver to CEEDAYS API]\n    D{Did CEEDAYS API\\nComplete the Conversion?}\n    E[Lillian Date Number Populated\\nRepresents number of days since\\nfixed reference date October 15, 1582]\n    F[Lillian Date Number Remains Zero\\nConversion was not successful\\nFeedback code captures the reason]\n    G([End: Return Lillian Number\\nand Feedback Code for Evaluation])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Conversion Successful| E\n    D -->|Conversion Failed| F\n    E --> G\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00031",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Reset Lillian Date Number Before Conversion",
+                    "rule_description": "Before initiating a new date conversion, the Lillian date number output holder must be cleared to zero to ensure no previously held date value influences the current conversion result.",
+                    "sub_graph_node_text": "Reset Lillian Date Number to Zero\nClear any previously held date value",
+                    "acceptance_criteria": {
+                        "Given": "A date conversion request is about to be submitted",
+                        "When": "The system prepares to call the date conversion service",
+                        "Then": "The Lillian date number output holder is reset to zero, ensuring no residual value from a prior conversion is carried forward"
+                    },
+                    "key_functionality_id": "convert-date-to-lillian-format"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00032",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Invoke Date Conversion Service with Date and Format",
+                    "rule_description": "The date conversion service (CEEDAYS) must be called with the input date string, the date format mask, the Lillian date number output holder, and a feedback receiver. This service converts the date string into a Lillian date number representing the number of days elapsed since October 15, 1582.",
+                    "sub_graph_node_text": "Submit Date Conversion Request\nPass the prepared date string,\nformat mask, Lillian output holder,\nand feedback receiver to CEEDAYS API",
+                    "acceptance_criteria": {
+                        "Given": "A date string and a date format mask have been provided as inputs, the Lillian date number holder has been reset to zero, and a feedback receiver is ready to capture the outcome",
+                        "When": "The date conversion service (CEEDAYS) is invoked with the date string, format mask, Lillian output holder, and feedback receiver",
+                        "Then": "The CEEDAYS service processes the conversion request and populates both the Lillian date number output holder and the feedback receiver with the result of the conversion attempt"
+                    },
+                    "key_functionality_id": "convert-date-to-lillian-format"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00033",
+                    "rule_type": "Computation Rules",
+                    "rule_name": "Populate Lillian Date Number on Successful Conversion",
+                    "rule_description": "When the CEEDAYS date conversion service successfully converts the input date string, the Lillian date number output holder is populated with a positive integer representing the number of days elapsed since the fixed reference date of October 15, 1582.",
+                    "sub_graph_node_text": "Lillian Date Number Populated\nRepresents number of days since\nfixed reference date October 15, 1582",
+                    "acceptance_criteria": {
+                        "Given": "The CEEDAYS service has been called with a valid date string and a valid format mask",
+                        "When": "The conversion completes successfully",
+                        "Then": "The Lillian date number output holder contains a positive integer value representing the number of days since October 15, 1582, and the feedback code reflects a successful outcome with a severity level indicating no error"
+                    },
+                    "key_functionality_id": "convert-date-to-lillian-format"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00034",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Retain Zero Lillian Date Number on Failed Conversion",
+                    "rule_description": "When the CEEDAYS date conversion service fails to convert the input date string, the Lillian date number output holder remains at zero, and the feedback code is populated with the specific reason for the failure, which is used for downstream evaluation.",
+                    "sub_graph_node_text": "Lillian Date Number Remains Zero\nConversion was not successful\nFeedback code captures the reason",
+                    "acceptance_criteria": {
+                        "Given": "The CEEDAYS service has been called with a date string and a format mask",
+                        "When": "The conversion fails for any reason such as an invalid date value, insufficient data, bad format mask, non-numeric data, invalid era, unsupported date range, invalid month, or year-in-era being zero",
+                        "Then": "The Lillian date number output holder remains zero, and the feedback code is populated with the severity level and message number identifying the specific reason for the conversion failure, which will be used in subsequent validation evaluation"
+                    },
+                    "key_functionality_id": "convert-date-to-lillian-format"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00035",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture Severity and Message Number from Conversion Feedback",
+                    "rule_description": "After the date conversion service completes, the severity level and message number from the feedback code are captured and made available for downstream evaluation and return to the calling program.",
+                    "sub_graph_node_text": "End: Return Lillian Number\nand Feedback Code for Evaluation",
+                    "acceptance_criteria": {
+                        "Given": "The CEEDAYS date conversion service has completed its processing, either successfully or with a failure",
+                        "When": "The feedback code is read after the service call",
+                        "Then": "The severity level from the feedback code is stored for use as the program return code, and the message number from the feedback code is stored for use in determining the specific validation outcome message to be returned to the caller"
+                    },
+                    "key_functionality_id": "convert-date-to-lillian-format"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Convert Date to Lillian Format"
+        },
+        {
+            "id": "capture-validation-feedback",
+            "title": "Capture Validation Feedback",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Capture Validation Feedback])\n    B[Retrieve Severity Code\\nfrom API Feedback Response]\n    C[Retrieve Message Number\\nfrom API Feedback Response]\n    D([End: Feedback Captured\\nReady for Evaluation])\n\n    A --> B\n    B --> C\n    C --> D",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00036",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Retrieve Severity Code from Date Validation Feedback",
+                    "rule_description": "After the date conversion service processes the date value and format, the severity level from the feedback response must be captured to indicate how serious the validation outcome is (e.g., success, warning, or failure).",
+                    "sub_graph_node_text": "Retrieve Severity Code from API Feedback Response",
+                    "acceptance_criteria": {
+                        "Given": "The date conversion service (CEEDAYS) has been called with a date value and a date format pattern, and a feedback response has been returned",
+                        "When": "The feedback response is received from the date conversion service",
+                        "Then": "The severity code contained within the feedback response must be extracted and stored so it can be used to determine the overall outcome of the date validation and returned to the calling program as the final result code"
+                    },
+                    "key_functionality_id": "capture-validation-feedback"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00037",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Retrieve Message Number from Date Validation Feedback",
+                    "rule_description": "After the date conversion service processes the date value and format, the specific message number from the feedback response must be captured to identify the precise nature of the validation result, enabling detailed downstream evaluation of the date validation outcome.",
+                    "sub_graph_node_text": "Retrieve Message Number from API Feedback Response",
+                    "acceptance_criteria": {
+                        "Given": "The date conversion service (CEEDAYS) has been called with a date value and a date format pattern, and a feedback response has been returned containing a message number",
+                        "When": "The feedback response is received from the date conversion service",
+                        "Then": "The message number contained within the feedback response must be extracted and stored so it can be used in subsequent evaluation to identify the specific validation condition (e.g., invalid era, bad date value, non-numeric data, unsupported range, etc.)"
+                    },
+                    "key_functionality_id": "capture-validation-feedback"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Capture Validation Feedback"
+        },
+        {
+            "id": "evaluate-date-validation-result",
+            "title": "Evaluate Date Validation Result",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Evaluate Date Validation Result])\n    B{Is feedback code\\nFC-INVALID-DATE?\\ni.e. Date is Valid}\n    C{Is feedback code\\nFC-INSUFFICIENT-DATA?}\n    D{Is feedback code\\nFC-BAD-DATE-VALUE?}\n    E{Is feedback code\\nFC-INVALID-ERA?}\n    F{Is feedback code\\nFC-UNSUPP-RANGE?}\n    G{Is feedback code\\nFC-INVALID-MONTH?}\n    H{Is feedback code\\nFC-BAD-PIC-STRING?}\n    I{Is feedback code\\nFC-NON-NUMERIC-DATA?}\n    J{Is feedback code\\nFC-YEAR-IN-ERA-ZERO?}\n    K([Outcome: Date is Valid])\n    L([Outcome: Insufficient Data\\nin date string])\n    M([Outcome: Date Value\\nis incorrect])\n    N([Outcome: Era specified\\nis invalid])\n    O([Outcome: Date is outside\\nsupported range])\n    P([Outcome: Month specified\\nis invalid])\n    Q([Outcome: Format picture\\nstring is invalid])\n    R([Outcome: Date contains\\nnon-numeric data])\n    S([Outcome: Year within\\nEra is zero])\n    T([Outcome: Date is\\notherwise invalid])\n\n    A --> B\n    B -->|Yes| K\n    B -->|No| C\n    C -->|Yes| L\n    C -->|No| D\n    D -->|Yes| M\n    D -->|No| E\n    E -->|Yes| N\n    E -->|No| F\n    F -->|Yes| O\n    F -->|No| G\n    G -->|Yes| P\n    G -->|No| H\n    H -->|Yes| Q\n    H -->|No| I\n    I -->|Yes| R\n    I -->|No| J\n    J -->|Yes| S\n    J -->|No| T",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00038",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Determine Date Validity from Validation Service Feedback",
+                    "rule_description": "When the date validation service returns a successful feedback code (FC-INVALID-DATE), the date value is confirmed as valid against the provided format pattern.",
+                    "sub_graph_node_text": "Is feedback code FC-INVALID-DATE? i.e. Date is Valid",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-INVALID-DATE (i.e., no error \u2014 the date is valid)",
+                        "Then": "The result message is set to 'Date is valid', indicating the date value is well-formed, complete, and conforms to the specified format pattern"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00039",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Insufficient Data in Date String",
+                    "rule_description": "When the date validation service returns an insufficient data feedback code, it means the date string does not contain enough information to fully resolve a date according to the given format.",
+                    "sub_graph_node_text": "Is feedback code FC-INSUFFICIENT-DATA?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is not FC-INVALID-DATE, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-INSUFFICIENT-DATA",
+                        "Then": "The result message is set to 'Insufficient', indicating the date string lacks sufficient data to determine a complete date as required by the format pattern"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00040",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Incorrect Date Value",
+                    "rule_description": "When the date validation service returns a bad date value feedback code, it means one or more numeric components of the date (such as day or year) are out of the acceptable range.",
+                    "sub_graph_node_text": "Is feedback code FC-BAD-DATE-VALUE?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is neither FC-INVALID-DATE nor FC-INSUFFICIENT-DATA, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-BAD-DATE-VALUE",
+                        "Then": "The result message is set to 'Datevalue error', indicating that a numeric date component contains a value outside the acceptable range for that component"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00041",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Invalid Era in Date",
+                    "rule_description": "When the date validation service returns an invalid era feedback code, it means the era designation specified in the date string is not recognized or not valid within the calendar system.",
+                    "sub_graph_node_text": "Is feedback code FC-INVALID-ERA?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, or FC-BAD-DATE-VALUE, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-INVALID-ERA",
+                        "Then": "The result message is set to 'Invalid Era', indicating the era designation within the date string is not recognized or valid in the applicable calendar system"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00042",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Date Outside Supported Calendar Range",
+                    "rule_description": "When the date validation service returns an unsupported range feedback code, it means the date value falls outside the supported calendar range (prior to October 15, 1582, the start of the Gregorian calendar).",
+                    "sub_graph_node_text": "Is feedback code FC-UNSUPP-RANGE?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, or FC-INVALID-ERA, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-UNSUPP-RANGE",
+                        "Then": "The result message is set to 'Unsupp. Range', indicating the date value falls outside the supported calendar date range"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Invalid Month in Date",
+                    "rule_description": "When the date validation service returns an invalid month feedback code, it means the month value specified in the date string does not correspond to a valid calendar month.",
+                    "sub_graph_node_text": "Is feedback code FC-INVALID-MONTH?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, or FC-UNSUPP-RANGE, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-INVALID-MONTH",
+                        "Then": "The result message is set to 'Invalid month', indicating the month component of the date string does not represent a valid calendar month"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00044",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Invalid Date Format Picture String",
+                    "rule_description": "When the date validation service returns a bad picture string feedback code, it means the date format pattern provided by the caller is itself malformed or contains unrecognized tokens.",
+                    "sub_graph_node_text": "Is feedback code FC-BAD-PIC-STRING?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, or FC-INVALID-MONTH, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-BAD-PIC-STRING",
+                        "Then": "The result message is set to 'Bad Pic String', indicating the date format pattern supplied is invalid or contains unrecognized formatting tokens"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00045",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Non-Numeric Data in Date String",
+                    "rule_description": "When the date validation service returns a non-numeric data feedback code, it means the date string contains non-numeric characters in positions where numeric digits are required by the format pattern.",
+                    "sub_graph_node_text": "Is feedback code FC-NON-NUMERIC-DATA?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, or FC-BAD-PIC-STRING, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-NON-NUMERIC-DATA",
+                        "Then": "The result message is set to 'Nonnumeric data', indicating the date string contains non-numeric characters where the format pattern requires numeric digits"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00046",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Identify Year-Within-Era Value of Zero",
+                    "rule_description": "When the date validation service returns a year-in-era-zero feedback code, it means the year value specified within the era is zero, which is not a valid year in the applicable calendar system.",
+                    "sub_graph_node_text": "Is feedback code FC-YEAR-IN-ERA-ZERO?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, or FC-NON-NUMERIC-DATA, and the service has returned a feedback code",
+                        "When": "The feedback code returned by the date validation service indicates FC-YEAR-IN-ERA-ZERO",
+                        "Then": "The result message is set to 'YearInEra is 0', indicating the year value within the specified era is zero, which is not permitted in the calendar system"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00047",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Handle All Other Unrecognized Date Validation Failures",
+                    "rule_description": "When the date validation service returns a feedback code that does not match any of the specifically handled error conditions, the date is treated as generally invalid.",
+                    "sub_graph_node_text": "Outcome: Date is otherwise invalid",
+                    "acceptance_criteria": {
+                        "Given": "A date value and a date format pattern have been submitted to the date validation service, and the service has returned a feedback code",
+                        "When": "The feedback code does not match any of the following specific conditions: FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, FC-NON-NUMERIC-DATA, or FC-YEAR-IN-ERA-ZERO",
+                        "Then": "The result message is set to 'Date is invalid', indicating the date has failed validation for an unspecified or unrecognized reason"
+                    },
+                    "key_functionality_id": "evaluate-date-validation-result"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Evaluate Date Validation Result"
+        },
+        {
+            "id": "set-human",
+            "title": "Set Human",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Set Result Message])\n    B{Is validation\\noutcome = Valid Date?}\n    C[Set Result:\\n'Date is valid']\n    D{Is outcome =\\nInsufficient Data?}\n    E[Set Result:\\n'Insufficient']\n    F{Is outcome =\\nBad Date Value?}\n    G[Set Result:\\n'Datevalue error']\n    H{Is outcome =\\nInvalid Era?}\n    I[Set Result:\\n'Invalid Era']\n    J{Is outcome =\\nUnsupported Range?}\n    K[Set Result:\\n'Unsupp. Range']\n    L{Is outcome =\\nInvalid Month?}\n    M[Set Result:\\n'Invalid month']\n    N{Is outcome =\\nBad Picture String?}\n    O[Set Result:\\n'Bad Pic String']\n    P{Is outcome =\\nNon-Numeric Data?}\n    Q[Set Result:\\n'Nonnumeric data']\n    R{Is outcome =\\nYear In Era is Zero?}\n    S[Set Result:\\n'YearInEra is 0']\n    T[Set Result:\\n'Date is invalid']\n    Z([End: Result Message Set])\n\n    A --> B\n    B -->|Yes| C\n    B -->|No| D\n    D -->|Yes| E\n    D -->|No| F\n    F -->|Yes| G\n    F -->|No| H\n    H -->|Yes| I\n    H -->|No| J\n    J -->|Yes| K\n    J -->|No| L\n    L -->|Yes| M\n    L -->|No| N\n    N -->|Yes| O\n    N -->|No| P\n    P -->|Yes| Q\n    P -->|No| R\n    R -->|Yes| S\n    R -->|No| T\n    C --> Z\n    E --> Z\n    G --> Z\n    I --> Z\n    K --> Z\n    M --> Z\n    O --> Z\n    Q --> Z\n    S --> Z\n    T --> Z",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00048",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Date is valid' for Valid Date Outcome",
+                    "rule_description": "When the date validation service confirms the date is valid and well-formed, the result message is set to indicate successful validation.",
+                    "sub_graph_node_text": "Is validation outcome = Valid Date?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a 'Valid Date' outcome (FC-INVALID-DATE feedback code indicating successful validation)",
+                        "Then": "The result message is set to 'Date is valid'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00049",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Insufficient' for Insufficient Data Outcome",
+                    "rule_description": "When the date validation service determines that the date value does not contain enough information to fully determine a complete date, the result message is set to indicate insufficient data.",
+                    "sub_graph_node_text": "Is outcome = Insufficient Data?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns an 'Insufficient Data' outcome (FC-INSUFFICIENT-DATA feedback code), meaning the date string lacks required components such as day, month, or year",
+                        "Then": "The result message is set to 'Insufficient'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00050",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Datevalue error' for Bad Date Value Outcome",
+                    "rule_description": "When the date validation service determines that a numeric value within the date is out of the acceptable range for its date component, the result message is set to indicate a date value error.",
+                    "sub_graph_node_text": "Is outcome = Bad Date Value?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a 'Bad Date Value' outcome (FC-BAD-DATE-VALUE feedback code), meaning a date component such as day or month contains a value outside its valid numeric range",
+                        "Then": "The result message is set to 'Datevalue error'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00051",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Invalid Era' for Invalid Era Outcome",
+                    "rule_description": "When the date validation service determines that the era designation within the date value is not recognized or not valid within the calendar system, the result message is set to indicate an invalid era.",
+                    "sub_graph_node_text": "Is outcome = Invalid Era?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns an 'Invalid Era' outcome (FC-INVALID-ERA feedback code), meaning the era component of the date is unrecognized or invalid",
+                        "Then": "The result message is set to 'Invalid Era'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00052",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Unsupp. Range' for Unsupported Date Range Outcome",
+                    "rule_description": "When the date validation service determines that the date value falls outside the supported calendar range (prior to October 15, 1582, the start of the Gregorian calendar), the result message is set to indicate an unsupported range.",
+                    "sub_graph_node_text": "Is outcome = Unsupported Range?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns an 'Unsupported Range' outcome (FC-UNSUPP-RANGE feedback code), meaning the date falls outside the boundaries of the supported calendar system",
+                        "Then": "The result message is set to 'Unsupp. Range'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00053",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Invalid month' for Invalid Month Outcome",
+                    "rule_description": "When the date validation service determines that the month value within the date does not correspond to a valid calendar month, the result message is set to indicate an invalid month.",
+                    "sub_graph_node_text": "Is outcome = Invalid Month?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns an 'Invalid Month' outcome (FC-INVALID-MONTH feedback code), meaning the month component of the date is not a valid calendar month (e.g., month 0 or month 13 or higher)",
+                        "Then": "The result message is set to 'Invalid month'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00054",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Bad Pic String' for Invalid Format Pattern Outcome",
+                    "rule_description": "When the date validation service determines that the date format pattern itself is malformed or contains unrecognized tokens, the result message is set to indicate a bad picture string.",
+                    "sub_graph_node_text": "Is outcome = Bad Picture String?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a 'Bad Picture String' outcome (FC-BAD-PIC-STRING feedback code), meaning the format pattern provided by the caller is invalid or contains unrecognized or incorrectly structured format tokens",
+                        "Then": "The result message is set to 'Bad Pic String'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00055",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Nonnumeric data' for Non-Numeric Data Outcome",
+                    "rule_description": "When the date validation service determines that the date value contains non-numeric characters where numeric digits are expected by the format pattern, the result message is set to indicate non-numeric data.",
+                    "sub_graph_node_text": "Is outcome = Non-Numeric Data?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a 'Non-Numeric Data' outcome (FC-NON-NUMERIC-DATA feedback code), meaning the date string contains alphabetic or special characters in positions where the format pattern requires numeric digits",
+                        "Then": "The result message is set to 'Nonnumeric data'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00056",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'YearInEra is 0' for Year-in-Era Zero Outcome",
+                    "rule_description": "When the date validation service determines that the year value within an era is specified as zero, which is not a valid year in most calendar systems, the result message is set to indicate a zero year-in-era.",
+                    "sub_graph_node_text": "Is outcome = Year In Era is Zero?",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a 'Year In Era is Zero' outcome (FC-YEAR-IN-ERA-ZERO feedback code), meaning the year component within the era designation is zero",
+                        "Then": "The result message is set to 'YearInEra is 0'"
+                    },
+                    "key_functionality_id": "set-human"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00057",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Set Result Message as 'Date is invalid' for All Other Unrecognized Failure Outcomes",
+                    "rule_description": "When the date validation service returns any failure outcome that does not match any of the specifically handled error conditions, the result message is set to a general date invalid indicator.",
+                    "sub_graph_node_text": "Set Result: 'Date is invalid'",
+                    "acceptance_criteria": {
+                        "Given": "A date value and date format pattern have been submitted for validation",
+                        "When": "The date validation service returns a feedback outcome that does not match any of the following specific conditions: Valid Date, Insufficient Data, Bad Date Value, Invalid Era, Unsupported Range, Invalid Month, Bad Picture String, Non-Numeric Data, or Year In Era is Zero",
+                        "Then": "The result message is set to 'Date is invalid' as a general catch-all failure indicator"
+                    },
+                    "key_functionality_id": "set-human"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Set Human"
+        },
+        {
+            "id": "return-validation-result-to-caller",
+            "title": "Return Validation Result to Caller",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Return Validation Result to Caller])\n    B[Package Full Message\\nCombine all validation details into\\noutput message structure including:\\n- Severity Code\\n- Message Code\\n- Result Description\\n- Tested Date\\n- Format Mask Used]\n    C[Send Result to Calling Program\\nTransfer the packaged message\\nto the output result field]\n    D[Set Return Code\\nPass the severity code back\\nto the calling program\\nas the return code]\n    E([End: Control Returned to Caller])\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00058",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Package Full Validation Result Message",
+                    "rule_description": "After date validation is complete, all relevant validation details \u2014 including the severity level, message code, result description, the date that was tested, and the format mask used \u2014 must be combined into a single output message structure before returning to the calling program.",
+                    "sub_graph_node_text": "Package Full Message\nCombine all validation details into\noutput message structure including:\n- Severity Code\n- Message Code\n- Result Description\n- Tested Date\n- Format Mask Used",
+                    "acceptance_criteria": {
+                        "Given": "A date validation has been performed using the provided date value and format pattern, and the validation service has returned a feedback code containing a severity level and a message number, and a result description has been determined based on the feedback",
+                        "When": "The program prepares to return control to the calling program",
+                        "Then": "The output message structure (WS-MESSAGE) must be populated by combining all of the following details: the severity code (WS-SEVERITY-N), the message code (WS-MSG-NO-N), the result description (WS-RESULT), the tested date value (WS-DATE), and the format mask used (WS-DATE-FMT), so that the caller receives a complete and self-contained validation result"
+                    },
+                    "key_functionality_id": "return-validation-result-to-caller"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00059",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Transfer Packaged Validation Message to Calling Program",
+                    "rule_description": "The fully packaged validation result message must be transferred to the designated output field so that the calling program can receive and process the complete validation outcome.",
+                    "sub_graph_node_text": "Send Result to Calling Program\nTransfer the packaged message\nto the output result field",
+                    "acceptance_criteria": {
+                        "Given": "The output message structure (WS-MESSAGE) has been fully populated with the severity code, message code, result description, tested date, and format mask",
+                        "When": "The program is ready to return control to the calling program",
+                        "Then": "The complete contents of WS-MESSAGE must be moved to the output result field (LS-RESULT) so that the calling program receives the full validation result"
+                    },
+                    "key_functionality_id": "return-validation-result-to-caller"
+                },
+                {
+                    "rule_id": "R-CSUTLDTC-cbl-00060",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Set Severity Code as Return Code to Calling Program",
+                    "rule_description": "The severity level obtained from the date validation feedback must be passed back to the calling program as the return code, enabling the caller to programmatically determine the seriousness of the validation outcome without parsing the message text.",
+                    "sub_graph_node_text": "Set Return Code\nPass the severity code back\nto the calling program\nas the return code",
+                    "acceptance_criteria": {
+                        "Given": "The date validation service has returned a feedback code and the severity level (WS-SEVERITY-N) has been extracted from that feedback",
+                        "When": "The program finalises its execution and returns control to the calling program",
+                        "Then": "The severity code (WS-SEVERITY-N) must be set as the RETURN-CODE so that the calling program can use it to determine whether the date validation succeeded, produced a warning, or failed with an error"
+                    },
+                    "key_functionality_id": "return-validation-result-to-caller"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Return Validation Result to Caller"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date validation program is invoked by a calling program",
+                "When": "The program starts execution",
+                "Then": "The output message structure (WS-MESSAGE) must be fully initialized to its default empty state, and the working date field (WS-DATE) must be cleared to spaces, ensuring a clean slate before any validation logic is applied"
+            },
+            "Rule_Name": "Initialize Output Before Date Validation",
+            "Rule_Description": "Before any date validation processing begins, all output message structures and date fields must be cleared to ensure no residual data from prior executions contaminates the current validation result."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program invokes the date validation service",
+                "When": "Input parameters are passed to the program",
+                "Then": "The program must receive and store the date value (LS-DATE) into the working date field (WS-DATE) and the date format mask (LS-DATE-FORMAT) into the working format field (WS-DATE-FMT), making both available for subsequent validation processing"
+            },
+            "Rule_Name": "Accept Date Value and Format Mask as Input Parameters",
+            "Rule_Description": "The program must receive two mandatory input parameters from the calling program: the date value to be validated and the date format mask that defines how the date string should be interpreted."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00003",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value (LS-DATE) has been received from the calling program",
+                "When": "The program prepares the date for validation",
+                "Then": "The exact character length of the date value must be recorded in the date structure's length field (VSTRING-LENGTH of WS-DATE-TO-TEST), and the date string content must be placed in the date structure's text field (VSTRING-TEXT of WS-DATE-TO-TEST), forming a complete variable-length date structure ready for the validation service"
+            },
+            "Rule_Name": "Prepare Date Value with Its Length for Validation",
+            "Rule_Description": "The date value to be validated must be packaged into a structured format that includes both the date string content and its exact character length, so the validation service can correctly parse the date boundaries."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00004",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date format mask (LS-DATE-FORMAT) has been received from the calling program",
+                "When": "The program prepares the format mask for validation",
+                "Then": "The exact character length of the format mask must be recorded in the format structure's length field (VSTRING-LENGTH of WS-DATE-FORMAT), and the format string content must be placed in the format structure's text field (VSTRING-TEXT of WS-DATE-FORMAT) as well as in the working format field (WS-DATE-FMT), forming a complete variable-length format structure ready for the validation service"
+            },
+            "Rule_Name": "Prepare Date Format Mask with Its Length for Validation",
+            "Rule_Description": "The date format mask must be packaged into a structured format that includes both the format string content and its exact character length, so the validation service can correctly interpret the expected date pattern."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00005",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date value structure (WS-DATE-TO-TEST) and the date format structure (WS-DATE-FORMAT) have been prepared with their respective content and lengths, and the Lilian output field (OUTPUT-LILLIAN) has been initialized to zero",
+                "When": "The CEEDAYS date conversion service is called with the date structure, format structure, Lilian output field, and feedback code as parameters",
+                "Then": "The service attempts to convert the date string to a Lilian day number using the provided format mask; if successful, OUTPUT-LILLIAN is populated with the numeric day count and the feedback code indicates success; if unsuccessful, OUTPUT-LILLIAN remains zero and the feedback code carries the specific reason for failure"
+            },
+            "Rule_Name": "Invoke Date Conversion Service to Validate Date Against Format",
+            "Rule_Description": "The program must invoke the CEEDAYS date conversion service, passing the prepared date structure and format mask structure, to attempt conversion of the date string into a Lilian day number. A successful conversion confirms the date is valid; any failure produces a specific feedback code identifying the nature of the invalidity."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00006",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has completed execution and returned a feedback code",
+                "When": "The program processes the feedback code",
+                "Then": "The severity level from the feedback code (SEVERITY of FEEDBACK-CODE) must be stored in the working severity field (WS-SEVERITY-N), and the message number from the feedback code (MSG-NO of FEEDBACK-CODE) must be stored in the working message number field (WS-MSG-NO-N), making both available for result determination and return to the caller"
+            },
+            "Rule_Name": "Capture Severity and Message Code from Validation Feedback",
+            "Rule_Description": "After the date conversion service returns, the program must extract and store the severity level and message number from the feedback code, as these values represent the outcome of the validation and will be returned to the calling program."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00007",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-INVALID-DATE condition (indicating successful date conversion with no errors)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Date is valid'"
+            },
+            "Rule_Name": "Determine Date is Valid When Conversion Succeeds",
+            "Rule_Description": "When the date conversion service feedback indicates a successful conversion (FC-INVALID-DATE condition, which in the CEEDAYS API context signals a valid, well-formed date), the validation result must be set to confirm the date is valid."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00008",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-INSUFFICIENT-DATA condition (indicating the date string lacks enough data to satisfy the format mask)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Insufficient'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Insufficient Data",
+            "Rule_Description": "When the date conversion service feedback indicates that the date string does not contain enough information to fully determine a complete date (e.g., missing required day, month, or year components as required by the format mask), the validation result must reflect insufficient data."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00009",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-BAD-DATE-VALUE condition (indicating a date component contains an out-of-range numeric value, such as day 32 or month 13)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Datevalue error'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Bad Date Value",
+            "Rule_Description": "When the date conversion service feedback indicates that a numeric component of the date (such as day or month) contains a value that is out of the acceptable range for that component, the validation result must reflect a bad date value error."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00010",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-INVALID-ERA condition (indicating the date contains an unrecognized or unsupported era designation)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Invalid Era'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Unrecognized Era",
+            "Rule_Description": "When the date conversion service feedback indicates that the date string references a calendar era designation that is not recognized or not valid within the supported calendar system, the validation result must reflect an invalid era."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00011",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-UNSUPP-RANGE condition (indicating the date falls outside the supported Gregorian calendar range)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Unsupp. Range'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Unsupported Calendar Range",
+            "Rule_Description": "When the date conversion service feedback indicates that the date falls outside the supported calendar range (dates prior to October 15, 1582, the start of the Gregorian calendar, are not supported), the validation result must reflect an unsupported range."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00012",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-INVALID-MONTH condition (indicating the date contains a month value that does not exist in the calendar)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Invalid month'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Invalid Month",
+            "Rule_Description": "When the date conversion service feedback indicates that the month value in the date string does not correspond to a valid calendar month (e.g., month 0 or any value greater than 12), the validation result must reflect an invalid month."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00013",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-BAD-PIC-STRING condition (indicating the date format mask contains invalid or unrecognized pattern tokens)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Bad Pic String'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Malformed Format Mask",
+            "Rule_Description": "When the date conversion service feedback indicates that the date format mask itself is malformed or contains unrecognized tokens that cannot be interpreted as a valid date pattern, the validation result must reflect a bad picture string error."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00014",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-NON-NUMERIC-DATA condition (indicating the date string contains alphabetic or special characters where numeric digits are required by the format mask)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Nonnumeric data'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Non-Numeric Characters",
+            "Rule_Description": "When the date conversion service feedback indicates that the date string contains non-numeric characters in positions where the format mask requires numeric digits, the validation result must reflect a non-numeric data error."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00015",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code matches the FC-YEAR-IN-ERA-ZERO condition (indicating the date specifies a year value of zero within its era, which is not a valid calendar year)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'YearInEra is 0'"
+            },
+            "Rule_Name": "Determine Date is Invalid Due to Zero Year Within Era",
+            "Rule_Description": "When the date conversion service feedback indicates that the year value within the specified era is zero, which is not a valid year in standard calendar systems, the validation result must reflect a year-in-era-is-zero error."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00016",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has returned a feedback code",
+                "When": "The feedback code does not match any of the specifically handled conditions (FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, FC-NON-NUMERIC-DATA, or FC-YEAR-IN-ERA-ZERO)",
+                "Then": "The validation result message (WS-RESULT) must be set to 'Date is invalid' as a catch-all general failure indicator"
+            },
+            "Rule_Name": "Determine Date is Invalid for Any Other Unclassified Reason",
+            "Rule_Description": "When the date conversion service feedback code does not match any of the specifically handled validation failure conditions, the validation result must default to a general date invalid message to ensure all failure scenarios are covered."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00017",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date validation feedback code has been evaluated and a specific validation outcome has been identified",
+                "When": "The result message is being set",
+                "Then": "The working result field (WS-RESULT) must contain exactly one of the following descriptive messages corresponding to the identified outcome: 'Date is valid' for a successful validation, 'Insufficient' for missing date components, 'Datevalue error' for out-of-range date component values, 'Invalid Era' for unrecognized era designations, 'Unsupp. Range' for dates outside the supported calendar range, 'Invalid month' for invalid month values, 'Bad Pic String' for malformed format masks, 'Nonnumeric data' for non-numeric characters in numeric positions, 'YearInEra is 0' for a zero year-in-era value, or 'Date is invalid' for any other unclassified failure"
+            },
+            "Rule_Name": "Assign Human-Readable Result Message Based on Validation Outcome",
+            "Rule_Description": "Based on the specific validation outcome determined from the feedback code evaluation, a descriptive human-readable result message must be assigned to clearly communicate the validation result to the calling program and its end users."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00018",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All date validation processing has completed and the result message (WS-RESULT) and severity level (WS-SEVERITY-N) have been determined",
+                "When": "The program returns control to the calling program",
+                "Then": "The complete output message structure (WS-MESSAGE, which contains the result message, date value, date format mask, and message number) must be transferred to the caller's result field (LS-RESULT), and the severity level (WS-SEVERITY-N) must be set as the program's return code so the calling program can assess the overall severity of the validation outcome"
+            },
+            "Rule_Name": "Return Complete Validation Result and Severity to Calling Program",
+            "Rule_Description": "Upon completion of all validation processing, the program must package and return the full validation outcome \u2014 including the descriptive result message and the severity level \u2014 back to the calling program so it can take appropriate downstream action."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00019",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date validation program has been invoked by a calling program with a date value and a date format pattern as inputs",
+                "When": "The program begins its execution cycle",
+                "Then": "The output message structure (WS-MESSAGE) must be fully cleared and reset to its initial default values, ensuring no previously stored result messages or data remnants are carried forward into the current validation process"
+            },
+            "Rule_Name": "Reset Output Message Structure Before Processing",
+            "Rule_Description": "Before any date validation processing begins, the output message structure must be cleared and reset to its default state to ensure no residual data from previous executions influences the current result."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00020",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The output message structure has already been cleared and reset to default values",
+                "When": "The program continues its initialization sequence prior to accepting input parameters",
+                "Then": "The internal date working field (WS-DATE) must be set to blank spaces, ensuring it contains no residual date data from any prior execution before the new input date value is received and processed"
+            },
+            "Rule_Name": "Reset Date Field to Blank Before Processing",
+            "Rule_Description": "Immediately after the output message structure is cleared, the internal date working field must also be reset to blank spaces to ensure a clean state before the input date value is loaded and validated."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00021",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program submits a date value string (LS-DATE) to the date validation service",
+                "When": "The date validation service receives the date value input parameter from the calling program",
+                "Then": "The date value string and its length are captured and stored internally so that the date value is ready to be passed to the date validation engine for processing"
+            },
+            "Rule_Name": "Receive Date Value from Calling Program",
+            "Rule_Description": "The date validation service must accept the date value submitted by the calling program and make it available for subsequent validation processing. The date value is received as a text string along with its length."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00022",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program submits a date format mask string (LS-DATE-FORMAT) alongside the date value to the date validation service",
+                "When": "The date validation service receives the date format mask input parameter from the calling program",
+                "Then": "The date format mask string and its length are captured and stored internally so that the format mask is ready to be passed to the date validation engine for processing"
+            },
+            "Rule_Name": "Receive Date Format Mask from Calling Program",
+            "Rule_Description": "The date validation service must accept the date format mask submitted by the calling program. The format mask defines the expected structure and pattern of the date value (e.g., YYYYMMDD, MM/DD/YYYY) and is required to correctly interpret and validate the date value."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00023",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date validation service has been invoked by a calling program",
+                "When": "The service checks whether both the date value (LS-DATE) and the date format mask (LS-DATE-FORMAT) have been received from the calling program",
+                "Then": "If both the date value and the date format mask are available, the service proceeds to invoke the date validation engine with both parameters; if either input is missing or not provided, the service still proceeds to the validation engine, which will return an appropriate validation failure result (such as Insufficient data or Bad Picture String) based on the missing input"
+            },
+            "Rule_Name": "Both Input Parameters Must Be Available Before Validation Proceeds",
+            "Rule_Description": "The date validation process requires both the date value and the date format mask to be present and available before date validation can be initiated. Both inputs are mandatory for the validation engine to correctly interpret and validate the submitted date."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00024",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "Both the date value (LS-DATE) and the date format mask (LS-DATE-FORMAT) have been received from the calling program",
+                "When": "The date validation service prepares the inputs for the date validation engine",
+                "Then": "The date value and the date format mask are both bound together and made available as a paired input set, with the Lilian date output initialized to zero, so that the date validation engine can evaluate the date value strictly according to the rules defined by the provided format mask"
+            },
+            "Rule_Name": "Date Value and Format Mask Are Paired for Validation",
+            "Rule_Description": "The date value and the date format mask must be treated as a paired set of inputs. The date value can only be correctly validated when interpreted against its corresponding format mask. Both parameters together define the complete input contract for the date validation service."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00025",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "An input date value (LS-DATE) has been received by the program",
+                "When": "The system prepares the date for submission to the date conversion service",
+                "Then": "The system measures the length of the input date value (LS-DATE) and records it as the date length within the date validation structure (VSTRING-LENGTH of WS-DATE-TO-TEST)"
+            },
+            "Rule_Name": "Measure Input Date Length for Validation Preparation",
+            "Rule_Description": "Before submitting a date for validation, the system must determine the exact length of the input date value so that the date conversion service can correctly interpret the date string."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00026",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The length of the input date value (LS-DATE) has been measured",
+                "When": "The system loads the date structure for the date conversion service",
+                "Then": "The measured date length is stored into the length field (VSTRING-LENGTH) of the date-to-test structure (WS-DATE-TO-TEST)"
+            },
+            "Rule_Name": "Store Date Length into Date Validation Structure",
+            "Rule_Description": "The measured length of the input date value must be stored into the date structure that will be passed to the date conversion service, ensuring the service knows how many characters to process."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00027",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The input date value (LS-DATE) has been received and its length has been recorded in the date structure",
+                "When": "The system finalizes preparation of the date structure for the date conversion service",
+                "Then": "The input date value (LS-DATE) is stored into both the text field (VSTRING-TEXT) of the date-to-test structure (WS-DATE-TO-TEST) and the working date field (WS-DATE), making the date string ready for submission to the date conversion service"
+            },
+            "Rule_Name": "Store Input Date Value into Date Validation Structure",
+            "Rule_Description": "The actual input date value must be stored into both the date validation structure for the conversion service and the working date field, so the date string is available for processing and result tracking."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00028",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Date Format Mask string (LS-DATE-FORMAT) has been received from the calling program",
+                "When": "The program prepares the Date Format Structure for the date conversion API call",
+                "Then": "The length of the Date Format Mask (LS-DATE-FORMAT) is measured and made available for storage into the Format Structure"
+            },
+            "Rule_Name": "Determine Date Format Mask Length from Calling Program",
+            "Rule_Description": "The program must determine the exact length of the Date Format Mask string as supplied by the calling program, so that the format structure used for date conversion is correctly sized and does not include extraneous characters."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00029",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The length of the Date Format Mask (LS-DATE-FORMAT) has been determined",
+                "When": "The Format Structure (WS-DATE-FORMAT) is being populated in preparation for the date conversion API call",
+                "Then": "The determined length value is stored into the length component (VSTRING-LENGTH) of the Date Format Structure (WS-DATE-FORMAT)"
+            },
+            "Rule_Name": "Store Date Format Mask Length into Format Structure",
+            "Rule_Description": "The measured length of the Date Format Mask must be stored into the length field of the Format Structure (VSTRING-LENGTH of WS-DATE-FORMAT) so that the date conversion API can correctly interpret the boundaries of the format string."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00030",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Date Format Mask string (LS-DATE-FORMAT) has been received from the calling program and the Format Structure length has already been populated",
+                "When": "The Format Structure (WS-DATE-FORMAT) is being fully populated in preparation for the date conversion API call",
+                "Then": "The Date Format Mask string (LS-DATE-FORMAT) is stored into both the text component (VSTRING-TEXT) of the Date Format Structure (WS-DATE-FORMAT) and into the working Date Format field (WS-DATE-FMT), making the Format Structure fully ready for the API call"
+            },
+            "Rule_Name": "Store Date Format Mask String into Format Structure",
+            "Rule_Description": "The actual Date Format Mask string received from the calling program must be stored into both the text field of the Format Structure (VSTRING-TEXT of WS-DATE-FORMAT) and the working format field (WS-DATE-FMT), ensuring the date conversion API has the complete format pattern available for date validation."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00031",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date conversion request is about to be submitted",
+                "When": "The system prepares to call the date conversion service",
+                "Then": "The Lillian date number output holder is reset to zero, ensuring no residual value from a prior conversion is carried forward"
+            },
+            "Rule_Name": "Reset Lillian Date Number Before Conversion",
+            "Rule_Description": "Before initiating a new date conversion, the Lillian date number output holder must be cleared to zero to ensure no previously held date value influences the current conversion result."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00032",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date string and a date format mask have been provided as inputs, the Lillian date number holder has been reset to zero, and a feedback receiver is ready to capture the outcome",
+                "When": "The date conversion service (CEEDAYS) is invoked with the date string, format mask, Lillian output holder, and feedback receiver",
+                "Then": "The CEEDAYS service processes the conversion request and populates both the Lillian date number output holder and the feedback receiver with the result of the conversion attempt"
+            },
+            "Rule_Name": "Invoke Date Conversion Service with Date and Format",
+            "Rule_Description": "The date conversion service (CEEDAYS) must be called with the input date string, the date format mask, the Lillian date number output holder, and a feedback receiver. This service converts the date string into a Lillian date number representing the number of days elapsed since October 15, 1582."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00033",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS service has been called with a valid date string and a valid format mask",
+                "When": "The conversion completes successfully",
+                "Then": "The Lillian date number output holder contains a positive integer value representing the number of days since October 15, 1582, and the feedback code reflects a successful outcome with a severity level indicating no error"
+            },
+            "Rule_Name": "Populate Lillian Date Number on Successful Conversion",
+            "Rule_Description": "When the CEEDAYS date conversion service successfully converts the input date string, the Lillian date number output holder is populated with a positive integer representing the number of days elapsed since the fixed reference date of October 15, 1582."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00034",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS service has been called with a date string and a format mask",
+                "When": "The conversion fails for any reason such as an invalid date value, insufficient data, bad format mask, non-numeric data, invalid era, unsupported date range, invalid month, or year-in-era being zero",
+                "Then": "The Lillian date number output holder remains zero, and the feedback code is populated with the severity level and message number identifying the specific reason for the conversion failure, which will be used in subsequent validation evaluation"
+            },
+            "Rule_Name": "Retain Zero Lillian Date Number on Failed Conversion",
+            "Rule_Description": "When the CEEDAYS date conversion service fails to convert the input date string, the Lillian date number output holder remains at zero, and the feedback code is populated with the specific reason for the failure, which is used for downstream evaluation."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00035",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The CEEDAYS date conversion service has completed its processing, either successfully or with a failure",
+                "When": "The feedback code is read after the service call",
+                "Then": "The severity level from the feedback code is stored for use as the program return code, and the message number from the feedback code is stored for use in determining the specific validation outcome message to be returned to the caller"
+            },
+            "Rule_Name": "Capture Severity and Message Number from Conversion Feedback",
+            "Rule_Description": "After the date conversion service completes, the severity level and message number from the feedback code are captured and made available for downstream evaluation and return to the calling program."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00036",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date conversion service (CEEDAYS) has been called with a date value and a date format pattern, and a feedback response has been returned",
+                "When": "The feedback response is received from the date conversion service",
+                "Then": "The severity code contained within the feedback response must be extracted and stored so it can be used to determine the overall outcome of the date validation and returned to the calling program as the final result code"
+            },
+            "Rule_Name": "Retrieve Severity Code from Date Validation Feedback",
+            "Rule_Description": "After the date conversion service processes the date value and format, the severity level from the feedback response must be captured to indicate how serious the validation outcome is (e.g., success, warning, or failure)."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00037",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date conversion service (CEEDAYS) has been called with a date value and a date format pattern, and a feedback response has been returned containing a message number",
+                "When": "The feedback response is received from the date conversion service",
+                "Then": "The message number contained within the feedback response must be extracted and stored so it can be used in subsequent evaluation to identify the specific validation condition (e.g., invalid era, bad date value, non-numeric data, unsupported range, etc.)"
+            },
+            "Rule_Name": "Retrieve Message Number from Date Validation Feedback",
+            "Rule_Description": "After the date conversion service processes the date value and format, the specific message number from the feedback response must be captured to identify the precise nature of the validation result, enabling detailed downstream evaluation of the date validation outcome."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00038",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-INVALID-DATE (i.e., no error \u2014 the date is valid)",
+                "Then": "The result message is set to 'Date is valid', indicating the date value is well-formed, complete, and conforms to the specified format pattern"
+            },
+            "Rule_Name": "Determine Date Validity from Validation Service Feedback",
+            "Rule_Description": "When the date validation service returns a successful feedback code (FC-INVALID-DATE), the date value is confirmed as valid against the provided format pattern."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00039",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is not FC-INVALID-DATE, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-INSUFFICIENT-DATA",
+                "Then": "The result message is set to 'Insufficient', indicating the date string lacks sufficient data to determine a complete date as required by the format pattern"
+            },
+            "Rule_Name": "Identify Insufficient Data in Date String",
+            "Rule_Description": "When the date validation service returns an insufficient data feedback code, it means the date string does not contain enough information to fully resolve a date according to the given format."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00040",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is neither FC-INVALID-DATE nor FC-INSUFFICIENT-DATA, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-BAD-DATE-VALUE",
+                "Then": "The result message is set to 'Datevalue error', indicating that a numeric date component contains a value outside the acceptable range for that component"
+            },
+            "Rule_Name": "Identify Incorrect Date Value",
+            "Rule_Description": "When the date validation service returns a bad date value feedback code, it means one or more numeric components of the date (such as day or year) are out of the acceptable range."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00041",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, or FC-BAD-DATE-VALUE, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-INVALID-ERA",
+                "Then": "The result message is set to 'Invalid Era', indicating the era designation within the date string is not recognized or valid in the applicable calendar system"
+            },
+            "Rule_Name": "Identify Invalid Era in Date",
+            "Rule_Description": "When the date validation service returns an invalid era feedback code, it means the era designation specified in the date string is not recognized or not valid within the calendar system."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00042",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, or FC-INVALID-ERA, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-UNSUPP-RANGE",
+                "Then": "The result message is set to 'Unsupp. Range', indicating the date value falls outside the supported calendar date range"
+            },
+            "Rule_Name": "Identify Date Outside Supported Calendar Range",
+            "Rule_Description": "When the date validation service returns an unsupported range feedback code, it means the date value falls outside the supported calendar range (prior to October 15, 1582, the start of the Gregorian calendar)."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, or FC-UNSUPP-RANGE, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-INVALID-MONTH",
+                "Then": "The result message is set to 'Invalid month', indicating the month component of the date string does not represent a valid calendar month"
+            },
+            "Rule_Name": "Identify Invalid Month in Date",
+            "Rule_Description": "When the date validation service returns an invalid month feedback code, it means the month value specified in the date string does not correspond to a valid calendar month."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00044",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, or FC-INVALID-MONTH, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-BAD-PIC-STRING",
+                "Then": "The result message is set to 'Bad Pic String', indicating the date format pattern supplied is invalid or contains unrecognized formatting tokens"
+            },
+            "Rule_Name": "Identify Invalid Date Format Picture String",
+            "Rule_Description": "When the date validation service returns a bad picture string feedback code, it means the date format pattern provided by the caller is itself malformed or contains unrecognized tokens."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00045",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, or FC-BAD-PIC-STRING, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-NON-NUMERIC-DATA",
+                "Then": "The result message is set to 'Nonnumeric data', indicating the date string contains non-numeric characters where the format pattern requires numeric digits"
+            },
+            "Rule_Name": "Identify Non-Numeric Data in Date String",
+            "Rule_Description": "When the date validation service returns a non-numeric data feedback code, it means the date string contains non-numeric characters in positions where numeric digits are required by the format pattern."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00046",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, the feedback code is none of FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, or FC-NON-NUMERIC-DATA, and the service has returned a feedback code",
+                "When": "The feedback code returned by the date validation service indicates FC-YEAR-IN-ERA-ZERO",
+                "Then": "The result message is set to 'YearInEra is 0', indicating the year value within the specified era is zero, which is not permitted in the calendar system"
+            },
+            "Rule_Name": "Identify Year-Within-Era Value of Zero",
+            "Rule_Description": "When the date validation service returns a year-in-era-zero feedback code, it means the year value specified within the era is zero, which is not a valid year in the applicable calendar system."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00047",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and a date format pattern have been submitted to the date validation service, and the service has returned a feedback code",
+                "When": "The feedback code does not match any of the following specific conditions: FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, FC-NON-NUMERIC-DATA, or FC-YEAR-IN-ERA-ZERO",
+                "Then": "The result message is set to 'Date is invalid', indicating the date has failed validation for an unspecified or unrecognized reason"
+            },
+            "Rule_Name": "Handle All Other Unrecognized Date Validation Failures",
+            "Rule_Description": "When the date validation service returns a feedback code that does not match any of the specifically handled error conditions, the date is treated as generally invalid."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00048",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a 'Valid Date' outcome (FC-INVALID-DATE feedback code indicating successful validation)",
+                "Then": "The result message is set to 'Date is valid'"
+            },
+            "Rule_Name": "Set Result Message as 'Date is valid' for Valid Date Outcome",
+            "Rule_Description": "When the date validation service confirms the date is valid and well-formed, the result message is set to indicate successful validation."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00049",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns an 'Insufficient Data' outcome (FC-INSUFFICIENT-DATA feedback code), meaning the date string lacks required components such as day, month, or year",
+                "Then": "The result message is set to 'Insufficient'"
+            },
+            "Rule_Name": "Set Result Message as 'Insufficient' for Insufficient Data Outcome",
+            "Rule_Description": "When the date validation service determines that the date value does not contain enough information to fully determine a complete date, the result message is set to indicate insufficient data."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00050",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a 'Bad Date Value' outcome (FC-BAD-DATE-VALUE feedback code), meaning a date component such as day or month contains a value outside its valid numeric range",
+                "Then": "The result message is set to 'Datevalue error'"
+            },
+            "Rule_Name": "Set Result Message as 'Datevalue error' for Bad Date Value Outcome",
+            "Rule_Description": "When the date validation service determines that a numeric value within the date is out of the acceptable range for its date component, the result message is set to indicate a date value error."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00051",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns an 'Invalid Era' outcome (FC-INVALID-ERA feedback code), meaning the era component of the date is unrecognized or invalid",
+                "Then": "The result message is set to 'Invalid Era'"
+            },
+            "Rule_Name": "Set Result Message as 'Invalid Era' for Invalid Era Outcome",
+            "Rule_Description": "When the date validation service determines that the era designation within the date value is not recognized or not valid within the calendar system, the result message is set to indicate an invalid era."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00052",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns an 'Unsupported Range' outcome (FC-UNSUPP-RANGE feedback code), meaning the date falls outside the boundaries of the supported calendar system",
+                "Then": "The result message is set to 'Unsupp. Range'"
+            },
+            "Rule_Name": "Set Result Message as 'Unsupp. Range' for Unsupported Date Range Outcome",
+            "Rule_Description": "When the date validation service determines that the date value falls outside the supported calendar range (prior to October 15, 1582, the start of the Gregorian calendar), the result message is set to indicate an unsupported range."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00053",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns an 'Invalid Month' outcome (FC-INVALID-MONTH feedback code), meaning the month component of the date is not a valid calendar month (e.g., month 0 or month 13 or higher)",
+                "Then": "The result message is set to 'Invalid month'"
+            },
+            "Rule_Name": "Set Result Message as 'Invalid month' for Invalid Month Outcome",
+            "Rule_Description": "When the date validation service determines that the month value within the date does not correspond to a valid calendar month, the result message is set to indicate an invalid month."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00054",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a 'Bad Picture String' outcome (FC-BAD-PIC-STRING feedback code), meaning the format pattern provided by the caller is invalid or contains unrecognized or incorrectly structured format tokens",
+                "Then": "The result message is set to 'Bad Pic String'"
+            },
+            "Rule_Name": "Set Result Message as 'Bad Pic String' for Invalid Format Pattern Outcome",
+            "Rule_Description": "When the date validation service determines that the date format pattern itself is malformed or contains unrecognized tokens, the result message is set to indicate a bad picture string."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00055",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a 'Non-Numeric Data' outcome (FC-NON-NUMERIC-DATA feedback code), meaning the date string contains alphabetic or special characters in positions where the format pattern requires numeric digits",
+                "Then": "The result message is set to 'Nonnumeric data'"
+            },
+            "Rule_Name": "Set Result Message as 'Nonnumeric data' for Non-Numeric Data Outcome",
+            "Rule_Description": "When the date validation service determines that the date value contains non-numeric characters where numeric digits are expected by the format pattern, the result message is set to indicate non-numeric data."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00056",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a 'Year In Era is Zero' outcome (FC-YEAR-IN-ERA-ZERO feedback code), meaning the year component within the era designation is zero",
+                "Then": "The result message is set to 'YearInEra is 0'"
+            },
+            "Rule_Name": "Set Result Message as 'YearInEra is 0' for Year-in-Era Zero Outcome",
+            "Rule_Description": "When the date validation service determines that the year value within an era is specified as zero, which is not a valid year in most calendar systems, the result message is set to indicate a zero year-in-era."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00057",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date value and date format pattern have been submitted for validation",
+                "When": "The date validation service returns a feedback outcome that does not match any of the following specific conditions: Valid Date, Insufficient Data, Bad Date Value, Invalid Era, Unsupported Range, Invalid Month, Bad Picture String, Non-Numeric Data, or Year In Era is Zero",
+                "Then": "The result message is set to 'Date is invalid' as a general catch-all failure indicator"
+            },
+            "Rule_Name": "Set Result Message as 'Date is invalid' for All Other Unrecognized Failure Outcomes",
+            "Rule_Description": "When the date validation service returns any failure outcome that does not match any of the specifically handled error conditions, the result message is set to a general date invalid indicator."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00058",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A date validation has been performed using the provided date value and format pattern, and the validation service has returned a feedback code containing a severity level and a message number, and a result description has been determined based on the feedback",
+                "When": "The program prepares to return control to the calling program",
+                "Then": "The output message structure (WS-MESSAGE) must be populated by combining all of the following details: the severity code (WS-SEVERITY-N), the message code (WS-MSG-NO-N), the result description (WS-RESULT), the tested date value (WS-DATE), and the format mask used (WS-DATE-FMT), so that the caller receives a complete and self-contained validation result"
+            },
+            "Rule_Name": "Package Full Validation Result Message",
+            "Rule_Description": "After date validation is complete, all relevant validation details \u2014 including the severity level, message code, result description, the date that was tested, and the format mask used \u2014 must be combined into a single output message structure before returning to the calling program."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00059",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The output message structure (WS-MESSAGE) has been fully populated with the severity code, message code, result description, tested date, and format mask",
+                "When": "The program is ready to return control to the calling program",
+                "Then": "The complete contents of WS-MESSAGE must be moved to the output result field (LS-RESULT) so that the calling program receives the full validation result"
+            },
+            "Rule_Name": "Transfer Packaged Validation Message to Calling Program",
+            "Rule_Description": "The fully packaged validation result message must be transferred to the designated output field so that the calling program can receive and process the complete validation outcome."
+        },
+        {
+            "Rule_Id": "R-CSUTLDTC-cbl-00060",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The date validation service has returned a feedback code and the severity level (WS-SEVERITY-N) has been extracted from that feedback",
+                "When": "The program finalises its execution and returns control to the calling program",
+                "Then": "The severity code (WS-SEVERITY-N) must be set as the RETURN-CODE so that the calling program can use it to determine whether the date validation succeeded, produced a warning, or failed with an error"
+            },
+            "Rule_Name": "Set Severity Code as Return Code to Calling Program",
+            "Rule_Description": "The severity level obtained from the date validation feedback must be passed back to the calling program as the return code, enabling the caller to programmatically determine the seriousness of the validation outcome without parsing the message text."
+        }
+    ],
+    "description": "CSUTLDTC is a utility program that validates a date value against a specified date format by invoking the IBM Language Environment API CEEDAYS, which converts a date string into its Lillian date representation. The program accepts a date and its format mask as input, calls CEEDAYS to perform the validation, and returns a descriptive result message along with a severity code indicating whether the date is valid or the nature of any error (e.g., invalid month, bad date value, non-numeric data, unsupported range, etc.).\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: None\n- **MQ Calls**: No\n- **Module Type**: Called module\n\n<br>\n\n### Key Functionalities:\n\n1: Initialize Message Output - Clear and reset the output message structure and date fields before processing begins.\n\n2: Accept Input Parameters - Receive the date value to be validated and the date format mask from the calling program.\n\n3: Prepare Date for Validation - Set the input date and its length into the date structure required for the date conversion API call.\n\n4: Prepare Date Format Mask - Set the date format string and its length into the format structure required for the date conversion API call.\n\n5: Convert Date to Lillian Format - Call the CEEDAYS API to convert the provided date string using the specified format mask into a Lillian date number, which represents the number of days since a fixed reference date.\n\n6: Capture Validation Feedback - Retrieve the severity code and message number returned by the date conversion API to determine the outcome of the date validation.\n\n7: Evaluate Date Validation Result - Assess the feedback code from the API call to determine whether the date is valid or identify the specific type of error (e.g., insufficient data, bad date value, invalid era, unsupported range, invalid month, bad picture string, non-numeric data, year-in-era is zero, or otherwise invalid).\n\n8: Set Human-Readable Result Message - Based on the validation outcome, assign a descriptive result message (e.g., 'Date is valid', 'Insufficient', 'Datevalue error', 'Invalid Era', 'Unsupp. Range', 'Invalid month', 'Bad Pic String', 'Nonnumeric data', 'YearInEra is 0', 'Date is invalid') to the output message field.\n\n9: Return Validation Result to Caller - Package the full message (including severity, message code, result description, tested date, and format mask used) and return it to the calling program along with the severity code as the return code.\n\n"
+}

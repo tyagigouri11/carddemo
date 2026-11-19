@@ -1,0 +1,119 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DUSRSECJ.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, **DUSRSECJ**, creates and populates a User Security file for the CardDemo application, which manages user authentication data. It establishes records for 5 administrative users and 5 regular users, each containing a user ID, first name, last name, and password. The job accomplishes this through a three-step process: creating a flat sequential file (PS) from in-stream user data, defining a VSAM KSDS cluster to serve as the permanent indexed security store, and copying the sequential data into the VSAM file for efficient keyed access.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'DEF USRSEC FILE'",
+          "description": "The accounting information or job description string passed to the system. It identifies the job and may be used for billing or tracking purposes."
+        },
+        {
+          "name": "REGION",
+          "value": "8M",
+          "description": "Specifies the maximum amount of virtual storage (8 megabytes) available to the entire job for execution. This limits memory usage across all job steps."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Assigns the job to input job class 'A', which determines the job entry subsystem (JES) queue where the job waits for execution and can influence scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class 'H' for the job log and system messages. This determines where the job's JCL listing, allocation messages, and other system output are routed after job completion."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Instructs the system to send a notification message to the submitting user (resolved from the symbolic parameter &SYSUID) when the job completes, informing them of the job's completion status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PREDEL",
+        "purpose": "Pre-deletion step that deletes the existing user security Physical Sequential (PS) dataset before recreation, ensuring a clean state for subsequent steps.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "AWS.M2.CARDDEMO.USRSEC.PS (deleted via MOD,DELETE,DELETE disposition)"
+      },
+      {
+        "step": "STEP01",
+        "purpose": "Creates a new Physical Sequential (PS) user security file by writing in-stream data records containing user credentials (user ID, first name, last name, and password) for both admin and regular users.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1 (in-stream data: 10 user records including ADMIN001–ADMIN005 and USER0001–USER0005 with names and passwords, fixed at 80 bytes each)",
+        "outputs": "AWS.M2.CARDDEMO.USRSEC.PS (new cataloged PS dataset, LRECL=80, RECFM=FB, DSORG=PS, BLKSIZE=0, allocated on SYSAD with 10 primary and 5 secondary tracks); SYSPRINT (utility messages to SYSOUT)"
+      },
+      {
+        "step": "STEP02",
+        "purpose": "Defines a new VSAM Key-Sequenced Dataset (KSDS) for user security by first deleting any existing version and then creating the cluster with specified key, record size, and space parameters.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (IDCAMS control statements: DELETE AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, SET MAXCC=0, DEFINE CLUSTER with KEYS(8,0), RECORDSIZE(80,80), REUSE, INDEXED, TRACKS(45,15), FREESPACE(10,15), CISZ(8192))",
+        "outputs": "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS (VSAM KSDS cluster), AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT (data component), AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX (index component); SYSPRINT (utility messages to SYSOUT)"
+      },
+      {
+        "step": "STEP03",
+        "purpose": "Copies the user security records from the Physical Sequential (PS) flat file into the newly defined VSAM KSDS file using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "IN: AWS.M2.CARDDEMO.USRSEC.PS (source PS dataset, DISP=SHR); SYSIN (REPRO INFILE(IN) OUTFILE(OUT) command)",
+        "outputs": "OUT: AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS (target VSAM KSDS populated with user security records, DISP=SHR); SYSPRINT, SYSOUT (utility messages to SYSOUT)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PREDEL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.PS",
+        "operations": "DELETE",
+        "description": "Pre-delete step using IEFBR14 to delete the existing sequential dataset AWS.M2.CARDDEMO.USRSEC.PS via MOD,DELETE,DELETE disposition"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "SYSUT1 (in-stream data)",
+        "operations": "READ",
+        "description": "IEBGENER reads 10 in-stream user security records containing user ID, first name, last name, and password fields (80-byte fixed records)"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.PS",
+        "operations": "WRITE",
+        "description": "IEBGENER creates and writes the new sequential dataset AWS.M2.CARDDEMO.USRSEC.PS with LRECL=80, RECFM=FB, cataloged on SYSAD unit with 10 primary and 5 secondary tracks"
+      },
+      {
+        "step": "STEP02",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS if it exists; MAXCC is set to 0 to suppress non-zero return code if dataset does not exist"
+      },
+      {
+        "step": "STEP02",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS, AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT, AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS with key length 8 at offset 0, record size 80, REUSE, INDEXED, 45 primary and 15 secondary tracks, 10% CI and 15% CA freespace, CISZ 8192, with data component AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.DAT and index component AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS.IDX"
+      },
+      {
+        "step": "STEP03",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.PS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the sequential dataset AWS.M2.CARDDEMO.USRSEC.PS as input (INFILE IN) for copying to the VSAM file"
+      },
+      {
+        "step": "STEP03",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO copies all records from AWS.M2.CARDDEMO.USRSEC.PS into the VSAM KSDS cluster AWS.M2.CARDDEMO.USRSEC.VSAM.KSDS (OUTFILE OUT), loading the 10 user security records into the keyed dataset"
+      }
+    ]
+  }
+}

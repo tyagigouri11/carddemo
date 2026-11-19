@@ -1,0 +1,142 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DEFGDGD.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job (DEFGDGD) creates and initializes Generation Data Groups (GDGs) for backing up transaction reference data in the CardDemo application, an AWS Mainframe Modernization demo system. It defines three GDG base entries — for Transaction Type, Transaction Category, and Disclosure Group — each with a retention limit of 5 generations, then immediately loads the first generation of each GDG by copying data from existing flat files. The overall business purpose is to establish a versioned backup structure for critical card transaction reference data, ensuring historical copies are maintained and automatically managed through the GDG mechanism.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'DEF DB2 GDG'",
+          "description": "The job name is DEFGDGD and the accounting/description field is 'DEF DB2 GDG'. This identifies the job to the system and provides a brief description of its purpose."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class A, which determines the initiator queue the job is submitted to. It controls scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages. Class 0 determines where the job's JES message output (job log) is routed, typically to a specific spool output class defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user whose user ID is stored in the symbolic parameter &SYSUID (the submitting user) will receive a TSO notification message when the job completes, informing them of the job's completion status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP10",
+        "purpose": "Defines a Generation Data Group (GDG) base entry named AWS.M2.CARDDEMO.TRANTYPE.BKUP in the system catalog, with a limit of 5 generations and SCRATCH option to automatically delete rolled-off generations.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE GENERATIONDATAGROUP command for AWS.M2.CARDDEMO.TRANTYPE.BKUP)",
+        "outputs": "GDG base AWS.M2.CARDDEMO.TRANTYPE.BKUP defined in catalog; SYSPRINT"
+      },
+      {
+        "step": "STEP20",
+        "purpose": "Creates the first generation of the Transaction Type GDG by copying the existing sequential dataset AWS.M2.CARDDEMO.TRANTYPE.PS into the new GDG generation AWS.M2.CARDDEMO.TRANTYPE.BKUP(+1). This step is skipped if STEP10 returned a non-zero condition code.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.TRANTYPE.PS (DISP=SHR)",
+        "outputs": "SYSUT2: AWS.M2.CARDDEMO.TRANTYPE.BKUP(+1) (NEW, CATLG, LRECL=60, RECFM=FB, BLKSIZE=600, SPACE=(TRK,(1,1),RLSE)); SYSPRINT"
+      },
+      {
+        "step": "STEP30",
+        "purpose": "Defines a Generation Data Group (GDG) base entry named AWS.M2.CARDDEMO.TRANCATG.PS.BKUP in the system catalog, with a limit of 5 generations and SCRATCH option to automatically delete rolled-off generations. This step is skipped if a prior step returned a non-zero condition code.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE GENERATIONDATAGROUP command for AWS.M2.CARDDEMO.TRANCATG.PS.BKUP)",
+        "outputs": "GDG base AWS.M2.CARDDEMO.TRANCATG.PS.BKUP defined in catalog; SYSPRINT"
+      },
+      {
+        "step": "STEP40",
+        "purpose": "Creates the first generation of the Transaction Category Type GDG by copying the existing sequential dataset AWS.M2.CARDDEMO.TRANCATG.PS into the new GDG generation AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1). This step is skipped if a prior step returned a non-zero condition code.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.TRANCATG.PS (DISP=SHR)",
+        "outputs": "SYSUT2: AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1) (NEW, CATLG, LRECL=60, RECFM=FB, BLKSIZE=600, SPACE=(TRK,(1,1),RLSE)); SYSPRINT"
+      },
+      {
+        "step": "STEP50",
+        "purpose": "Defines a Generation Data Group (GDG) base entry named AWS.M2.CARDDEMO.DISCGRP.BKUP in the system catalog, with a limit of 5 generations and SCRATCH option to automatically delete rolled-off generations.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE GENERATIONDATAGROUP command for AWS.M2.CARDDEMO.DISCGRP.BKUP)",
+        "outputs": "GDG base AWS.M2.CARDDEMO.DISCGRP.BKUP defined in catalog; SYSPRINT"
+      },
+      {
+        "step": "STEP60",
+        "purpose": "Creates the first generation of the Disclosure Group GDG by copying the existing sequential dataset AWS.M2.CARDDEMO.DISCGRP.PS into the new GDG generation AWS.M2.CARDDEMO.DISCGRP.BKUP(+1). This step is skipped if a prior step returned a non-zero condition code.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.DISCGRP.PS (DISP=SHR)",
+        "outputs": "SYSUT2: AWS.M2.CARDDEMO.DISCGRP.BKUP(+1) (NEW, CATLG, LRECL=50, RECFM=FB, BLKSIZE=500, SPACE=(TRK,(1,1),RLSE)); SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.BKUP",
+        "operations": "DEFINE GDG",
+        "description": "IDCAMS defines a Generation Data Group base named AWS.M2.CARDDEMO.TRANTYPE.BKUP with a limit of 5 generations and SCRATCH option"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.PS",
+        "operations": "READ",
+        "description": "IEBGENER reads the source sequential dataset AWS.M2.CARDDEMO.TRANTYPE.PS as input (SYSUT1) with shared disposition"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IEBGENER copies data to create the first generation AWS.M2.CARDDEMO.TRANTYPE.BKUP(+1) as a new cataloged dataset with LRECL=60, RECFM=FB, BLKSIZE=600"
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.PS.BKUP",
+        "operations": "DEFINE GDG",
+        "description": "IDCAMS defines a Generation Data Group base named AWS.M2.CARDDEMO.TRANCATG.PS.BKUP with a limit of 5 generations and SCRATCH option"
+      },
+      {
+        "step": "STEP40",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.PS",
+        "operations": "READ",
+        "description": "IEBGENER reads the source sequential dataset AWS.M2.CARDDEMO.TRANCATG.PS as input (SYSUT1) with shared disposition"
+      },
+      {
+        "step": "STEP40",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IEBGENER copies data to create the first generation AWS.M2.CARDDEMO.TRANCATG.PS.BKUP(+1) as a new cataloged dataset with LRECL=60, RECFM=FB, BLKSIZE=600"
+      },
+      {
+        "step": "STEP50",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.BKUP",
+        "operations": "DEFINE GDG",
+        "description": "IDCAMS defines a Generation Data Group base named AWS.M2.CARDDEMO.DISCGRP.BKUP with a limit of 5 generations and SCRATCH option"
+      },
+      {
+        "step": "STEP60",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.PS",
+        "operations": "READ",
+        "description": "IEBGENER reads the source sequential dataset AWS.M2.CARDDEMO.DISCGRP.PS as input (SYSUT1) with shared disposition"
+      },
+      {
+        "step": "STEP60",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IEBGENER copies data to create the first generation AWS.M2.CARDDEMO.DISCGRP.BKUP(+1) as a new cataloged dataset with LRECL=50, RECFM=FB, BLKSIZE=500"
+      }
+    ]
+  }
+}

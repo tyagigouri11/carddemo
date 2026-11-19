@@ -1,0 +1,79 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "OPENFIL.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **OPENFIL**, is designed to open multiple files within a CICS (Customer Information Control System) region named **CICSAWSA**. It uses the SDSF utility to issue CEMT (CICS Master Terminal) commands that transition five key files — TRANSACT, CCXREF, ACCTDAT, CXACAIX, and USRSEC — to an open/enabled state. These files appear to support a card management application (CardDemo), storing transaction data, account cross-references, account details, and user security information, making them available for online CICS processing.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Open files in CICS'",
+          "description": "The accounting information or job description string passed to the system. It identifies the job and may be used for billing or informational purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted. CLASS=A assigns the job to job class A, which determines scheduling priority and resource allocation by the JES subsystem."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages (JCL listing, allocation/termination messages). MSGCLASS=0 routes these messages to output class 0, determining where the job log is delivered or held."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the submitting user, so that user receives a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "OPCIFIL",
+        "purpose": "Opens multiple CICS files in the CICSAWSA region by issuing CEMT SET FILE OPEN commands via SDSF operator modify commands. This step enables the files TRANSACT, CCXREF, ACCTDAT, CXACAIX, and USRSEC to be available for CICS transactions.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline CEMT commands: /F CICSAWSA,'CEMT SET FIL(TRANSACT) OPE', /F CICSAWSA,'CEMT SET FIL(CCXREF) OPE', /F CICSAWSA,'CEMT SET FIL(ACCTDAT) OPE', /F CICSAWSA,'CEMT SET FIL(CXACAIX) OPE', /F CICSAWSA,'CEMT SET FIL(USRSEC) OPE')",
+        "outputs": "ISFOUT (SDSF output, SYSOUT=*), CMDOUT (command output, SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "TRANSACT",
+        "operations": "OPEN",
+        "description": "CEMT SET FILE command issued via SDSF /F operator command to CICS region CICSAWSA to open file TRANSACT"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "CCXREF",
+        "operations": "OPEN",
+        "description": "CEMT SET FILE command issued via SDSF /F operator command to CICS region CICSAWSA to open file CCXREF"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "ACCTDAT",
+        "operations": "OPEN",
+        "description": "CEMT SET FILE command issued via SDSF /F operator command to CICS region CICSAWSA to open file ACCTDAT"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "CXACAIX",
+        "operations": "OPEN",
+        "description": "CEMT SET FILE command issued via SDSF /F operator command to CICS region CICSAWSA to open file CXACAIX"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "USRSEC",
+        "operations": "OPEN",
+        "description": "CEMT SET FILE command issued via SDSF /F operator command to CICS region CICSAWSA to open file USRSEC"
+      }
+    ]
+  }
+}

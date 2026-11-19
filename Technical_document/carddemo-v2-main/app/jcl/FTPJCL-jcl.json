@@ -1,0 +1,66 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "FTPJCL.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job performs an FTP file transfer operation, sending a mainframe dataset ('AWS.M2.CARDEMO.FTP.TEST') to a remote server as a text file ('welcome.txt'). It connects to a remote FTP server at IP address 172.31.21.124 using provided credentials, navigates to a designated folder ('/ftpfolder'), and transfers the file in ASCII mode. The job appears to be part of a card demonstration application, likely used to export mainframe data to an external system or file repository.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'FTP JCL'",
+          "description": "The accounting information or programmer name associated with the job. Here it is set to 'FTP JCL' as a simple job identifier string."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to job class A, which determines scheduling priority and resource allocation by the JES subsystem."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (system messages). MSGCLASS=H routes the job's message output to output class H, determining where the job log is sent (e.g., held for online viewing)."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) prints all JCL statements including those from procedures; the second value (1) prints all system messages including those for non-abnormal terminations."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of virtual storage available to the entire job. REGION=0M means the job can use the maximum available region size, effectively removing memory constraints at the job level."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, so that user receives a completion notification message."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. TIME=1440 sets the limit to 1440 minutes (24 hours), effectively allowing the job to run without a practical CPU time restriction."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP1",
+        "purpose": "Transfers a mainframe dataset to a remote FTP server using IBM's z/OS FTP utility. Connects to the remote server at 172.31.21.124, navigates to the target directory, and uploads the mainframe file as a text file.",
+        "programs": "FTP*",
+        "inputs": "SYSIN (FTP subcommands: server IP 172.31.21.124, credentials carddemousr/ftpdemo1, ASCII mode, pwd, dir, cd /ftpfolder); Source dataset: AWS.M2.CARDEMO.FTP.TEST",
+        "outputs": "welcome.txt uploaded to /ftpfolder on remote FTP server 172.31.21.124"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDEMO.FTP.TEST",
+        "operations": "READ",
+        "description": "The FTP PUT command reads the mainframe dataset AWS.M2.CARDEMO.FTP.TEST and transfers it to the remote FTP server at 172.31.21.124 as the file welcome.txt in the /ftpfolder directory."
+      }
+    ]
+  }
+}

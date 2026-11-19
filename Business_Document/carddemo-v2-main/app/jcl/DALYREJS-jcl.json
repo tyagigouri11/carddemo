@@ -1,0 +1,54 @@
+{
+    "created_on": "2026-11-05",
+    "name": "DALYREJS.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/DALYREJS.jcl",
+    "type": "jcl",
+    "description": "This JCL job defines a Generation Data Group (GDG) named AWS.M2.CARDDEMO.DALYREJS to manage daily rejection records in the CardDemo application. The GDG is configured to retain a maximum of 5 generations, with older generations automatically scratched (deleted) when the limit is exceeded.Key Functionalities:\nDefines a new Generation Data Group (GDG) catalog entry named AWS.M2.CARDDEMO.DALYREJS to organize and track daily rejection data for the CardDemo system.\nSets a generation limit of 5, meaning only the 5 most recent versions of the daily rejection data will be retained at any given time.\nEnables the SCRATCH option, ensuring that when the generation limit of 5 is reached, the oldest generation is automatically deleted from the system to make room for new data.",
+    "rules": [
+        {
+            "Rule_Id": "R-DALYREJS-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo application requires a versioned storage structure to store and manage Daily Rejection records",
+                "When": "The GDG definition step is executed for the first time",
+                "Then": "A Generation Data Group named AWS.M2.CARDDEMO.DALYREJS is successfully registered in the system catalog, making it available for all subsequent Daily Rejection data processing jobs to write and read rejection records"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Define Daily Rejections Generation Data Group",
+            "Rule_Description": "Registers a versioned storage structure in the system catalog specifically dedicated to holding CardDemo Daily Rejection records, enabling the application to manage multiple versions of rejection data over time.",
+            "Rule_Type": "Definitional Rule"
+        },
+        {
+            "Rule_Id": "R-DALYREJS-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Rejections GDG (AWS.M2.CARDDEMO.DALYREJS) has been defined in the system catalog",
+                "When": "A new version of Daily Rejection data is created and added to the GDG",
+                "Then": "The system enforces a maximum of 5 simultaneous versions of Daily Rejection data; if the count would exceed 5, the oldest version is automatically removed to accommodate the new version"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Enforce Maximum of 5 Daily Rejection Versions",
+            "Rule_Description": "Enforces a retention policy that limits the number of coexisting Daily Rejection data versions to 5, ensuring controlled storage usage for the CardDemo application.",
+            "Rule_Type": "Validation Rule"
+        },
+        {
+            "Rule_Id": "R-DALYREJS-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Daily Rejections GDG (AWS.M2.CARDDEMO.DALYREJS) already holds the maximum of 5 versions of Daily Rejection data",
+                "When": "A new (6th) version of Daily Rejection data is written to the GDG",
+                "Then": "The oldest (1st) version of Daily Rejection data is automatically and permanently deleted from storage \u2014 it is not archived or simply uncataloged, but fully and irreversibly removed"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Permanently Delete Oldest Daily Rejection Version Upon Overflow",
+            "Rule_Description": "When the Daily Rejection version count reaches its maximum limit of 5 and a new version is added, the oldest version is automatically and permanently removed from storage with no possibility of recovery.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DALYREJS-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo application is being set up and no Daily Rejections GDG base exists in the system catalog",
+                "When": "The GDG definition step (STEP05) is executed",
+                "Then": "The versioned storage structure for Daily Rejections is established in the catalog, and all downstream Daily Rejection processing jobs are enabled to create, read, and manage Daily Rejection data versions; if this step is skipped, all downstream rejection jobs will fail"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Establish Daily Rejections Storage as a Prerequisite",
+            "Rule_Description": "The Daily Rejections GDG base must be defined in the system catalog before any Daily Rejection data can be stored or processed by the CardDemo application. This is a mandatory one-time setup step.",
+            "Rule_Type": "Process Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCardDemo Daily Rejections - GDG Setup]):::start\n\n    B[STEP05 - IDCAMS\nDefine Generation Data Group Base\nAWS.M2.CARDDEMO.DALYREJS\nMax 5 Generations - Auto Purge Old Versions]:::process\n\n    C{IDCAMS\nGDG Definition\nSuccessful?}:::decision\n\n    D([GDG Base Successfully Created\nAWS.M2.CARDDEMO.DALYREJS\nReady to Store Daily Rejection Records\nUp to 5 Daily Versions Retained]):::success\n\n    E([STEP05 FAILED\nGDG Base Not Created\nPossible Duplicate Entry or Catalog Error\nDownstream Daily Rejection Steps Will Fail]):::error\n\n    A --> B\n    B --> C\n    C -->|Yes - Return Code = 0| D\n    C -->|No - Return Code > 0| E\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

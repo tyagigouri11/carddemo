@@ -1,0 +1,451 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COTRN02C.cbl",
+        "type": "cobol",
+        "transaction_id": "CT02"
+      },
+      "overview": "COTRN02C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program operates within the transaction entry workflow, allowing authorized users to manually add new financial transactions to the system. The program serves as the Add Transaction screen handler (transaction ID CT02), enabling users to create new transaction records in the TRANSACT file by entering transaction details such as type, amount, merchant information, and associated card or account numbers. It solves the need for manual transaction entry by providing a validated, interactive CICS screen interface that ensures data integrity before committing records to the file system.",
+      "key_features": [
+        {
+          "feature": "Account and Card Lookup",
+          "description": "Allows users to enter either an Account ID or Card Number, automatically cross-referencing the CCXREF and CXACAIX files to resolve and populate the corresponding linked identifier."
+        },
+        {
+          "feature": "Comprehensive Input Validation",
+          "description": "Validates all required transaction fields including type code, category code, source, description, amount format (+/-99999999.99), date format (YYYY-MM-DD), and merchant details before allowing submission."
+        },
+        {
+          "feature": "Date Validation via External Utility",
+          "description": "Calls the external CSUTLDTC utility program to verify that both the origination date and processing date are valid calendar dates, not just correctly formatted strings."
+        },
+        {
+          "feature": "Auto-Increment Transaction ID",
+          "description": "Determines the next available transaction ID by browsing to the last existing record in the TRANSACT file and incrementing it by one, ensuring unique sequential transaction IDs."
+        },
+        {
+          "feature": "Copy Last Transaction Data",
+          "description": "PF5 key functionality that retrieves the most recent transaction record for the given account or card and pre-populates the screen fields, streamlining repetitive data entry."
+        },
+        {
+          "feature": "User Confirmation Workflow",
+          "description": "Requires explicit Y/N confirmation from the user before writing the transaction record, preventing accidental submissions."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the previous program, PF4 to clear the current screen, and PF5 to copy the last transaction, providing standard CardDemo navigation conventions."
+        },
+        {
+          "feature": "Success and Error Messaging",
+          "description": "Provides real-time feedback by displaying field-level error messages for validation failures and a success message including the newly assigned Transaction ID upon successful record creation."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRANSACT",
+        "type": "Read/Write",
+        "description": "Transaction file - browsed (STARTBR/READPREV/ENDBR) to retrieve the last transaction ID for auto-increment, and written (WRITE) to add the new transaction record"
+      },
+      {
+        "name": "CCXREF",
+        "type": "Read",
+        "description": "Card cross-reference file - read by card number to look up and validate the associated account ID"
+      },
+      {
+        "name": "CXACAIX",
+        "type": "Read",
+        "description": "Card cross-reference alternate index file - read by account ID to look up and validate the associated card number"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN; if zero, redirects to sign-on screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA and determines if this is a first-time entry or re-entry.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-CT02-TRN-SELECTED"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Receive Transaction Add Screen",
+          "description": "On re-entry, receives the BMS map COTRN2A from mapset COTRN02 into COTRN2AI, capturing all user-entered transaction fields.",
+          "records": [
+            "COTRN2AI",
+            "ACTIDINI",
+            "CARDNINI",
+            "TTYPCDI",
+            "TCATCDI",
+            "TRNSRCI",
+            "TRNAMTI",
+            "TDESCI",
+            "TORIGDTI",
+            "TPROCDTI",
+            "MIDI",
+            "MNAMEI",
+            "MCITYI",
+            "MZIPI",
+            "CONFIRMI"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "AID Key Evaluation and Routing",
+          "description": "Evaluates EIBAID to route processing: ENTER triggers validation and add, PF3 returns to previous screen, PF4 clears screen, PF5 copies last transaction data, any other key sets error flag.",
+          "records": [
+            "EIBAID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Validate Input Key Fields (Account ID or Card Number)",
+          "description": "Checks whether Account ID or Card Number was entered. If Account ID provided, validates it is numeric, then reads CXACAIX alternate index file to retrieve the associated card number. If Card Number provided, validates it is numeric, then reads CCXREF file to retrieve the associated account ID.",
+          "records": [
+            "ACTIDINI",
+            "CARDNINI",
+            "WS-ACCT-ID-N",
+            "WS-CARD-NUM-N",
+            "XREF-ACCT-ID",
+            "XREF-CARD-NUM",
+            "CARD-XREF-RECORD"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Read CXACAIX Alternate Index File",
+          "description": "Performs a CICS READ on the CXACAIX dataset keyed by XREF-ACCT-ID to retrieve the card cross-reference record and populate the card number on the screen.",
+          "records": [
+            "XREF-ACCT-ID",
+            "CARD-XREF-RECORD",
+            "XREF-CARD-NUM",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read CCXREF File",
+          "description": "Performs a CICS READ on the CCXREF dataset keyed by XREF-CARD-NUM to retrieve the card cross-reference record and populate the account ID on the screen.",
+          "records": [
+            "XREF-CARD-NUM",
+            "CARD-XREF-RECORD",
+            "XREF-ACCT-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Validate Input Data Fields - Presence Checks",
+          "description": "Sequentially validates that all required transaction fields are non-empty: Type CD, Category CD, Source, Description, Amount, Origination Date, Processing Date, Merchant ID, Merchant Name, Merchant City, and Merchant Zip.",
+          "records": [
+            "TTYPCDI",
+            "TCATCDI",
+            "TRNSRCI",
+            "TDESCI",
+            "TRNAMTI",
+            "TORIGDTI",
+            "TPROCDTI",
+            "MIDI",
+            "MNAMEI",
+            "MCITYI",
+            "MZIPI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Validate Input Data Fields - Format Checks",
+          "description": "Validates Type CD and Category CD are numeric; validates Amount format as +/-99999999.99; validates Origination Date and Processing Date format as YYYY-MM-DD; validates Merchant ID is numeric.",
+          "records": [
+            "TTYPCDI",
+            "TCATCDI",
+            "TRNAMTI",
+            "TORIGDTI",
+            "TPROCDTI",
+            "MIDI",
+            "WS-TRAN-AMT-N",
+            "WS-TRAN-AMT-E"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Date Validation via CSUTLDTC Call",
+          "description": "Calls external subroutine CSUTLDTC twice to validate the Origination Date and Processing Date against the YYYY-MM-DD format. Checks severity code and message number to determine validity.",
+          "records": [
+            "CSUTLDTC-DATE",
+            "CSUTLDTC-DATE-FORMAT",
+            "CSUTLDTC-RESULT",
+            "CSUTLDTC-RESULT-SEV-CD",
+            "CSUTLDTC-RESULT-MSG-NUM",
+            "TORIGDTI",
+            "TPROCDTI"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Confirm Transaction Add",
+          "description": "Evaluates the CONFIRMI field. If 'Y' or 'y', proceeds to add the transaction. If 'N', blank, or low-values, prompts user to confirm. Any other value sets an invalid value error.",
+          "records": [
+            "CONFIRMI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Determine Next Transaction ID via Browse",
+          "description": "Starts a backward browse on TRANSACT file from HIGH-VALUES using STARTBR, reads the last (highest) transaction record using READPREV to obtain the current maximum TRAN-ID, then ends the browse with ENDBR.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-RECORD",
+            "WS-TRAN-ID-N",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Build Transaction Record",
+          "description": "Increments the retrieved TRAN-ID by 1 to generate a new unique transaction ID. Initializes TRAN-RECORD and populates all fields from screen input: type, category, source, description, amount, card number, merchant details, and dates.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-SOURCE",
+            "TRAN-DESC",
+            "TRAN-AMT",
+            "TRAN-CARD-NUM",
+            "TRAN-MERCHANT-ID",
+            "TRAN-MERCHANT-NAME",
+            "TRAN-MERCHANT-CITY",
+            "TRAN-MERCHANT-ZIP",
+            "TRAN-ORIG-TS",
+            "TRAN-PROC-TS",
+            "WS-TRAN-AMT-N"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Write Transaction Record to TRANSACT File",
+          "description": "Performs a CICS WRITE to the TRANSACT dataset using TRAN-ID as the record key. On success, initializes all screen fields and displays a success message with the new transaction ID. On duplicate key or other error, sets error flag and redisplays screen.",
+          "records": [
+            "TRAN-RECORD",
+            "TRAN-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-MESSAGE",
+            "ERRMSGO"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Copy Last Transaction Data (PF5)",
+          "description": "Validates key fields, browses TRANSACT file backward from HIGH-VALUES to retrieve the most recent transaction record, and populates all screen data fields with values from that record before re-entering the process-enter-key flow.",
+          "records": [
+            "TRAN-AMT",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-SOURCE",
+            "TRAN-DESC",
+            "TRAN-ORIG-TS",
+            "TRAN-PROC-TS",
+            "TRAN-MERCHANT-ID",
+            "TRAN-MERCHANT-NAME",
+            "TRAN-MERCHANT-CITY",
+            "TRAN-MERCHANT-ZIP",
+            "WS-TRAN-AMT-E"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Send Transaction Add Screen",
+          "description": "Populates header information (titles, program name, transaction ID, current date and time) into COTRN2AO, moves WS-MESSAGE to ERRMSGO, and sends the BMS map COTRN2A to the terminal with ERASE and CURSOR options, then returns with TRANSID CT02.",
+          "records": [
+            "COTRN2AO",
+            "ERRMSGO",
+            "TITLE01O",
+            "TITLE02O",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "WS-MESSAGE",
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Return to Previous Screen",
+          "description": "Sets CDEMO-TO-PROGRAM (defaulting to COSGN00C if blank), records the current program and transaction ID in COMMAREA, resets program context to zero, and transfers control via CICS XCTL.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "CICS RETURN with TRANSID",
+          "description": "At the end of MAIN-PARA, issues CICS RETURN with TRANSID CT02 and COMMAREA to maintain pseudo-conversational state, ensuring the program is re-invoked on the next user interaction.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN Zero Check Before COMMAREA Access",
+          "description": "The program must check EIBCALEN is non-zero before attempting to reference DFHCOMMAREA. A zero length means no commarea was passed and the program immediately redirects to sign-on, preventing an invalid memory reference."
+        },
+        {
+          "dependency": "ERR-FLG-ON Gate for Data Field Validation",
+          "description": "VALIDATE-INPUT-DATA-FIELDS checks ERR-FLG-ON at entry; if already set from key field validation, it clears all data input fields before proceeding. This prevents stale screen data from being validated when the key lookup already failed."
+        },
+        {
+          "dependency": "Account ID / Card Number Mutual Exclusivity",
+          "description": "VALIDATE-INPUT-KEY-FIELDS uses an EVALUATE TRUE to process either Account ID or Card Number, but not both simultaneously. Exactly one must be provided; if neither is present, an error is raised. The resolved counterpart is populated from the cross-reference file lookup."
+        },
+        {
+          "dependency": "CXACAIX Lookup Dependency on XREF-ACCT-ID",
+          "description": "The CXACAIX alternate index read requires XREF-ACCT-ID to be populated from the numeric conversion of ACTIDINI. The resulting XREF-CARD-NUM is then moved to CARDNINI, making the card number field dependent on a successful account lookup."
+        },
+        {
+          "dependency": "CCXREF Lookup Dependency on XREF-CARD-NUM",
+          "description": "The CCXREF primary file read requires XREF-CARD-NUM to be populated from the numeric conversion of CARDNINI. The resulting XREF-ACCT-ID is then moved to ACTIDINI, making the account ID field dependent on a successful card number lookup."
+        },
+        {
+          "dependency": "TRANSACT Browse Sequence for ID Generation",
+          "description": "The new transaction ID is derived by browsing TRANSACT backward from HIGH-VALUES (STARTBR → READPREV → ENDBR) to find the current maximum ID, then incrementing by 1. This sequence must complete successfully before the WRITE; if READPREV returns ENDFILE, TRAN-ID is set to zero, resulting in a new ID of 1."
+        },
+        {
+          "dependency": "CONFIRMI Field Gate for ADD-TRANSACTION",
+          "description": "ADD-TRANSACTION is only invoked when CONFIRMI equals 'Y' or 'y'. All validation must pass (ERR-FLG-OFF implied by reaching the EVALUATE) before the confirmation check is meaningful. The confirmation acts as a final user-intent gate before the irreversible WRITE."
+        },
+        {
+          "dependency": "CSUTLDTC Date Validation Dependency on Format String",
+          "description": "The CSUTLDTC subroutine call depends on WS-DATE-FORMAT being set to 'YYYY-MM-DD' and the date fields (TORIGDTI, TPROCDTI) already passing the structural format check (EVALUATE TRUE pattern checks) before the call is made. Message number 2513 is treated as a non-fatal condition."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER State Flag for Screen Flow Control",
+          "description": "The CDEMO-PGM-REENTER flag in CARDDEMO-COMMAREA distinguishes first-time entry from subsequent re-entries. On first entry it is set to TRUE and the send-screen path is taken; on re-entry the receive-screen path is taken. This flag persists across pseudo-conversational returns via COMMAREA."
+        },
+        {
+          "dependency": "WS-TRAN-AMT-N Intermediate Numeric Conversion",
+          "description": "The transaction amount is converted from the screen string TRNAMTI using FUNCTION NUMVAL-C into WS-TRAN-AMT-N (signed packed decimal), then reformatted through WS-TRAN-AMT-E back to the screen field. This normalized value is also used when writing TRAN-AMT to the record, making the write dependent on successful numeric conversion."
+        },
+        {
+          "dependency": "COPY-LAST-TRAN-DATA Calls PROCESS-ENTER-KEY",
+          "description": "COPY-LAST-TRAN-DATA performs VALIDATE-INPUT-KEY-FIELDS and then calls PROCESS-ENTER-KEY after populating screen fields from the last transaction. This creates a dependency where the PF5 path re-enters the full validation and confirmation flow, meaning any key field error during PF5 processing will abort the copy operation."
+        },
+        {
+          "dependency": "SEND-TRNADD-SCREEN Issues CICS RETURN",
+          "description": "SEND-TRNADD-SCREEN always issues a CICS RETURN after sending the map, terminating the current task. Any paragraph that calls SEND-TRNADD-SCREEN as an error handler effectively ends execution for that invocation. Code after such a PERFORM will not execute in the same task instance."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction Processing Monitor",
+          "purpose": "Provides the runtime environment for all screen I/O (SEND MAP, RECEIVE MAP), file access (READ, WRITE, STARTBR, READPREV, ENDBR), program control (XCTL, RETURN with TRANSID and COMMAREA), and EIB communication area (EIBCALEN, EIBAID) used throughout the program."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        },
+        {
+          "name": "CSUTLDTC.cbl",
+          "purpose": "This program is a utility component within the CardDemo financial application, serving as a reusable date validation service that can be called by other programs in the system. It operates as a shared infrastructure module in the date processing workflow, providing centralized date validation capabilities. The program validates whether a given date string conforms to a specified format by invoking the IBM Language Environment (LE) API CEEDAYS, which converts a date into a Lillian date (a standardized integer representation). It solves the problem of consistent, reliable date validation across the application by wrapping the CEEDAYS API call and translating its feedback codes into human-readable result messages that calling programs can interpret."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors - Key Fields",
+        "description": "Validates that either Account ID or Card Number is entered (not both empty). Checks numeric format for Account ID and Card Number. Sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive error, sets cursor position via length field (e.g., ACTIDINL = -1), and calls SEND-TRNADD-SCREEN to redisplay the screen with the error message."
+      },
+      {
+        "category": "Input Validation Errors - Data Fields",
+        "description": "Validates all transaction fields (Type CD, Category CD, Source, Description, Amount, Orig Date, Proc Date, Merchant ID/Name/City/Zip) for empty/spaces/low-values and correct format. If a prior key field error exists, data fields are cleared before validation. Each failure sets ERR-FLG-ON, assigns a specific message, positions cursor on the offending field, and redisplays the screen. Numeric checks are applied to Type CD, Category CD, and Merchant ID. Amount format is validated character-by-character for sign, digits, and decimal. Date fields are validated for YYYY-MM-DD structure and then verified via external CSUTLDTC call."
+      },
+      {
+        "category": "Date Validation Errors - External Utility",
+        "description": "After format validation, both Orig Date and Proc Date are passed to the external CSUTLDTC routine. If the severity code is not '0000' and the message number is not '2513' (a tolerated warning), ERR-FLG is set to 'Y', a 'Not a valid date' message is assigned, cursor is positioned on the date field, and the screen is redisplayed. Message number '2513' is explicitly tolerated and treated as non-fatal."
+      },
+      {
+        "category": "Confirmation Field Errors",
+        "description": "After all validations pass, the CONFIRMI field is evaluated. If it is spaces, low-values, or 'N'/'n', the error flag is set and a prompt message 'Confirm to add this transaction...' is displayed with cursor on CONFIRMI. If an invalid value is entered, a message 'Invalid value. Valid values are (Y/N)...' is shown. Only 'Y' or 'y' proceeds to ADD-TRANSACTION."
+      },
+      {
+        "category": "File Operation Errors - CXACAIX Read (Account Lookup)",
+        "description": "After a CICS READ on the CXACAIX alternate index file, WS-RESP-CD is evaluated. NOTFND sets ERR-FLG, displays 'Account ID NOT found...', positions cursor on ACTIDINL, and redisplays the screen. Any other non-normal response additionally issues a DISPLAY of RESP/REAS codes to the system log before showing 'Unable to lookup Acct in XREF AIX file...' and redisplaying."
+      },
+      {
+        "category": "File Operation Errors - CCXREF Read (Card Lookup)",
+        "description": "After a CICS READ on the CCXREF file, WS-RESP-CD is evaluated. NOTFND sets ERR-FLG, displays 'Card Number NOT found...', positions cursor on CARDNINL, and redisplays the screen. Any other non-normal response additionally issues a DISPLAY of RESP/REAS codes before showing 'Unable to lookup Card # in XREF file...' and redisplaying."
+      },
+      {
+        "category": "File Operation Errors - TRANSACT File Browse (STARTBR/READPREV/ENDBR)",
+        "description": "STARTBR: NOTFND sets ERR-FLG and displays 'Transaction ID NOT found...'; OTHER logs RESP/REAS and displays 'Unable to lookup Transaction...'. READPREV: ENDFILE is treated as a non-error condition by moving ZEROS to TRAN-ID (indicating an empty file, allowing ID generation from zero); OTHER logs RESP/REAS and sets ERR-FLG with 'Unable to lookup Transaction...'. ENDBR has no explicit error handling. All errors position cursor on ACTIDINL and redisplay the screen."
+      },
+      {
+        "category": "File Operation Errors - TRANSACT File Write",
+        "description": "After CICS WRITE, WS-RESP-CD is evaluated. NORMAL triggers INITIALIZE-ALL-FIELDS, sets message color to DFHGREEN, and builds a success message including the new TRAN-ID before redisplaying. DUPKEY/DUPREC sets ERR-FLG and displays 'Tran ID already exist...'. OTHER logs RESP/REAS codes via DISPLAY and shows 'Unable to Add Transaction...'. All error paths position cursor on ACTIDINL and redisplay the screen."
+      },
+      {
+        "category": "Session / Navigation Errors",
+        "description": "If EIBCALEN is 0 (no commarea on entry), the program redirects to COSGN00C sign-on screen via RETURN-TO-PREV-SCREEN, preventing unauthorized or stateless access. Invalid AID key presses (not ENTER, PF3, PF4, PF5) set ERR-FLG and display 'CCDA-MSG-INVALID-KEY' before redisplaying the screen."
+      },
+      {
+        "category": "Error State Propagation and Display Mechanism",
+        "description": "A single WS-ERR-FLG (88-level ERR-FLG-ON/ERR-FLG-OFF) acts as a global error indicator across all validation and file operation routines. WS-MESSAGE carries the human-readable error text. SEND-TRNADD-SCREEN always moves WS-MESSAGE to ERRMSGO before issuing CICS SEND MAP followed immediately by CICS RETURN, terminating the current task and returning control to CICS with the error displayed. This prevents further processing after any error."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COTRN02",
+        "map_name": "COTRN2A",
+        "business_function": "Provides a data entry interface for adding a new credit card transaction to the TRANSACT file. The operator can enter either an Account ID or Card Number (mutually cross-referenced), along with full transaction details including type, category, source, description, amount, origination date, processing date, and merchant information. The screen requires explicit confirmation (Y/N) before the transaction is written. It also supports copying the last transaction's data as a template for faster entry."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COTRN02 - Add Transaction</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#fff;width:80ch;font-size:16px;line-height:1.5;padding:4px;border:1px solid #444;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .turquoise{color:#00ffff;} .red{color:#ff0000;} .neutral{color:#aaaaaa;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .row{white-space:pre;height:1.5em;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CT02</span><span class='blue'>              </span><span class='yellow'>CardDemo                                </span><span class='blue'>Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COTRN02C</span><span class='blue'>              </span><span class='yellow'>Credit Card Demo Application            </span><span class='blue'>Time: </span><span class='blue'>14:32:10</span></div><div class='row'></div><div class='row'><span class='neutral bright'>                             Add Transaction                                    </span></div><div class='row'></div><div class='row'><span class='turquoise'>     Enter Acct #: </span><span class='green underline'>00000001001</span><span class='neutral'>   </span><span class='neutral'>(or)</span><span class='turquoise'>  Card #: </span><span class='green underline'>4000002000000001</span><span>  </span></div><div class='row'></div><div class='row'><span class='neutral'>     ----------------------------------------------------------------------</span></div><div class='row'></div><div class='row'><span class='turquoise'>     Type CD: </span><span class='green underline'>01</span><span class='turquoise'>      Category CD: </span><span class='green underline'>0001</span><span class='turquoise'>    Source: </span><span class='green underline'>ONLINE    </span><span>  </span></div><div class='row'></div><div class='row'><span class='turquoise'>     Description: </span><span class='green underline'>Purchase at Amazon Marketplace                    </span><span>   </span></div><div class='row'></div><div class='row'><span class='turquoise'>     Amount: </span><span class='green underline'>-00000150.00</span><span class='turquoise'>   Orig Date: </span><span class='green underline'>2022-07-19</span><span class='turquoise'>   Proc Date: </span><span class='green underline'>2022-07-19</span></div><div class='row'><span class='blue'>             (-99999999.99)          (YYYY-MM-DD)          (YYYY-MM-DD)   </span></div><div class='row'><span class='turquoise'>     Merchant ID: </span><span class='green underline'>000000001</span><span class='turquoise'>   Merchant Name: </span><span class='green underline'>Amazon Marketplace            </span></div><div class='row'></div><div class='row'><span class='turquoise'>     Merchant City: </span><span class='green underline'>Seattle                  </span><span class='turquoise'>   Merchant Zip: </span><span class='green underline'>98101     </span></div><div class='row'></div><div class='row'></div><div class='row'><span class='turquoise'>     You are about to add this transaction. Please confirm : </span><span class='green underline'>Y</span><span class='neutral'> (Y/N)</span></div><div class='row'></div><div class='row'><span class='red bright'>                                                                              </span></div><div class='row'><span class='yellow'>ENTER=Continue  F3=Back  F4=Clear  F5=Copy Last Tran.                        </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Validate all input fields and, if Confirm field is 'Y', write the new transaction record to the TRANSACT file. If Confirm is blank or 'N', prompts the user to confirm before adding."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen (the calling program stored in CDEMO-FROM-PROGRAM, or COMEN01C if none was set)."
+        },
+        {
+          "key": "F4",
+          "action": "Clear all input fields on the current screen and redisplay a blank Add Transaction form."
+        },
+        {
+          "key": "F5",
+          "action": "Copy the data from the most recently added transaction record into the input fields as a template, then process as if Enter was pressed to allow review and confirmation."
+        }
+      ]
+    }
+  }
+}

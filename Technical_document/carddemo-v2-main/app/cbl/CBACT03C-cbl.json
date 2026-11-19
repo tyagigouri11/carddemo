@@ -1,0 +1,200 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBACT03C.cbl",
+        "type": "cobol"
+      },
+      "overview": "This program is part of the CardDemo application, a credit card management system that maintains cross-reference data linking card numbers to their associated account identifiers. It operates as a batch reporting utility within the account management workflow, typically run to audit or verify the integrity of card-to-account mappings. The program sequentially reads and displays all records from the account cross-reference VSAM indexed file (KSDS), providing a printed listing of every card number and its corresponding account data. It solves the operational need to inspect and report on the complete cross-reference dataset without modifying any records.",
+      "key_features": [
+        {
+          "feature": "Sequential File Read",
+          "description": "Reads all records from the account cross-reference VSAM KSDS file in sequential order from beginning to end"
+        },
+        {
+          "feature": "Card-to-Account Display",
+          "description": "Displays each cross-reference record showing the 16-digit card number and its associated 34-byte account data"
+        },
+        {
+          "feature": "End-of-File Handling",
+          "description": "Detects and gracefully handles end-of-file conditions, terminating the read loop cleanly when all records have been processed"
+        },
+        {
+          "feature": "Error Detection and Reporting",
+          "description": "Identifies and reports file I/O errors during open, read, and close operations with detailed file status codes"
+        },
+        {
+          "feature": "Abnormal Termination (Abend)",
+          "description": "Calls the CEE3ABD system routine to force a controlled program abend with code 999 when unrecoverable errors are encountered"
+        },
+        {
+          "feature": "I/O Status Diagnostics",
+          "description": "Translates and displays numeric or non-numeric file status codes to assist in diagnosing file access issues"
+        },
+        {
+          "feature": "Structured Open and Close",
+          "description": "Uses dedicated paragraphs to open and close the cross-reference file with proper status checking at each step"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "XREFFILE",
+        "type": "Read",
+        "description": "Account cross-reference VSAM KSDS file - read sequentially to retrieve card cross-reference records containing card number (16 chars), customer ID (9 digits), and account ID (11 digits). Each record is displayed to standard output as it is read."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Program begins execution, displays start message, and initiates the file open sequence",
+          "records": []
+        },
+        {
+          "step": 2,
+          "process": "Open Cross-Reference File",
+          "description": "Opens XREFFILE as an indexed VSAM KSDS file in sequential input mode. Validates file status code '00' for success. On failure, displays error, logs IO status, and abends the program",
+          "records": [
+            "XREFFILE-STATUS",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Sequential Record Read Loop",
+          "description": "Iterates through all records in the cross-reference file sequentially until end-of-file is reached. The END-OF-FILE flag controls loop termination",
+          "records": [
+            "END-OF-FILE",
+            "FD-XREF-CARD-NUM",
+            "FD-XREF-DATA"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Next Cross-Reference Record",
+          "description": "Reads the next sequential record from XREFFILE into CARD-XREF-RECORD (defined in CVACT03Y copybook). Evaluates file status: '00' for success, '10' for end-of-file, any other value triggers an abend",
+          "records": [
+            "CARD-XREF-RECORD",
+            "FD-XREF-CARD-NUM",
+            "FD-XREF-DATA",
+            "XREFFILE-STATUS",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Display Cross-Reference Record",
+          "description": "Displays the contents of CARD-XREF-RECORD to standard output (SYSOUT). Record is displayed both within the read routine (on successful read) and in the main loop body, resulting in duplicate display per record",
+          "records": [
+            "CARD-XREF-RECORD"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "End-of-File Detection",
+          "description": "When file status '10' is returned, APPL-RESULT is set to 16 (APPL-EOF condition), and END-OF-FILE flag is set to 'Y', terminating the read loop",
+          "records": [
+            "END-OF-FILE",
+            "APPL-RESULT",
+            "XREFFILE-STATUS"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Close Cross-Reference File",
+          "description": "Closes XREFFILE after all records have been processed. Validates file status '00' for success. On failure, displays error, logs IO status, and abends the program",
+          "records": [
+            "XREFFILE-STATUS",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Program Termination",
+          "description": "Displays end-of-execution message and returns control to the calling environment via GOBACK",
+          "records": []
+        },
+        {
+          "step": 9,
+          "process": "Error Handling and Abend",
+          "description": "On any unrecoverable I/O error, IO-STATUS is populated, 9910-DISPLAY-IO-STATUS formats and displays the two-byte file status code (handling both numeric and non-numeric status values including VSAM extended codes), then 9999-ABEND-PROGRAM calls CEE3ABD with abend code 999 to terminate abnormally",
+          "records": [
+            "IO-STATUS",
+            "IO-STAT1",
+            "IO-STAT2",
+            "IO-STATUS-04",
+            "TWO-BYTES-BINARY",
+            "ABCODE",
+            "TIMING"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "XREFFILE Open Before Read",
+          "description": "The XREFFILE VSAM KSDS must be successfully opened in paragraph 0000-XREFFILE-OPEN before any read operations in 1000-XREFFILE-GET-NEXT are attempted. A failed open triggers an immediate abend, preventing any reads"
+        },
+        {
+          "dependency": "CVACT03Y Copybook Record Layout",
+          "description": "The CARD-XREF-RECORD structure is entirely defined by the CVACT03Y copybook. The program depends on this copybook to correctly map the 50-byte record (16-byte card number + 34-byte data) read from XREFFILE into named fields for display and processing"
+        },
+        {
+          "dependency": "END-OF-FILE Flag State",
+          "description": "The main processing loop depends on the END-OF-FILE flag being initialized to 'N'. The flag is only set to 'Y' within 1000-XREFFILE-GET-NEXT upon receiving file status '10'. Any corruption of this flag would cause an infinite loop or premature termination"
+        },
+        {
+          "dependency": "APPL-RESULT Condition Code State",
+          "description": "APPL-RESULT drives all post-I/O branching logic. It uses 88-level condition names APPL-AOK (value 0) and APPL-EOF (value 16). The open routine pre-sets it to 8 before the OPEN statement to ensure a non-zero value if the OPEN verb itself fails silently"
+        },
+        {
+          "dependency": "XREFFILE-STATUS Two-Byte File Status",
+          "description": "All I/O outcome decisions depend on the two-character XREFFILE-STATUS field populated by the COBOL runtime after each file operation. The program explicitly checks for '00' (success) and '10' (EOF); all other values are treated as fatal errors"
+        },
+        {
+          "dependency": "Sequential Access Mode Constraint",
+          "description": "XREFFILE is defined with ACCESS MODE IS SEQUENTIAL. This means records must be processed in key order (FD-XREF-CARD-NUM ascending) and no random or dynamic access is possible. The program has no capability to seek to a specific card number"
+        },
+        {
+          "dependency": "Duplicate DISPLAY Logic",
+          "description": "CARD-XREF-RECORD is displayed twice per record: once inside 1000-XREFFILE-GET-NEXT on a successful read, and once in the main loop body after the paragraph returns. This is a logical dependency issue where the main loop's display is redundant and dependent on the read paragraph not having already displayed the record"
+        },
+        {
+          "dependency": "CEE3ABD Abend Routine Availability",
+          "description": "The abend paragraph 9999-ABEND-PROGRAM depends on the LE (Language Environment) runtime routine CEE3ABD being available in the execution environment. This routine is called with TIMING=0 and ABCODE=999 to force an abnormal termination with a user abend code"
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM Language Environment (LE)",
+          "type": "Runtime Abend Service",
+          "purpose": "CEE3ABD is called to force an abnormal program termination with user abend code 999 when an unrecoverable I/O error occurs. This is an IBM z/OS Language Environment callable service used for controlled abend processing"
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "In 0000-XREFFILE-OPEN, after attempting to open the XREFFILE, the FILE STATUS is checked. A status of '00' sets APPL-RESULT to 0 (AOK); any other status sets it to 12. If not AOK, an error message is displayed, IO-STATUS is populated, 9910-DISPLAY-IO-STATUS is performed to format and display the status code, and 9999-ABEND-PROGRAM is called to terminate the program abnormally."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "In 1000-XREFFILE-GET-NEXT, after each READ, FILE STATUS is evaluated: '00' sets APPL-RESULT to 0 (AOK), '10' sets it to 16 (EOF), and any other status sets it to 12 (error). EOF condition gracefully sets END-OF-FILE to 'Y' to exit the read loop. Any other non-AOK status triggers an error message display, IO-STATUS formatting via 9910-DISPLAY-IO-STATUS, and program abend via 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "In 9000-XREFFILE-CLOSE, after the CLOSE operation, FILE STATUS is checked. A status of '00' zeroes APPL-RESULT (AOK); any other status sets it to 12. If not AOK, an error message is displayed, IO-STATUS is populated, 9910-DISPLAY-IO-STATUS is performed, and 9999-ABEND-PROGRAM is called to force an abnormal termination."
+      },
+      {
+        "category": "I/O Status Display and Formatting",
+        "description": "The 9910-DISPLAY-IO-STATUS routine handles both numeric and non-numeric (e.g., VSAM system-specific) file status codes. For non-numeric or '9x' statuses, it converts the binary second byte into a numeric representation using TWO-BYTES-BINARY redefinition. For standard numeric statuses, it formats the two-character status into a four-digit display field. The formatted status is then displayed to the operator for diagnostics."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "The 9999-ABEND-PROGRAM routine provides a centralized abnormal termination mechanism. It displays 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then calls the IBM Language Environment routine 'CEE3ABD' to force a controlled program abend. This ensures that unrecoverable errors result in a clean, identifiable failure rather than silent continuation."
+      }
+    ]
+  }
+}

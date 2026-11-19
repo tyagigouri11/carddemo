@@ -1,0 +1,377 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COACTVWC.cbl",
+        "type": "cobol",
+        "transaction_id": "CAVW"
+      },
+      "overview": "This program is part of a credit card management system (CardDemo), operating within the business logic layer to support customer service and account management workflows. It runs as a CICS online transaction (transaction ID: CAVW) that allows users to look up and view detailed credit card account information. The program accepts an account number from a user via a BMS map screen, validates the input, retrieves the associated account details, card cross-reference data, and customer demographic information from their respective VSAM files, and displays the combined results on the Account View screen. It solves the need for a unified, single-screen view of all relevant account and customer data for a given account number.",
+      "key_features": [
+        {
+          "feature": "Account Number Input and Validation",
+          "description": "Accepts an 11-digit numeric account number from the user and validates it is non-blank, numeric, and non-zero before proceeding with data retrieval."
+        },
+        {
+          "feature": "Card Cross-Reference Lookup",
+          "description": "Reads the card cross-reference file (CXACAIX) via an alternate index keyed by account ID to resolve the associated customer ID and card number."
+        },
+        {
+          "feature": "Account Master Data Retrieval",
+          "description": "Reads the account master file (ACCTDAT) to retrieve account details such as balance, credit limit, cash limit, cycle credits/debits, open date, expiration date, and group ID."
+        },
+        {
+          "feature": "Customer Master Data Retrieval",
+          "description": "Reads the customer master file (CUSTDAT) to retrieve full customer demographic information including name, address, SSN, date of birth, FICO score, phone numbers, and government-issued ID."
+        },
+        {
+          "feature": "BMS Screen Display",
+          "description": "Populates and sends a formatted BMS map (CACTVWA in mapset COACTVW) displaying all retrieved account and customer data, with appropriate field attributes and cursor positioning."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Supports Enter key to submit and display account data, and PF3 to exit back to the calling program or main menu, with invalid PF keys defaulting to Enter behavior."
+        },
+        {
+          "feature": "Error Messaging",
+          "description": "Provides descriptive error messages for conditions such as missing input, non-numeric account number, account not found in cross-reference, account not found in master file, and customer not found."
+        },
+        {
+          "feature": "Inter-Program Communication",
+          "description": "Uses a shared COMMAREA (CARDDEMO-COMMAREA) to maintain context across CICS pseudo-conversational returns and to support navigation to and from related programs such as the main menu."
+        },
+        {
+          "feature": "Abend Handling",
+          "description": "Implements a structured abend routine that captures unexpected errors, sends an error message to the screen, and issues a CICS ABEND with code 9999 for controlled failure handling."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CXACAIX",
+        "type": "Read",
+        "description": "Card cross-reference file accessed via alternate index by account ID - used to look up card number and customer ID associated with a given account"
+      },
+      {
+        "name": "ACCTDAT",
+        "type": "Read",
+        "description": "Account master file - reads account details including balance, credit limit, cash credit limit, open date, expiration date, reissue date, cycle credits/debits, and group ID for a given account ID"
+      },
+      {
+        "name": "CUSTDAT",
+        "type": "Read",
+        "description": "Customer master file - retrieves customer information including name, address, SSN, date of birth, FICO score, phone numbers, government ID, EFT account ID, and primary card holder indicator for a given customer ID"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Initializes working storage, communication area, and sets transaction ID. Checks EIBCALEN to determine if this is a fresh entry or re-entry. Loads CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA from DFHCOMMAREA if available.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "WS-TRANID",
+            "EIBCALEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "PF Key Mapping and Validation",
+          "description": "Calls CSSTRPFY copybook routine to remap and store the PF key pressed. Validates that only Enter or PF03 are acceptable keys; any other key is treated as Enter.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "WS-PFK-FLAG"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Navigation Decision Evaluation",
+          "description": "Evaluates program state using CDEMO-PGM-ENTER and CDEMO-PGM-REENTER flags to determine whether to send the initial screen, process user inputs, or transfer control back to the calling program.",
+          "records": [
+            "CDEMO-PGM-ENTER",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-TO-TRANID"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Exit to Calling Program (PF03)",
+          "description": "When PF03 is pressed, sets destination program and transaction ID back to the calling program (or main menu if none). Issues CICS XCTL to transfer control with the updated CARDDEMO-COMMAREA.",
+          "records": [
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-TO-TRANID",
+            "CDEMO-LAST-MAPSET",
+            "CDEMO-LAST-MAP",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Initial Screen Display",
+          "description": "On first entry (CDEMO-PGM-ENTER), initializes and sends the account view map (CACTVWA) with current date, time, titles, and a prompt message. No data is populated yet.",
+          "records": [
+            "CACTVWAO",
+            "WS-CURDATE-DATA",
+            "WS-CURTIME-HH-MM-SS",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-INFO-MSG"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Receive User Input from Screen",
+          "description": "On re-entry (CDEMO-PGM-REENTER), issues CICS RECEIVE MAP to read the account ID entered by the user from the CACTVWA map into CACTVWAI.",
+          "records": [
+            "CACTVWAI",
+            "ACCTSIDI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Validate Account Input",
+          "description": "Edits the received account ID: checks for blank/low-values, non-numeric values, and zero values. Sets INPUT-ERROR and FLG-ACCTFILTER flags accordingly. Moves valid account ID to CDEMO-ACCT-ID.",
+          "records": [
+            "CC-ACCT-ID",
+            "CDEMO-ACCT-ID",
+            "WS-INPUT-FLAG",
+            "WS-EDIT-ACCT-FLAG",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Read Card Cross-Reference by Account",
+          "description": "Uses CICS READ on the CXACAIX alternate index dataset keyed by account ID to retrieve the card cross-reference record. Extracts customer ID and card number on success.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "CARD-XREF-RECORD",
+            "XREF-CUST-ID",
+            "XREF-CARD-NUM",
+            "CDEMO-CUST-ID",
+            "CDEMO-CARD-NUM",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Read Account Master Record",
+          "description": "Issues CICS READ on the ACCTDAT dataset keyed by account ID to retrieve the full account record. Sets FOUND-ACCT-IN-MASTER flag on success.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-GROUP-ID",
+            "WS-ACCOUNT-MASTER-READ-FLAG"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Read Customer Master Record",
+          "description": "Issues CICS READ on the CUSTDAT dataset keyed by customer ID (obtained from cross-reference) to retrieve the full customer record. Sets FOUND-CUST-IN-MASTER flag on success.",
+          "records": [
+            "WS-CARD-RID-CUST-ID-X",
+            "CUSTOMER-RECORD",
+            "CUST-ID",
+            "CUST-SSN",
+            "CUST-FICO-CREDIT-SCORE",
+            "CUST-DOB-YYYY-MM-DD",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-PHONE-NUM-1",
+            "CUST-PHONE-NUM-2",
+            "CUST-GOVT-ISSUED-ID",
+            "CUST-EFT-ACCOUNT-ID",
+            "CUST-PRI-CARD-HOLDER-IND",
+            "WS-CUST-MASTER-READ-FLAG"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Populate and Send Account View Screen",
+          "description": "Populates the CACTVWAO output map with account and customer data retrieved from files. Formats SSN with dashes. Sets field colors and cursor position based on validation state. Sends the map via CICS SEND MAP.",
+          "records": [
+            "CACTVWAO",
+            "ACCTSIDO",
+            "ACSTTUSO",
+            "ACURBALO",
+            "ACRDLIMO",
+            "ACSHLIMO",
+            "ACRCYCRO",
+            "ACRCYDBO",
+            "ADTOPENO",
+            "AEXPDTO",
+            "AREISDTO",
+            "AADDGRPO",
+            "ACSTNUMO",
+            "ACSTSSNO",
+            "ACSTFCOO",
+            "ACSTDOBO",
+            "ACSFNAMO",
+            "ACSMNAMO",
+            "ACSLNAMO",
+            "ACSADL1O",
+            "ACSADL2O",
+            "ACSCITYO",
+            "ACSSTTEO",
+            "ACSZIPCO",
+            "ACSCTRYO",
+            "ACSPHN1O",
+            "ACSPHN2O",
+            "ACSGOVTO",
+            "ACSEFTCO",
+            "ACSPFLGO",
+            "ERRMSGO",
+            "INFOMSGO"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Return to CICS with Commarea",
+          "description": "Packages CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA into WS-COMMAREA and issues CICS RETURN with transaction ID CAVW and the combined commarea to await next user interaction.",
+          "records": [
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "LIT-THISTRANID",
+            "CCARD-ERROR-MSG",
+            "WS-RETURN-MSG"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN initialization gate",
+          "description": "If EIBCALEN is zero or the calling program is the main menu without re-entry, CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA are re-initialized, discarding any prior state. All downstream logic depends on this gate being evaluated first."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER flag for input processing",
+          "description": "Input processing (RECEIVE MAP, validation, file reads) is only triggered when CDEMO-PGM-REENTER is TRUE. On first entry (CDEMO-PGM-ENTER), only the blank screen is sent. This flag must be correctly set in the commarea before re-entry."
+        },
+        {
+          "dependency": "Card cross-reference read must precede account and customer reads",
+          "description": "The CXACAIX read (9200-GETCARDXREF-BYACCT) must succeed before the account master read, because it provides CDEMO-CUST-ID used as the key for the customer master read. If the cross-reference read fails, both subsequent reads are skipped."
+        },
+        {
+          "dependency": "Account master read must precede customer master read",
+          "description": "The ACCTDAT read (9300-GETACCTDATA-BYACCT) must succeed before the customer master read is attempted. A NOTFND or error response causes an early exit from 9000-READ-ACCT, bypassing the customer read entirely."
+        },
+        {
+          "dependency": "FLG-ACCTFILTER-NOT-OK blocks file reads",
+          "description": "If FLG-ACCTFILTER-NOT-OK is set after the cross-reference read, the program immediately exits 9000-READ-ACCT without reading the account or customer master files. This flag is also set during input validation, preventing any file I/O on invalid input."
+        },
+        {
+          "dependency": "WS-RETURN-MSG-OFF guards error message overwrite",
+          "description": "Error messages are only written to WS-RETURN-MSG when WS-RETURN-MSG-OFF is TRUE (i.e., the field is spaces). This prevents later errors from overwriting the first and most relevant error message encountered during processing."
+        },
+        {
+          "dependency": "CDEMO-ACCT-ID to WS-CARD-RID-ACCT-ID data handoff",
+          "description": "The validated account ID from CDEMO-ACCT-ID is moved to WS-CARD-RID-ACCT-ID before file reads. The redefine WS-CARD-RID-ACCT-ID-X (PIC X(11)) is used as the actual RIDFLD key in all three CICS READ operations."
+        },
+        {
+          "dependency": "XREF-CUST-ID to WS-CARD-RID-CUST-ID handoff",
+          "description": "The customer ID extracted from the card cross-reference record (XREF-CUST-ID moved to CDEMO-CUST-ID) is subsequently moved to WS-CARD-RID-CUST-ID before the customer master read. This chain must be intact for customer data retrieval."
+        },
+        {
+          "dependency": "FOUND-ACCT-IN-MASTER and FOUND-CUST-IN-MASTER flags control screen population",
+          "description": "Account fields on the output map are only populated when FOUND-ACCT-IN-MASTER or FOUND-CUST-IN-MASTER is TRUE. Customer fields are only populated when FOUND-CUST-IN-MASTER is TRUE. These flags must be set by successful file reads."
+        },
+        {
+          "dependency": "SSN formatting dependency on CUST-SSN field length",
+          "description": "The SSN is formatted with dashes using STRING with fixed substring positions (1:3, 4:2, 6:4). This assumes CUST-SSN is exactly 9 characters as defined in CVCUS01Y. Any deviation in the copybook definition would cause incorrect formatting."
+        },
+        {
+          "dependency": "Commarea length dependency for WS-THIS-PROGCOMMAREA offset",
+          "description": "WS-THIS-PROGCOMMAREA is stored and retrieved at a fixed offset within WS-COMMAREA calculated as LENGTH OF CARDDEMO-COMMAREA + 1. Both programs sharing this commarea must agree on the exact length of CARDDEMO-COMMAREA."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Online transaction processing middleware",
+          "purpose": "Provides the runtime environment for all screen I/O (SEND MAP, RECEIVE MAP), file access (READ on ACCTDAT, CUSTDAT, CXACAIX), program transfer (XCTL), transaction management (RETURN with TRANSID and COMMAREA), abend handling (HANDLE ABEND, ABEND), and plain text output (SEND TEXT)."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validated in paragraph 2200-EDIT-MAP-INPUTS and 2210-EDIT-ACCOUNT. Checks for blank/low-value account ID (sets FLG-ACCTFILTER-BLANK, INPUT-ERROR), non-numeric or zero account ID (sets FLG-ACCTFILTER-NOT-OK, INPUT-ERROR). Error messages are stored in WS-RETURN-MSG using 88-level condition names. Cursor is repositioned to the offending field via ACCTSIDL. Field color is changed to DFHRED to highlight errors. On INPUT-ERROR, the map is re-sent without proceeding to file reads."
+      },
+      {
+        "category": "File Operation Errors - NOTFND",
+        "description": "Handled in paragraphs 9200-GETCARDXREF-BYACCT, 9300-GETACCTDATA-BYACCT, and 9400-GETCUSTDATA-BYCUST using EVALUATE on WS-RESP-CD. When DFHRESP(NOTFND) is returned, INPUT-ERROR and FLG-ACCTFILTER-NOT-OK (or FLG-CUSTFILTER-NOT-OK) are set. A descriptive STRING message including the key value, RESP, and RESP2 codes is built into WS-RETURN-MSG, but only if WS-RETURN-MSG-OFF to avoid overwriting a prior error. Processing short-circuits via GO TO the exit paragraph."
+      },
+      {
+        "category": "File Operation Errors - Unexpected Response",
+        "description": "Handled in the WHEN OTHER branch of each file read EVALUATE block. Sets INPUT-ERROR and the appropriate filter flag to NOT-OK. Populates the structured WS-FILE-ERROR-MESSAGE template with operation name (ERROR-OPNAME), file name (ERROR-FILE), RESP (ERROR-RESP), and RESP2 (ERROR-RESP2) codes, then moves it to WS-RETURN-MSG. Commented-out code suggests SEND-LONG-TEXT was considered for debug output but is not active in production."
+      },
+      {
+        "category": "Unexpected Program Flow / Logic Errors",
+        "description": "Handled in the WHEN OTHER branch of the main EVALUATE TRUE block in 0000-MAIN. Sets ABEND-CULPRIT to the program name, ABEND-CODE to '0001', and moves 'UNEXPECTED DATA SCENARIO' to WS-RETURN-MSG. Calls SEND-PLAIN-TEXT to display the message and immediately returns. This acts as a defensive catch-all for unrecognized program states."
+      },
+      {
+        "category": "CICS Abend Handling",
+        "description": "A global HANDLE ABEND LABEL(ABEND-ROUTINE) is established at program entry. The ABEND-ROUTINE paragraph checks if ABEND-MSG is populated (defaulting to 'UNEXPECTED ABEND OCCURRED.' if not), sets ABEND-CULPRIT to the program name, sends ABEND-DATA to the terminal using NOHANDLE, cancels the abend handler with HANDLE ABEND CANCEL, then issues CICS ABEND with code '9999' to formally terminate the task and produce a diagnostic record."
+      },
+      {
+        "category": "Invalid PF Key Handling",
+        "description": "Handled in 0000-MAIN after YYYY-STORE-PFKEY. Only ENTER and PF03 are recognized as valid (PFK-VALID). Any other AID key sets PFK-INVALID and forces CCARD-AID-ENTER to TRUE, effectively treating the input as an Enter key press and continuing normal processing rather than raising an explicit error."
+      },
+      {
+        "category": "Error Message Propagation and Display",
+        "description": "WS-RETURN-MSG is the central error message carrier. It is moved to CCARD-ERROR-MSG and then to ERRMSGO of the BMS map before each screen send. The WS-RETURN-MSG-OFF condition (SPACES) guards against overwriting the first error message when multiple errors could occur in sequence. WS-INFO-MSG provides supplementary informational messages displayed separately on the screen via INFOMSGO."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COACTVW",
+        "map_name": "CACTVWA",
+        "business_function": "Provides a read-only view of a credit card account and its associated customer details. The user enters an 11-digit account number, and the program retrieves account data (status, balances, limits, dates, group) from the account master file and customer data (name, address, contact info, SSN, DOB, FICO score, EFT, government ID) from the customer master file via a card cross-reference lookup. The screen displays all retrieved information in a structured 24x80 3270 terminal layout."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COACTVW - Account View</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ff00;width:80ch;font-size:14px;line-height:1.5;white-space:pre;border:1px solid #444;padding:4px;} .blue{color:#6699ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .green{color:#00ff00;} .red{color:#ff4444;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .underline{text-decoration:underline;} .input-field{background:#000;color:#00ff00;text-decoration:underline;display:inline-block;} .bright{font-weight:bold;}</style></head><body><div class='terminal'><span class='blue'>Tran:</span><span class='blue'>CAVW</span>               <span class='yellow'>CardDemo Account View                   </span>  <span class='blue'>Date:</span><span class='blue'>07/19/22</span>\n<span class='blue'>Prog:</span><span class='blue'>COACTVWC</span>           <span class='yellow'>                                        </span>  <span class='blue'>Time:</span><span class='blue'>23:12:32</span>\n\n                                <span class='neutral'>View Account</span>\n\n                   <span class='turquoise'>Account Number :</span> <span class='green underline'>00000123456</span>          <span class='turquoise'>Active Y/N: </span><span class='underline'>Y</span>\n\n        <span class='turquoise'>Opened:</span><span class='underline'>2018-01-15</span>           <span class='turquoise'>Credit Limit        :</span><span class='underline'>  +50,000,000.00</span>\n        <span class='turquoise'>Expiry:</span><span class='underline'>2025-12-31</span>           <span class='turquoise'>Cash credit Limit   :</span><span class='underline'>  +10,000,000.00</span>\n       <span class='turquoise'>Reissue:</span><span class='underline'>2023-01-15</span>           <span class='turquoise'>Current Balance     :</span><span class='underline'>   +5,432,100.00</span>\n                                    <span class='turquoise'>Current Cycle Credit:</span><span class='underline'>   +1,000,000.00</span>\n        <span class='turquoise'>Account Group:</span><span class='underline'>SILVER    </span>      <span class='turquoise'>Current Cycle Debit :</span><span class='underline'>     +500,000.00</span>\n\n                               <span class='neutral'>Customer Details</span>\n        <span class='turquoise'>Customer id  :</span><span class='underline'>000123456</span>         <span class='turquoise'>SSN:</span><span class='underline'>123-45-6789 </span>\n        <span class='turquoise'>Date of birth:</span><span class='underline'>1975-06-15</span>        <span class='turquoise'>FICO Score:</span><span class='underline'>750</span>\n<span class='turquoise'>First Name</span>                   <span class='turquoise'>Middle Name: </span>            <span class='turquoise'>Last Name : </span>\n<span class='underline'>John                     </span><span class='underline'>Michael                  </span><span class='underline'>Smith                    </span>\n<span class='turquoise'>Address:</span><span class='underline'>123 Main Street                                   </span>  <span class='turquoise'>State </span><span class='underline'>TX</span>\n         <span class='underline'>Suite 400                                         </span>  <span class='turquoise'>Zip</span><span class='underline'>75001</span>\n<span class='turquoise'>City </span>    <span class='underline'>Dallas                                            </span>  <span class='turquoise'>Country</span><span class='underline'>USA</span>\n<span class='turquoise'>Phone 1:</span><span class='underline'>2145551234   </span>  <span class='turquoise'>Government Issued Id Ref    : </span><span class='underline'>DL-TX-123456789012  </span>\n<span class='turquoise'>Phone 2:</span><span class='underline'>2145559876   </span>  <span class='turquoise'>EFT Account Id: </span><span class='underline'>9876543210</span>  <span class='turquoise'>Primary Card Holder Y/N:</span><span class='underline'>Y</span>\n\n                      <span class='neutral'>Displaying details of given Account             </span>\n<span class='red bright'>                                                                              </span>\n<span class='turquoise'>  F3=Exit </span>\n</div></body></html>",
+      "pf_keys": [
+        {
+          "key": "Enter",
+          "action": "Submit the account number entered and retrieve account and customer details from the master files"
+        },
+        {
+          "key": "F3",
+          "action": "Exit the Account View screen and return to the calling program or main menu (COMEN01C)"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CREASTMT.jcl",
+        "type": "jcl"
+      },
+      "overview": "The CREASTMT job generates customer credit card statements for all cards present in a cross-reference (XREF) file. It processes transaction data by reorganizing and reindexing it with card number and transaction ID as the key, then invokes the CBSTM03A program to produce statements in both plain text and HTML formats. The job draws on multiple VSAM datasets containing transaction, account, and customer data to produce comprehensive, formatted account statements.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "CREASTMT",
+          "description": "The name assigned to this job, used to identify the job in the system log, job queue, and output listings."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'Create Statement'",
+          "description": "Accounting information passed to the installation's accounting routine. Here it serves as a descriptive label for the job's purpose."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to a specific execution queue defined by the installation, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job's system messages (JCL listing, allocation/termination messages). Class H determines where the job log is routed for output processing or printing."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including cataloged procedures to be printed; the second value (1) causes all system messages including allocation and termination messages to be printed."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, sending a completion notification message to that user."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. A value of 1440 minutes (24 hours) effectively sets the maximum allowable time limit, preventing the job from running indefinitely while allowing long-running processes to complete."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "DELDEF01",
+        "purpose": "Deletes existing sequential and VSAM KSDS transaction files if they exist, resets the maximum condition code to 0 to suppress errors from the delete operations, then defines a new VSAM KSDS cluster for transaction data with specified key, record size, volume, share options, and space allocations.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE and DEFINE commands)",
+        "outputs": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS (VSAM KSDS cluster with DATA component AWS.M2.CARDDEMO.TRXFL.DATA and INDEX component AWS.M2.CARDDEMO.TRXFL.INDEX); SYSPRINT"
+      },
+      {
+        "step": "STEP010",
+        "purpose": "Reads the existing transaction VSAM KSDS file, sorts the records by card number (positions 263-278, ascending) then by transaction ID (positions 1-16, ascending), and reformats each output record by placing the card number first (positions 1-16), followed by the original first 262 bytes (positions 17-278), then the remaining 50 bytes (positions 279-328), writing the result to a new sequential file.",
+        "programs": "SORT*",
+        "inputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (SORTIN)",
+        "outputs": "AWS.M2.CARDDEMO.TRXFL.SEQ (SORTOUT, new cataloged sequential file, LRECL=350, BLKSIZE=3500, RECFM=FB); SYSPRINT, SYSOUT"
+      },
+      {
+        "step": "STEP020",
+        "purpose": "Copies the reformatted sequential transaction file into the newly defined VSAM KSDS cluster, effectively loading the sorted and restructured transaction records into the VSAM dataset for keyed access. Executes only if the previous step completed with a condition code of 0.",
+        "programs": "IDCAMS*",
+        "inputs": "AWS.M2.CARDDEMO.TRXFL.SEQ (INFILE)",
+        "outputs": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS (OUTFILE, populated with records); SYSPRINT"
+      },
+      {
+        "step": "STEP030",
+        "purpose": "Deletes the statement HTML and print sequential files from the previous run by allocating them with MOD disposition and immediately deleting them on normal and abnormal termination, ensuring a clean slate before new statement files are generated. Executes only if the previous step completed with a condition code of 0.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "AWS.M2.CARDDEMO.STATEMNT.HTML (deleted), AWS.M2.CARDDEMO.STATEMNT.PS (deleted)"
+      },
+      {
+        "step": "STEP040",
+        "purpose": "Executes the customer application program CBSTM03A to generate credit card account statements for each card present in the cross-reference file, producing output in both plain text and HTML formats by reading transaction, cross-reference, account, and customer data files. Executes only if the previous step completed with a condition code of 0.",
+        "programs": "CBSTM03A",
+        "inputs": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS (TRNXFILE), AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (XREFFILE), AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS (ACCTFILE), AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS (CUSTFILE)",
+        "outputs": "AWS.M2.CARDDEMO.STATEMNT.PS (STMTFILE, new cataloged sequential file, LRECL=80, BLKSIZE=8000, RECFM=FB), AWS.M2.CARDDEMO.STATEMNT.HTML (HTMLFILE, new cataloged sequential file, LRECL=100, BLKSIZE=800, RECFM=FB); SYSPRINT, SYSOUT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "DELDEF01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.SEQ",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the sequential transaction file AWS.M2.CARDDEMO.TRXFL.SEQ"
+      },
+      {
+        "step": "DELDEF01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the VSAM KSDS cluster AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS including its cluster definition"
+      },
+      {
+        "step": "DELDEF01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS, AWS.M2.CARDDEMO.TRXFL.DATA, AWS.M2.CARDDEMO.TRXFL.INDEX",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS with key length 32 at offset 0, record size 350, CYL(1 5), with DATA component AWS.M2.CARDDEMO.TRXFL.DATA and INDEX component AWS.M2.CARDDEMO.TRXFL.INDEX"
+      },
+      {
+        "step": "STEP010",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "SORT reads the transaction VSAM KSDS file as input (SORTIN)"
+      },
+      {
+        "step": "STEP010",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.SEQ",
+        "operations": "WRITE",
+        "description": "SORT writes the sorted and reformatted output to new sequential file AWS.M2.CARDDEMO.TRXFL.SEQ (SORTOUT), sorted by card number (positions 263-278) ascending then transaction ID (positions 1-16) ascending, with output record reformatted: card number first (16 bytes), then original fields (262 bytes), then remaining (50 bytes)"
+      },
+      {
+        "step": "STEP020",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.SEQ",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the sequential file AWS.M2.CARDDEMO.TRXFL.SEQ as input (INFILE)"
+      },
+      {
+        "step": "STEP020",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO loads records from the sequential file into the VSAM KSDS cluster AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS (OUTFILE)"
+      },
+      {
+        "step": "STEP030",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.HTML",
+        "operations": "DELETE",
+        "description": "IEFBR14 deletes the HTML statement file AWS.M2.CARDDEMO.STATEMNT.HTML from a previous run using DISP=(MOD,DELETE,DELETE)"
+      },
+      {
+        "step": "STEP030",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.PS",
+        "operations": "DELETE",
+        "description": "IEFBR14 deletes the text statement file AWS.M2.CARDDEMO.STATEMNT.PS from a previous run using DISP=(MOD,DELETE,DELETE)"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBSTM03A reads the transaction VSAM KSDS file (TRNXFILE) to retrieve transaction records for statement generation"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBSTM03A reads the card cross-reference VSAM KSDS file (XREFFILE) to look up card-to-account relationships"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBSTM03A reads the account data VSAM KSDS file (ACCTFILE) to retrieve account information for each card"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CBSTM03A reads the customer data VSAM KSDS file (CUSTFILE) to retrieve customer information for statement generation"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.PS",
+        "operations": "WRITE",
+        "description": "CBSTM03A writes the generated account statement in plain text format to new sequential file AWS.M2.CARDDEMO.STATEMNT.PS (STMTFILE), LRECL=80, RECFM=FB"
+      },
+      {
+        "step": "STEP040",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.STATEMNT.HTML",
+        "operations": "WRITE",
+        "description": "CBSTM03A writes the generated account statement in HTML format to new sequential file AWS.M2.CARDDEMO.STATEMNT.HTML (HTMLFILE), LRECL=100, RECFM=FB"
+      }
+    ]
+  }
+}

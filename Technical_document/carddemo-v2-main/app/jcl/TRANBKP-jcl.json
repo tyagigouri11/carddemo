@@ -1,0 +1,115 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANBKP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TRANBKP**, performs a backup and refresh cycle for the CardDemo application's Transaction Master VSAM file. It first reproduces (copies) the existing transaction data into a versioned backup dataset, then deletes the current VSAM cluster and its alternate index, and finally redefines a fresh, empty VSAM KSDS cluster to receive new transactions. The overall business purpose is to archive processed transaction records and reset the transaction master file for the next processing cycle.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'REPRO and Delete Transaction Master'",
+          "description": "The accounting information or job description string passed to the system. It identifies the job and provides a description that appears in job logs and system accounting records."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted. CLASS=A routes the job to the 'A' job class, which determines scheduling priority and resource allocation based on installation-defined class characteristics."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job's system messages (JCL listing, allocation/termination messages). MSGCLASS=0 routes the job log output to the output class '0', determining where the job's system output is directed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        },
+        {
+          "name": "JCLLIB",
+          "value": "ORDER=('AWS.M2.CARDDEMO.PROC')",
+          "description": "Defines the private procedure library search order for the job. It instructs the system to search the partitioned dataset 'AWS.M2.CARDDEMO.PROC' when resolving cataloged procedures (such as REPROC used in STEP05R) before searching the system procedure libraries."
+        }
+      ],
+      "procedures": [
+        "REPROC"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PRC001",
+        "purpose": "Backs up the Transaction Master VSAM KSDS file by reproducing (copying) its contents into a new generation of a sequential backup dataset. This preserves the current state of transaction data before any destructive operations are performed.",
+        "programs": "IDCAMS*",
+        "inputs": "FILEIN: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (VSAM KSDS, shared); SYSIN: REPRO command",
+        "outputs": "FILEOUT: AWS.M2.CARDDEMO.TRANSACT.BKUP(+1) (new GDG generation, sequential, LRECL=350, RECFM=FB, 1 cylinder primary); SYSPRINT: system messages"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing Transaction Master VSAM cluster and its associated Alternate Index if they exist, resetting the maximum condition code to 0 if the return code is 8 or less to allow subsequent steps to proceed normally.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN: DELETE commands for AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (CLUSTER) and AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX (ALTERNATEINDEX)",
+        "outputs": "Deletion of AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS cluster and AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX alternate index; SYSPRINT: system messages"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new Transaction Master VSAM KSDS cluster with its associated data and index components, establishing the structure for storing transaction records. This step only executes if the condition code from prior steps is not less than 4.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN: DEFINE CLUSTER command specifying cluster attributes (1 primary cylinder, 5 secondary cylinders, volume AWSHJ1, 16-byte key at offset 0, record size 350, share options 2 3, ERASE, INDEXED)",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (new VSAM KSDS cluster), AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA (data component), AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX (index component); SYSPRINT: system messages"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads from the VSAM KSDS transaction master file as input (FILEIN)"
+      },
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO writes a backup copy of the transaction master to the next generation of the GDG dataset (FILEOUT), cataloged as new with LRECL=350, RECFM=FB on SYSDA"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS; if MAXCC is 08 or less, condition code is reset to 0 to allow continuation"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "DELETE",
+        "description": "IDCAMS deletes the VSAM alternate index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX; if MAXCC is 08 or less, condition code is reset to 0 to allow continuation"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS with CYLINDERS(1 5), KEYS(16 0), RECORDSIZE(350 350), SHAREOPTIONS(2 3), ERASE, INDEXED on volume AWSHJ1"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines the DATA component of the new VSAM KSDS cluster as AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX",
+        "operations": "DEFINE",
+        "description": "IDCAMS defines the INDEX component of the new VSAM KSDS cluster as AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX"
+      }
+    ]
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANTYPE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TRANTYPE**, sets up a VSAM Key-Sequenced Data Set (KSDS) to store transaction type data for the CardDemo credit card application. It first deletes any existing version of the VSAM file, recreates it with defined storage and key specifications, and then populates it by copying records from a flat file source. The overall business purpose is to initialize and load the transaction type reference data that the CardDemo application relies on for categorizing and processing credit card transactions.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "TRANTYPE",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It is the first positional parameter on the JOB statement."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'DEFINE TRAN TYPE'",
+          "description": "A positional parameter providing accounting or identification information for the job. It is used for job tracking, billing, or descriptive purposes and appears in job logs."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted. CLASS=A determines the execution priority, resource allocation, and scheduling characteristics of the job as defined by the installation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listing, allocation/termination messages, and system messages. The value '0' routes the job log to a specific output queue as defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing Transaction Type VSAM KSDS cluster if it already exists, and resets the maximum condition code to 0 to allow subsequent steps to proceed regardless of whether the delete succeeded.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE command for AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS CLUSTER)",
+        "outputs": "SYSPRINT (utility execution log); AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS deleted if it existed"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new indexed VSAM KSDS cluster for Transaction Type data with specified space allocation, key definition, record size, and share options on volume AWSHJ1.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE CLUSTER command for AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS with CYLINDERS(1 5), KEYS(2 0), RECORDSIZE(60 60), SHAREOPTIONS(1 4), ERASE, INDEXED on VOLUMES(AWSHJ1))",
+        "outputs": "SYSPRINT (utility execution log); AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS (cluster), AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.DATA (data component), AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.INDEX (index component)"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies all records from the Transaction Type flat file (sequential PS dataset) into the newly defined Transaction Type VSAM KSDS cluster using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "TRANTYPE: AWS.M2.CARDDEMO.TRANTYPE.PS (source flat file, DISP=SHR); SYSIN (REPRO INFILE(TRANTYPE) OUTFILE(TTYPVSAM) command)",
+        "outputs": "SYSPRINT (utility execution log); TTYPVSAM: AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS (populated VSAM KSDS, DISP=OLD)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS if it already exists. MAXCC is set to 0 to suppress errors if the dataset does not exist."
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS, AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS with 1 primary and 5 secondary cylinders on volume AWSHJ1, key length 2 at offset 0, fixed record size of 60 bytes, share options (1 4), ERASE, and INDEXED. Also defines the DATA component AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.DATA and INDEX component AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS.INDEX."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) dataset AWS.M2.CARDDEMO.TRANTYPE.PS as the input source for the REPRO operation."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the VSAM KSDS dataset AWS.M2.CARDDEMO.TRANTYPE.VSAM.KSDS as the output target of the REPRO operation, copying all data from the flat file."
+      }
+    ]
+  }
+}

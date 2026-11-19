@@ -1,0 +1,284 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DBUNLDGS.CBL",
+        "type": "cobol"
+      },
+      "overview": "This program operates within a financial services or banking domain, specifically handling pending authorization records stored in an IMS hierarchical database. It serves as a database unload utility within a batch processing workflow, likely used for data migration, archival, or downstream processing of authorization data. The program (DBUNLDGS) reads pending authorization records from an IMS database — traversing both root (summary) segments and their associated child (detail) segments — and writes them to IMS GSAM (Generalized Sequential Access Method) output datasets. It solves the problem of extracting a full parent-child hierarchy of pending authorization data from IMS for use outside the transactional database environment.",
+      "key_features": [
+        {
+          "feature": "IMS Hierarchical Database Read",
+          "description": "Sequentially reads root-level Pending Authorization Summary segments (PAUTSUM0) using GN (Get Next) DL/I calls, traversing the entire database."
+        },
+        {
+          "feature": "Parent-Child Segment Traversal",
+          "description": "For each summary record, retrieves all associated Pending Authorization Detail child segments (PAUTDTL1) using GNP (Get Next within Parent) DL/I calls."
+        },
+        {
+          "feature": "GSAM Output for Summary Records",
+          "description": "Inserts each parent summary segment into a GSAM sequential output file (PASFLPCB) for downstream consumption."
+        },
+        {
+          "feature": "GSAM Output for Detail Records",
+          "description": "Inserts each child detail segment into a separate GSAM sequential output file (PADFLPCB), preserving the relationship to the parent."
+        },
+        {
+          "feature": "End-of-Database Handling",
+          "description": "Detects IMS status code 'GB' (end of database) to gracefully terminate the root segment read loop."
+        },
+        {
+          "feature": "Error Detection and Abend",
+          "description": "Monitors IMS PCB status codes after every DL/I call and triggers a controlled abend with return code 16 if an unexpected status is encountered."
+        },
+        {
+          "feature": "Record Counting",
+          "description": "Maintains counters for summary and detail records read and processed, supporting auditability of the unload run."
+        },
+        {
+          "feature": "Numeric Account ID Validation",
+          "description": "Validates that the account ID (PA-ACCT-ID) is numeric before writing summary and detail records, preventing invalid data from being written to output."
+        },
+        {
+          "feature": "Commented-Out Sequential File Support",
+          "description": "Contains scaffolding for traditional sequential flat file output (OPFILE1, OPFILE2) that has been replaced by GSAM output, indicating an evolution in the program's design."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "PAUTBPCB (PAUTSUM0/PAUTDTL1)",
+        "type": "Read",
+        "description": "IMS database PCB for the Pending Authorization database. The program reads root segments (PAUTSUM0 - Pending Authorization Summary) using GN calls and child segments (PAUTDTL1 - Pending Authorization Details) using GNP calls, sequentially unloading all records."
+      },
+      {
+        "name": "PASFLPCB",
+        "type": "Write",
+        "description": "IMS GSAM (Generalized Sequential Access Method) PCB used as the output file for parent/summary segments. The program inserts each PENDING-AUTH-SUMMARY record read from the source IMS database into this sequential output dataset via ISRT calls."
+      },
+      {
+        "name": "PADFLPCB",
+        "type": "Write",
+        "description": "IMS GSAM (Generalized Sequential Access Method) PCB used as the output file for child/detail segments. The program inserts each PENDING-AUTH-DETAILS record read from the source IMS database into this sequential output dataset via ISRT calls."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Accepts current date and Julian date from system, displays program start banner with today's date. Initializes working storage counters and flags. File open logic for OPFILE1 and OPFILE2 is commented out, indicating output is handled via GSAM PCBs instead.",
+          "records": [
+            "CURRENT-DATE",
+            "CURRENT-YYDDD",
+            "WS-PGMNAME",
+            "WS-NO-CHKP",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "WS-TOT-REC-WRITTEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Root (Summary) IMS Segment",
+          "description": "Issues a GN (Get Next) DL/I call via CBLTDLI to the PAUTBPCB PCB targeting the PAUTSUM0 segment using an unqualified SSA. Retrieves the next PENDING-AUTH-SUMMARY root segment sequentially from the IMS database. Increments summary read and processed counters.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB",
+            "PAUT-SEG-LEVEL",
+            "PAUT-SEG-NAME",
+            "WS-NO-SUMRY-READ",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "ROOT-UNQUAL-SSA"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Validate and Stage Root Segment Data",
+          "description": "After a successful GN call (PCB status = spaces), copies PENDING-AUTH-SUMMARY into OPFIL1-REC working storage record. Initializes ROOT-SEG-KEY and CHILD-SEG-REC, then moves PA-ACCT-ID to ROOT-SEG-KEY. Validates that PA-ACCT-ID is numeric before proceeding.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "OPFIL1-REC",
+            "ROOT-SEG-KEY",
+            "CHILD-SEG-REC",
+            "PA-ACCT-ID"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Write Parent Segment to GSAM Output",
+          "description": "Issues an ISRT DL/I call via CBLTDLI to the PASFLPCB GSAM PCB to insert the PENDING-AUTH-SUMMARY record into the parent GSAM output dataset. Checks PASFL-PCB-STATUS for errors and abends if non-spaces status is returned.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PASFL-PCB-STATUS",
+            "PASFL-KEYFB",
+            "PASFL-DBDNAME",
+            "PASFL-PCB-PROCOPT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Read Child (Detail) IMS Segment",
+          "description": "Issues a GNP (Get Next within Parent) DL/I call via CBLTDLI to the PAUTBPCB PCB targeting the PAUTDTL1 child segment using an unqualified SSA. Retrieves the next PENDING-AUTH-DETAILS child segment under the current root parent. Increments summary read and processed counters.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB",
+            "PAUT-SEG-NAME",
+            "WS-NO-SUMRY-READ",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "CHILD-UNQUAL-SSA",
+            "WS-END-OF-CHILD-SEG"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Stage Child Segment Data",
+          "description": "After a successful GNP call (PCB status = spaces), sets MORE-AUTHS flag and copies PENDING-AUTH-DETAILS into CHILD-SEG-REC within OPFIL2-REC working storage. Prepares data for GSAM child output write.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "CHILD-SEG-REC",
+            "OPFIL2-REC",
+            "WS-MORE-AUTHS-FLAG"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Write Child Segment to GSAM Output",
+          "description": "Issues an ISRT DL/I call via CBLTDLI to the PADFLPCB GSAM PCB to insert the PENDING-AUTH-DETAILS record into the child/detail GSAM output dataset. Checks PADFL-PCB-STATUS for errors and abends if non-spaces status is returned.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PADFL-PCB-STATUS",
+            "PADFL-KEYFB",
+            "PADFL-DBDNAME",
+            "PADFL-PCB-PROCOPT"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Child Segment Loop Control",
+          "description": "After each GNP call, checks if PCB status is 'GE' (segment not found / no more children). If so, sets WS-END-OF-CHILD-SEG to 'Y' to exit the child loop and return to reading the next root segment. Abends on any unexpected PCB status.",
+          "records": [
+            "PAUT-PCB-STATUS",
+            "WS-END-OF-CHILD-SEG",
+            "WS-MORE-AUTHS-FLAG",
+            "WS-END-OF-AUTHDB-FLAG"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Root Segment Loop Control and End-of-Database Detection",
+          "description": "After each GN call, checks if PCB status is 'GB' (end of database). If so, sets END-OF-AUTHDB and WS-END-OF-ROOT-SEG to 'Y' to exit the main processing loop. Abends on any unexpected PCB status other than spaces or 'GB'.",
+          "records": [
+            "PAUT-PCB-STATUS",
+            "WS-END-OF-ROOT-SEG",
+            "WS-END-OF-AUTHDB-FLAG",
+            "PAUT-KEYFB"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "File Close and Program Termination",
+          "description": "Displays 'CLOSING THE FILE' message. File close logic for OPFILE1 and OPFILE2 is commented out as output is managed via GSAM PCBs. Program returns control via GOBACK.",
+          "records": [
+            "WS-OUTFL1-STATUS",
+            "WS-OUTFL2-STATUS"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Abend Handling",
+          "description": "On any critical error (unexpected IMS PCB status from GN, GNP, or ISRT calls), displays an abend message, sets RETURN-CODE to 16, and issues GOBACK to terminate the program abnormally.",
+          "records": [
+            "RETURN-CODE",
+            "PAUT-PCB-STATUS",
+            "PASFL-PCB-STATUS",
+            "PADFL-PCB-STATUS"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "IMS PSB Scheduling (PAUTBPCB)",
+          "description": "The program depends on the IMS PSB being successfully scheduled before any DL/I calls can be made. The PCB mask PAUTBPCB must be valid and available at program entry via the DLITCBL entry point. All GN and GNP read calls depend on this PCB."
+        },
+        {
+          "dependency": "Parent-before-Child IMS Read Ordering",
+          "description": "The GNP call in paragraph 3000-FIND-NEXT-AUTH-DTL is strictly dependent on a prior successful GN call in 2000-FIND-NEXT-AUTH-SUMMARY establishing the current parent position in the IMS hierarchy. GNP retrieves children only within the context of the last successfully retrieved PAUTSUM0 root segment."
+        },
+        {
+          "dependency": "Parent GSAM Write Before Child GSAM Write",
+          "description": "The ISRT to PASFLPCB (parent GSAM) in paragraph 3100 must complete successfully before the child GSAM ISRT to PADFLPCB in paragraph 3200 is attempted. The child write is only triggered after a successful parent write and a successful GNP child read, preserving referential integrity in the output datasets."
+        },
+        {
+          "dependency": "PA-ACCT-ID Numeric Validation Gate",
+          "description": "The entire child processing loop (3000-FIND-NEXT-AUTH-DTL) and the parent GSAM insert (3100-INSERT-PARENT-SEG-GSAM) are conditionally gated on PA-ACCT-ID being numeric. If PA-ACCT-ID is non-numeric, both the parent GSAM write and all child reads/writes for that root segment are skipped."
+        },
+        {
+          "dependency": "IMS PCB Status Code State Machine",
+          "description": "Program flow is entirely driven by IMS PCB status codes returned after each CBLTDLI call. Spaces indicates success, 'GB' signals end-of-database for root loop termination, 'GE' signals no more children for child loop termination, and any other status triggers an immediate abend. The program has no retry logic despite defining RETRY-CONDITION (BA, FH, TE) in working storage."
+        },
+        {
+          "dependency": "PAUT-PCB-STATUS Initialization Before GN Call",
+          "description": "PAUT-PCB-STATUS is explicitly initialized (INITIALIZE PAUT-PCB-STATUS) at the start of paragraph 2000 before each GN call, and again at the end of paragraph 3000 after each GNP call. This prevents stale status codes from prior calls from incorrectly influencing subsequent conditional logic."
+        },
+        {
+          "dependency": "WS-END-OF-CHILD-SEG Flag Reset Between Root Iterations",
+          "description": "WS-END-OF-CHILD-SEG is initialized (INITIALIZE WS-END-OF-CHILD-SEG) within the root segment processing block before the child loop is entered. This ensures the child loop executes fresh for each new root segment and does not carry over the termination state from the previous parent's child processing."
+        },
+        {
+          "dependency": "GSAM PCB Availability (PASFLPCB and PADFLPCB)",
+          "description": "Both GSAM output PCBs (PASFLPCB for parent summary output and PADFLPCB for child detail output) must be available and properly allocated by IMS at program scheduling time. These are passed via the PROCEDURE DIVISION USING clause and the DLITCBL entry point. Failure of either GSAM ISRT results in immediate program abend."
+        },
+        {
+          "dependency": "Copybook Data Structure Alignment",
+          "description": "The program depends on CIPAUSMY defining PENDING-AUTH-SUMMARY fields (including PA-ACCT-ID) and CIPAUDTY defining PENDING-AUTH-DETAILS fields to match the physical IMS segment layouts for PAUTSUM0 and PAUTDTL1 respectively. Any mismatch causes data corruption in reads and GSAM writes."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM IMS (Information Management System) - Hierarchical Database",
+          "type": "IMS DL/I Database",
+          "purpose": "Source database for the unload operation. The program reads PAUTSUM0 root segments (Pending Authorization Summary) and PAUTDTL1 child segments (Pending Authorization Details) sequentially using GN and GNP DL/I calls via CBLTDLI through the PAUTBPCB PCB."
+        },
+        {
+          "system": "IBM IMS GSAM (Generalized Sequential Access Method) - Parent Summary Output",
+          "type": "IMS GSAM Sequential Output Dataset",
+          "purpose": "Target output for unloaded parent/root segments. The program inserts each PENDING-AUTH-SUMMARY record into this GSAM dataset via ISRT DL/I calls through the PASFLPCB PCB, replacing the originally designed OPFILE1 sequential flat file output."
+        },
+        {
+          "system": "IBM IMS GSAM (Generalized Sequential Access Method) - Child Detail Output",
+          "type": "IMS GSAM Sequential Output Dataset",
+          "purpose": "Target output for unloaded child/detail segments. The program inserts each PENDING-AUTH-DETAILS record into this GSAM dataset via ISRT DL/I calls through the PADFLPCB PCB, replacing the originally designed OPFILE2 sequential flat file output."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "IMS Database Read Errors (GN/GNP calls)",
+        "description": "After each CBLTDLI call (GN for root segment, GNP for child segment), the PCB status code (PAUT-PCB-STATUS) is checked. A blank status indicates success. 'GB' (end of database) on root reads sets WS-END-OF-ROOT-SEG to 'Y' to terminate the main loop. 'GE' (segment not found) on child reads sets WS-END-OF-CHILD-SEG to 'Y' to terminate the child loop. Any other unexpected status code triggers PERFORM 9999-ABEND, displaying the PCB status and key feedback area (PAUT-KEYFB) before terminating."
+      },
+      {
+        "category": "IMS GSAM Insert Errors (ISRT calls)",
+        "description": "After each CBLTDLI ISRT call to GSAM files (parent segment via PASFLPCB, child segment via PADFLPCB), the respective PCB status (PASFL-PCB-STATUS, PADFL-PCB-STATUS) is checked. Any non-blank status is treated as a fatal error, triggering a DISPLAY of the failed PCB status and key feedback area (PASFL-KEYFB or PADFL-KEYFB), followed by PERFORM 9999-ABEND."
+      },
+      {
+        "category": "Abend / Fatal Error Handling",
+        "description": "The centralized 9999-ABEND paragraph handles all unrecoverable errors. It displays 'DBUNLDGS ABENDING...', sets RETURN-CODE to 16 (indicating a severe error to the job scheduler), and issues GOBACK to terminate the program. There is no retry logic or graceful recovery; all unexpected conditions result in immediate program termination."
+      },
+      {
+        "category": "File Open/Close Errors (Commented Out)",
+        "description": "The original file open and close error handling for OPFILE1 and OPFILE2 is fully commented out. The intended logic checked WS-OUTFL1-STATUS and WS-OUTFL2-STATUS for non-zero/non-blank values and would have called 9999-ABEND on open failure or displayed an error message on close failure. These checks are inactive in the current code."
+      },
+      {
+        "category": "Data Validation",
+        "description": "A minimal inline data validation check exists in paragraph 2000: PA-ACCT-ID is checked with IS NUMERIC before proceeding to write the parent segment and process child segments. If PA-ACCT-ID is not numeric, the record and its children are silently skipped with no error message or counter increment, representing a silent discard approach."
+      },
+      {
+        "category": "Error Flag Usage",
+        "description": "WS-ERR-FLG (with 88-level conditions ERR-FLG-ON and ERR-FLG-OFF) is defined in Working Storage but is never set or evaluated in the active code. It appears to be a vestigial or placeholder error flag with no functional role in the current error handling flow."
+      }
+    ]
+  }
+}

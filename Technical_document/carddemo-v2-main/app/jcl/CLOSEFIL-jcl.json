@@ -1,0 +1,93 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CLOSEFIL.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **CLOSEFIL**, is designed to close multiple files within a CICS (Customer Information Control System) region as part of a CardDemo application. It executes the SDSF utility to issue CEMT (CICS Master Terminal) commands that close five specific files: TRANSACT, CCXREF, ACCTDAT, CXACAIX, and USRSEC. This type of job is typically run during maintenance windows, batch processing cycles, or system shutdowns to ensure files are properly closed before updates, backups, or other administrative tasks are performed.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Close files in CICS'",
+          "description": "The accounting information or job description string. This positional parameter provides a label or description for the job, used for identification and accounting purposes in the job output and logs."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to job class A, which determines scheduling priority, resource allocation, and which initiator will pick up the job for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages (JES message log). MSGCLASS=0 directs the job's system messages and JCL listing to output class 0, controlling where the job log is routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "CLCIFIL",
+        "purpose": "Closes five CICS files (TRANSACT, CCXREF, ACCTDAT, CXACAIX, USRSEC) in the CICS region CICSAWSA by issuing CEMT SET FILE CLO operator commands via SDSF.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (inline CEMT SET FILE CLO commands for files TRANSACT, CCXREF, ACCTDAT, CXACAIX, USRSEC in CICS region CICSAWSA)",
+        "outputs": "ISFOUT (SYSOUT), CMDOUT (SYSOUT)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "ISFOUT",
+        "operations": "WRITE",
+        "description": "SDSF output written to SYSOUT"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CMDOUT",
+        "operations": "WRITE",
+        "description": "SDSF command output written to SYSOUT"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "TRANSACT",
+        "operations": "CLOSE",
+        "description": "CICS file TRANSACT closed in region CICSAWSA via CEMT SET FIL(TRANSACT) CLO"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CCXREF",
+        "operations": "CLOSE",
+        "description": "CICS file CCXREF closed in region CICSAWSA via CEMT SET FIL(CCXREF) CLO"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "ACCTDAT",
+        "operations": "CLOSE",
+        "description": "CICS file ACCTDAT closed in region CICSAWSA via CEMT SET FIL(ACCTDAT) CLO"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CXACAIX",
+        "operations": "CLOSE",
+        "description": "CICS file CXACAIX closed in region CICSAWSA via CEMT SET FIL(CXACAIX) CLO"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "USRSEC",
+        "operations": "CLOSE",
+        "description": "CICS file USRSEC closed in region CICSAWSA via CEMT SET FIL(USRSEC) CLO"
+      }
+    ]
+  }
+}

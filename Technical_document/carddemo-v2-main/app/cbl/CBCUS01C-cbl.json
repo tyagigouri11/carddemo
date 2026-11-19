@@ -1,0 +1,215 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBCUS01C.cbl",
+        "type": "cobol"
+      },
+      "overview": "This program is part of the CardDemo application, a credit card management system that maintains customer account data. It operates as a batch process, typically run on a scheduled basis to audit, report, or verify customer data stored in the system. In this workflow role, it serves as a data extraction and reporting utility for customer records. The program reads all customer records sequentially from an indexed VSAM file (KSDS) and displays each record to the system output. It solves the operational need to enumerate and review all customer data in the file, providing visibility into the customer master data store without modifying any records.",
+      "key_features": [
+        {
+          "feature": "Sequential Customer File Read",
+          "description": "Reads all customer records one by one from an indexed VSAM file in sequential access mode until end-of-file is reached."
+        },
+        {
+          "feature": "Customer Data Display",
+          "description": "Outputs each customer record to the system display, allowing operators or downstream processes to review customer information."
+        },
+        {
+          "feature": "File Open and Close Management",
+          "description": "Handles the full lifecycle of the customer file, including opening it for input and properly closing it after processing is complete."
+        },
+        {
+          "feature": "Error Handling and Abend Processing",
+          "description": "Detects file I/O errors during open, read, and close operations, displays meaningful error messages, and terminates the program abnormally via CEE3ABD if a critical error occurs."
+        },
+        {
+          "feature": "File Status Reporting",
+          "description": "Translates and displays detailed file status codes to assist operators in diagnosing I/O issues, including handling non-numeric and system-specific status codes."
+        },
+        {
+          "feature": "End-of-File Detection",
+          "description": "Gracefully detects and handles the end-of-file condition, stopping record processing cleanly without triggering an error."
+        },
+        {
+          "feature": "Customer Record Layout Integration",
+          "description": "Uses the CVCUS01Y copybook to define the structured customer record layout, ensuring consistent interpretation of customer data fields across the application."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CUSTFILE",
+        "type": "Read",
+        "description": "Indexed VSAM KSDS customer data file - sequentially reads all customer records containing customer ID, name, address, phone, SSN, government ID, date of birth, EFT account ID, primary card holder indicator, and FICO credit score. Each record is 500 bytes in length."
+      },
+      {
+        "name": "SYSOUT",
+        "type": "Write",
+        "description": "Standard output (DISPLAY) - outputs each CUSTOMER-RECORD read from CUSTFILE, as well as program start/end messages, error messages for file open/read/close failures, I/O status codes on errors, and abend notifications."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Program starts execution, displays start message, and initializes working storage fields including END-OF-FILE flag set to 'N' and APPL-RESULT",
+          "records": [
+            "END-OF-FILE",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Open Customer File",
+          "description": "Opens the CUSTFILE VSAM KSDS indexed file in sequential INPUT mode. Validates file status code '00' for success. On failure, displays error, captures IO-STATUS, and abends the program",
+          "records": [
+            "CUSTFILE-STATUS",
+            "APPL-RESULT",
+            "IO-STATUS"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Sequential Read Loop Control",
+          "description": "Iterates in a PERFORM UNTIL loop checking END-OF-FILE flag. Continues reading records as long as END-OF-FILE remains 'N'",
+          "records": [
+            "END-OF-FILE"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Next Customer Record",
+          "description": "Reads the next sequential record from CUSTFILE-FILE into CUSTOMER-RECORD (defined in CVCUS01Y copybook). Evaluates file status: '00' sets APPL-RESULT to 0 (success), '10' sets APPL-RESULT to 16 (EOF), any other status sets APPL-RESULT to 12 (error)",
+          "records": [
+            "FD-CUST-ID",
+            "FD-CUST-DATA",
+            "CUSTOMER-RECORD",
+            "CUSTFILE-STATUS",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Evaluate Read Result",
+          "description": "Checks APPL-RESULT condition names: APPL-AOK (0) continues processing, APPL-EOF (16) sets END-OF-FILE to 'Y' to terminate loop, any error (12) triggers IO-STATUS display and program abend",
+          "records": [
+            "APPL-RESULT",
+            "END-OF-FILE",
+            "IO-STATUS",
+            "CUSTFILE-STATUS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Display Customer Record",
+          "description": "Displays the CUSTOMER-RECORD to standard output (SYSOUT). Note: DISPLAY is called twice for each successful read — once inside 1000-CUSTFILE-GET-NEXT and once in the main loop, resulting in duplicate output per record",
+          "records": [
+            "CUSTOMER-RECORD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Close Customer File",
+          "description": "Closes the CUSTFILE-FILE after all records are processed or EOF is reached. Validates file status '00' for success. On failure, displays error and abends the program",
+          "records": [
+            "CUSTFILE-STATUS",
+            "APPL-RESULT",
+            "IO-STATUS"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Program Termination",
+          "description": "Displays end-of-execution message and returns control to the calling environment via GOBACK",
+          "records": []
+        },
+        {
+          "step": 9,
+          "process": "Error Handling - Display IO Status",
+          "description": "Formats and displays the two-byte file status code. Handles non-numeric status (system/hardware errors with status starting '9') by converting IO-STAT2 through binary redefine to produce a numeric display code. Handles numeric status by formatting into IO-STATUS-04",
+          "records": [
+            "IO-STATUS",
+            "IO-STAT1",
+            "IO-STAT2",
+            "IO-STATUS-04",
+            "TWO-BYTES-BINARY",
+            "TWO-BYTES-RIGHT",
+            "IO-STATUS-0403"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Abnormal Program Termination",
+          "description": "Sets TIMING to 0 and ABCODE to 999, then calls CEE3ABD to force an abnormal termination (abend) of the program with a user-defined abend code",
+          "records": [
+            "TIMING",
+            "ABCODE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "File Open Before Read",
+          "description": "CUSTFILE-FILE must be successfully opened in paragraph 0000-CUSTFILE-OPEN before any READ operations are attempted in 1000-CUSTFILE-GET-NEXT. A failed open triggers an immediate abend, preventing any read attempts"
+        },
+        {
+          "dependency": "CUSTFILE-STATUS Gate for All I/O",
+          "description": "Every file operation (OPEN, READ, CLOSE) is gated by the CUSTFILE-STATUS two-byte field. All subsequent processing logic depends on this status being evaluated correctly before proceeding or branching to error handling"
+        },
+        {
+          "dependency": "APPL-RESULT State Machine",
+          "description": "APPL-RESULT acts as a central state variable controlling program flow. It is pre-set to 8 before OPEN and CLOSE operations as a sentinel value, then overwritten based on file status. The condition names APPL-AOK (0) and APPL-EOF (16) drive all branching decisions"
+        },
+        {
+          "dependency": "END-OF-FILE Flag Dependency",
+          "description": "The main processing loop depends entirely on the END-OF-FILE flag being set to 'Y' by paragraph 1000-CUSTFILE-GET-NEXT when file status '10' (EOF) is encountered. Failure to set this flag would result in an infinite loop"
+        },
+        {
+          "dependency": "CUSTOMER-RECORD Layout from CVCUS01Y Copybook",
+          "description": "The DISPLAY of CUSTOMER-RECORD and all record field references depend on the structure defined in the CVCUS01Y copybook. The FD record (FD-CUST-ID 9(09) + FD-CUST-DATA X(491) = 500 bytes) must align exactly with the CUSTOMER-RECORD layout in the copybook"
+        },
+        {
+          "dependency": "TWO-BYTES-BINARY Redefine for Status Conversion",
+          "description": "The Z-DISPLAY-IO-STATUS paragraph depends on the REDEFINES relationship between TWO-BYTES-BINARY (PIC 9(4) BINARY) and TWO-BYTES-ALPHA (TWO-BYTES-LEFT + TWO-BYTES-RIGHT) to convert a single character IO-STAT2 into a numeric value for display of system file status codes"
+        },
+        {
+          "dependency": "Duplicate DISPLAY Side Effect",
+          "description": "The main loop calls DISPLAY CUSTOMER-RECORD before calling 1000-CUSTFILE-GET-NEXT, and 1000-CUSTFILE-GET-NEXT also calls DISPLAY CUSTOMER-RECORD on success. This creates a dependency where each successfully read record is displayed twice, which may be an unintended defect"
+        },
+        {
+          "dependency": "Sequential Access Mode Constraint",
+          "description": "The file is defined with ACCESS MODE IS SEQUENTIAL, meaning records must be processed in key order (FD-CUST-ID ascending). Random or dynamic access is not available in this program, and the entire file will be read from beginning to end on each execution"
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "In 0000-CUSTFILE-OPEN, after opening CUSTFILE-FILE, the FILE STATUS is checked. A status of '00' sets APPL-RESULT to 0 (AOK); any other status sets it to 12. If not AOK, an error message is displayed, IO-STATUS is populated, Z-DISPLAY-IO-STATUS is performed to format and display the status code, and Z-ABEND-PROGRAM is called to terminate the program abnormally with abend code 999 via CEE3ABD."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "In 1000-CUSTFILE-GET-NEXT, after each READ, FILE STATUS '00' sets APPL-RESULT to 0 (AOK), status '10' (end-of-file) sets it to 16 (APPL-EOF), and any other status sets it to 12. EOF condition gracefully sets END-OF-FILE to 'Y' to terminate the read loop. Any other non-AOK condition triggers an error display, IO-STATUS formatting via Z-DISPLAY-IO-STATUS, and program abend via Z-ABEND-PROGRAM."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "In 9000-CUSTFILE-CLOSE, after closing CUSTFILE-FILE, FILE STATUS '00' resets APPL-RESULT to 0 (AOK); any other status sets it to 12. If not AOK, an error message is displayed, IO-STATUS is populated, Z-DISPLAY-IO-STATUS is performed, and Z-ABEND-PROGRAM is called to force an abnormal termination."
+      },
+      {
+        "category": "I/O Status Display and Formatting",
+        "description": "Z-DISPLAY-IO-STATUS handles both numeric and non-numeric (e.g., VSAM extended) file status codes. For non-numeric or '9x' statuses, it converts the binary second byte to a numeric value and formats a 4-character display code. For numeric statuses, it formats the two-character status into a 4-digit display. The formatted status is always displayed with the label 'FILE STATUS IS: NNNN' for diagnostic purposes."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "Z-ABEND-PROGRAM provides a centralized abnormal termination routine. It displays 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then calls the IBM Language Environment routine CEE3ABD to force a controlled program abend. This ensures that unrecoverable file errors result in a hard failure with a consistent abend code rather than silent continuation."
+      },
+      {
+        "category": "End-of-File Handling",
+        "description": "EOF is treated as a non-error condition. When FILE STATUS '10' is detected during a read, APPL-RESULT is set to 16 (APPL-EOF) and END-OF-FILE is set to 'Y', cleanly terminating the main processing loop without triggering any error messages or abend logic."
+      }
+    ]
+  }
+}

@@ -1,0 +1,334 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COADM01C.cbl",
+        "type": "cobol",
+        "transaction_id": "CA00"
+      },
+      "overview": "COADM01C is part of the CardDemo application, a credit card management system that provides administrative functions for managing card accounts and users. This program serves as the administrative navigation hub, presenting a menu of administrative options exclusively to admin-level users within the CICS online transaction environment. The program displays a dynamic menu of up to 10 administrative options, captures the user's selection, validates it, and transfers control to the appropriate administrative sub-program, acting as the central dispatcher for all admin workflows in the CardDemo system.",
+      "key_features": [
+        {
+          "feature": "Admin Menu Display",
+          "description": "Dynamically builds and presents a numbered menu of up to 10 administrative options sourced from the shared COMMAREA configuration."
+        },
+        {
+          "feature": "User Option Selection",
+          "description": "Captures and validates the user's numeric menu selection, ensuring it falls within the valid range of available options."
+        },
+        {
+          "feature": "Program Transfer (XCTL)",
+          "description": "Transfers control to the selected administrative sub-program using CICS XCTL, passing the shared COMMAREA for session continuity."
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Tracks whether the screen is being displayed for the first time or re-entered, controlling initial display versus input processing logic."
+        },
+        {
+          "feature": "Uninstalled Option Handling",
+          "description": "Detects menu options marked as 'DUMMY' or programs that fail to load (PGMIDERR), and displays a friendly 'not installed' message instead of crashing."
+        },
+        {
+          "feature": "Sign-On Return Navigation",
+          "description": "Allows users to exit the admin menu and return to the sign-on screen via the PF3 key or when no valid session is detected."
+        },
+        {
+          "feature": "Screen Header Population",
+          "description": "Populates the screen header with current date, time, transaction ID, and program name for consistent display across all CardDemo screens."
+        },
+        {
+          "feature": "Invalid Key Handling",
+          "description": "Intercepts unsupported keyboard inputs and displays an appropriate error message, keeping the user on the admin menu screen."
+        }
+      ]
+    },
+    "input_output": [],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Validation",
+          "description": "Program checks EIBCALEN to determine if a communication area was passed. If zero, redirects to signon screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA for processing.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-FROM-PROGRAM"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "First-Entry Detection and Screen Initialization",
+          "description": "Checks CDEMO-PGM-REENTER flag to determine if this is the first time the program is entered. On first entry, sets the reenter flag to TRUE, initializes the output map to LOW-VALUES, and sends the menu screen.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "COADM1AO",
+            "WS-ERR-FLG"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive Menu Screen Input",
+          "description": "On re-entry, receives the BMS map COADM1A from the terminal into COADM1AI, capturing the user's option selection and any other input fields.",
+          "records": [
+            "COADM1AI",
+            "OPTIONI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Evaluation",
+          "description": "Evaluates the EIBAID to determine which key the user pressed. ENTER triggers option processing, PF3 returns to signon screen, and any other key sets an error flag with an invalid key message.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Process Enter Key - Option Extraction",
+          "description": "Trims trailing spaces from the OPTIONI field by scanning from right to left, then moves the trimmed value into WS-OPTION-X, replaces spaces with zeros, and converts to numeric WS-OPTION.",
+          "records": [
+            "OPTIONI",
+            "WS-IDX",
+            "WS-OPTION-X",
+            "WS-OPTION",
+            "OPTIONO"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Option Validation",
+          "description": "Validates that the entered option is numeric, non-zero, and does not exceed CDEMO-ADMIN-OPT-COUNT. If invalid, sets error flag and sends menu screen with an error message.",
+          "records": [
+            "WS-OPTION",
+            "CDEMO-ADMIN-OPT-COUNT",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Program Transfer for Valid Option",
+          "description": "If no error and the selected option's program name does not start with 'DUMMY', sets COMMAREA context fields and issues CICS XCTL to transfer control to the target admin program.",
+          "records": [
+            "CDEMO-ADMIN-OPT-PGMNAME",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA",
+            "WS-TRANID",
+            "WS-PGMNAME"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Handle Uninstalled Option",
+          "description": "If the selected option program name starts with 'DUMMY' or a PGMIDERR condition is raised during XCTL, displays a 'not installed' message in green on the menu screen.",
+          "records": [
+            "WS-MESSAGE",
+            "ERRMSGC",
+            "COADM1AO",
+            "DFHGREEN"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Populate Header Information",
+          "description": "Retrieves the current system date and time using FUNCTION CURRENT-DATE, formats date as MM-DD-YY and time as HH-MM-SS, and populates the screen header fields including titles, transaction ID, program name, date, and time.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "WS-CURDATE-MM",
+            "WS-CURDATE-DD",
+            "WS-CURDATE-YY",
+            "WS-CURTIME-HH",
+            "WS-CURTIME-MM",
+            "WS-CURTIME-SS"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Build Menu Options Display",
+          "description": "Iterates through all admin options defined in CDEMO-ADMIN-OPT-COUNT, concatenates option number and name into WS-ADMIN-OPT-TXT, and maps each to the corresponding output field OPTN001O through OPTN010O on the screen.",
+          "records": [
+            "CDEMO-ADMIN-OPT-NUM",
+            "CDEMO-ADMIN-OPT-NAME",
+            "CDEMO-ADMIN-OPT-COUNT",
+            "WS-ADMIN-OPT-TXT",
+            "WS-IDX",
+            "OPTN001O",
+            "OPTN002O",
+            "OPTN003O",
+            "OPTN004O",
+            "OPTN005O",
+            "OPTN006O",
+            "OPTN007O",
+            "OPTN008O",
+            "OPTN009O",
+            "OPTN010O"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Send Menu Screen",
+          "description": "Sends the populated BMS map COADM1A from mapset COADM01 to the terminal with ERASE, displaying the admin menu with header, options, and any error messages.",
+          "records": [
+            "COADM1AO",
+            "ERRMSGO",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Return with COMMAREA",
+          "description": "Issues CICS RETURN with transaction ID CA00 and the updated CARDDEMO-COMMAREA to maintain conversational state for the next user interaction.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Return to Signon Screen",
+          "description": "Issues CICS XCTL to transfer control to COSGN00C (signon program) when PF3 is pressed or no COMMAREA is present, effectively logging the user out of the admin menu.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA Presence (EIBCALEN)",
+          "description": "The entire program logic depends on EIBCALEN being non-zero. A zero value bypasses all menu processing and forces an immediate redirect to the signon screen, preventing unauthorized or uninitialized access."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER Flag State",
+          "description": "The reenter flag in CARDDEMO-COMMAREA controls whether the program sends the initial menu screen or processes user input. This flag must be correctly set on first entry and persisted across CICS pseudo-conversational returns."
+        },
+        {
+          "dependency": "CDEMO-ADMIN-OPT-COUNT Boundary",
+          "description": "Option validation and the BUILD-MENU-OPTIONS loop both depend on CDEMO-ADMIN-OPT-COUNT (defined in COADM02Y copybook) being correctly initialized. An incorrect count could cause invalid option acceptance or incomplete menu rendering."
+        },
+        {
+          "dependency": "CDEMO-ADMIN-OPT-PGMNAME DUMMY Check",
+          "description": "The decision to issue CICS XCTL depends on the target program name not starting with 'DUMMY'. This string comparison is a soft dependency on the option table data being correctly populated in the COMMAREA."
+        },
+        {
+          "dependency": "CARDDEMO-COMMAREA Integrity Across Pseudo-Conversational Cycles",
+          "description": "The program passes CARDDEMO-COMMAREA on every CICS RETURN. The integrity of fields like CDEMO-FROM-TRANID, CDEMO-FROM-PROGRAM, and CDEMO-PGM-CONTEXT must be maintained across cycles for correct navigation and context tracking."
+        },
+        {
+          "dependency": "PGMIDERR Condition Handler Registration",
+          "description": "The HANDLE CONDITION for PGMIDERR must be registered before any XCTL is attempted. This creates a control-flow dependency where the error handler must be active to gracefully handle missing target programs."
+        },
+        {
+          "dependency": "WS-ERR-FLG State Propagation",
+          "description": "The ERR-FLG-ON condition controls whether XCTL is attempted after option validation. If the flag is set during validation, the XCTL block is skipped entirely, making the flag a critical gate for program transfer logic."
+        },
+        {
+          "dependency": "BMS Map COADM01/COADM1A Availability",
+          "description": "Both SEND and RECEIVE operations depend on the BMS mapset COADM01 and map COADM1A being installed and available in the CICS region. Absence would cause a mapset error condition."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS Transaction Server",
+          "type": "Online Transaction Processing Middleware",
+          "purpose": "Provides the pseudo-conversational execution environment including COMMAREA management, BMS map SEND/RECEIVE for terminal I/O, XCTL for program-to-program transfer, HANDLE CONDITION for error handling, and RETURN with TRANSID for transaction chaining."
+        },
+        {
+          "system": "CICS BMS (Basic Mapping Support)",
+          "type": "Terminal I/O Mapping Facility",
+          "purpose": "Manages the formatting and transmission of the admin menu screen (map COADM1A, mapset COADM01) to and from the 3270 terminal, handling field-level attributes such as color (DFHGREEN) and cursor positioning."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COTRTLIC.cbl",
+          "purpose": "This program operates within a credit card management system (CardDemo) as part of the administrative business logic layer, handling the maintenance of transaction type reference data. It serves as the list/selection screen in a CRUD workflow, allowing administrators to view, search, and select transaction type records for subsequent update or deletion operations. The program manages the TRANSACTION_TYPE table in Db2, providing a paginated list interface within a CICS terminal environment where users can filter records by type code or description, then mark individual rows for update or delete actions that are confirmed via function key."
+        },
+        {
+          "name": "COTRTUPC.cbl",
+          "purpose": "This program is part of the CardDemo application, a credit card management system that maintains reference data supporting transaction processing. It operates within the administrative layer, allowing authorized users to manage the transaction type reference table — a foundational dataset that categorizes and describes the types of transactions processed by the system. COTRTUPC is a CICS interactive program that handles the full lifecycle of transaction type record maintenance, including searching for existing records, displaying details, validating user input, and performing create, update, and delete operations against the DB2 TRANSACTION_TYPE table. It solves the need for a controlled, user-friendly interface to keep transaction type reference data accurate and current."
+        },
+        {
+          "name": "COUSR00C.cbl",
+          "purpose": "COUSR00C is part of the CardDemo application, a credit card management system that includes administrative functions for managing user accounts and access. This program serves as the user administration list screen, providing administrators with a paginated view of all users registered in the system's security file (USRSEC). It acts as a navigation hub within the user management workflow, allowing administrators to browse all system users and initiate update or delete operations on selected user records."
+        },
+        {
+          "name": "COUSR01C.cbl",
+          "purpose": "COUSR01C is part of the CardDemo application, a credit card management system that requires controlled access through user security management. This program operates within the administrative workflow, allowing authorized administrators to create new user accounts in the system's security file. The program provides an interactive CICS screen-based interface for adding both regular and administrative users to the USRSEC security file, solving the need for a governed user provisioning process. It validates all required user information, prevents duplicate user IDs, and confirms successful account creation, ensuring data integrity within the application's security infrastructure."
+        },
+        {
+          "name": "COUSR02C.cbl",
+          "purpose": "COUSR02C is part of the CardDemo application, a credit card management system that handles administrative functions including user account management. This program operates within the administrative workflow, allowing authorized personnel to look up and modify existing user records in the security file. The program provides a CICS interactive screen (transaction CU02) that enables administrators to update user profile information — including first name, last name, password, and user type — stored in the USRSEC security file, ensuring user credentials and roles remain current and accurate."
+        },
+        {
+          "name": "COUSR03C.cbl",
+          "purpose": "COUSR03C is part of the CardDemo application, a credit card management system, and operates within the administrative user management workflow. It serves as the user deletion screen handler, allowing administrators to remove user records from the system's security file (USRSEC). The program manages the full lifecycle of a user deletion request — from displaying the deletion confirmation screen, looking up the user record, and executing the delete — ensuring that only valid, existing users are removed and that the administrator is informed of the outcome at each step."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Program Transfer Errors (PGMIDERR)",
+        "description": "Uses EXEC CICS HANDLE CONDITION PGMIDERR to intercept failed XCTL program transfers. The PGMIDERR-ERR-PARA paragraph catches these conditions, sets a green-colored informational message ('This option is not installed...'), sends the menu screen back to the user, and returns control to the transaction — preventing an abend and gracefully notifying the user of uninstalled menu options."
+      },
+      {
+        "category": "Input Validation Errors",
+        "description": "In PROCESS-ENTER-KEY, the entered option is validated for numeric content, non-zero value, and range against CDEMO-ADMIN-OPT-COUNT. If any check fails, WS-ERR-FLG is set to 'Y' (ERR-FLG-ON), a descriptive message ('Please enter a valid option number...') is placed in WS-MESSAGE, and SEND-MENU-SCREEN is performed to redisplay the screen with the error. Subsequent logic checks ERR-FLG-ON before proceeding with program transfer."
+      },
+      {
+        "category": "Invalid Key / Unsupported AID Errors",
+        "description": "In the EVALUATE EIBAID block within MAIN-PARA, any attention identifier key other than ENTER (DFHENTER) or PF3 (DFHPF3) falls into the WHEN OTHER branch. WS-ERR-FLG is set to 'Y' and CCDA-MSG-INVALID-KEY (a standard message from CSMSG01Y copybook) is moved to WS-MESSAGE, then SEND-MENU-SCREEN redisplays the screen with the error message."
+      },
+      {
+        "category": "Session / Communication Area Errors",
+        "description": "At program entry, EIBCALEN is checked. If it equals zero, indicating no communication area was passed (e.g., direct invocation without a proper session), the program redirects the user to the sign-on screen (COSGN00C) via RETURN-TO-SIGNON-SCREEN rather than attempting to process an invalid or missing COMMAREA."
+      },
+      {
+        "category": "Uninstalled Menu Option Errors",
+        "description": "In PROCESS-ENTER-KEY, before issuing XCTL, the selected program name is checked for the prefix 'DUMMY'. If matched, the XCTL is skipped and a message ('This option is not installed...') is built using STRING and displayed in green (DFHGREEN) via SEND-MENU-SCREEN, providing a soft-failure path for placeholder menu entries without triggering a PGMIDERR condition."
+      },
+      {
+        "category": "Screen Receive Errors",
+        "description": "The RECEIVE-MENU-SCREEN paragraph captures RESP and RESP2 codes into WS-RESP-CD and WS-REAS-CD respectively when receiving the BMS map. However, no explicit conditional logic follows to evaluate these response codes within the visible code, indicating response capture is present but downstream handling is minimal or delegated to the HANDLE CONDITION mechanism."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COADM01",
+        "map_name": "COADM1A",
+        "business_function": "Provides the administrative menu interface for the CardDemo application. Displays up to 10 dynamically populated menu options for admin users, allowing navigation to various administrative functions such as user management. The screen presents a numbered list of available options and accepts a numeric selection from the user to transfer control to the corresponding administrative program."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COADM01 - Admin Menu</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background-color:#000;color:#00ff00;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .blue{color:#4444ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .red{color:#ff0000;} .green{color:#00ff00;} .white{color:#ffffff;} .neutral-bright{color:#ffffff;font-weight:bold;} .underline{text-decoration:underline;} .bright{font-weight:bold;} pre{margin:0;font-family:'Courier New',Courier,monospace;}</style></head><body><div class='terminal'><pre>\n<span class='blue'>Tran:</span><span class='blue'>CA00</span>               <span class='yellow bright'>AWS CardDemo                            </span>   <span class='blue'>Date:</span><span class='blue'>07/19/22</span>\n<span class='blue'>Prog:</span><span class='blue'>COADM01C</span>           <span class='yellow bright'>Admin Menu                              </span>   <span class='blue'>Time:</span><span class='blue'>23:12:32</span>\n\n                                   <span class='neutral-bright'>Admin Menu</span>\n\n                   <span class='blue'>1. User Management                      </span>\n                   <span class='blue'>2. View User List                       </span>\n                   <span class='blue'>3. Add New User                         </span>\n                   <span class='blue'>4. Update User                          </span>\n                   <span class='blue'>5. Delete User                          </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n                   <span class='blue'>                                        </span>\n\n\n              <span class='turquoise bright'>Please select an option :</span> <span class='green underline'>__</span>\n\n\n<span class='red bright'>                                                                              </span>\n<span class='yellow'>ENTER=Continue  F3=Exit                </span>\n</pre></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the selected menu option number and transfer control to the corresponding administrative program via XCTL"
+        },
+        {
+          "key": "F3",
+          "action": "Exit the Admin Menu and return to the Sign-On screen (COSGN00C)"
+        }
+      ]
+    }
+  }
+}

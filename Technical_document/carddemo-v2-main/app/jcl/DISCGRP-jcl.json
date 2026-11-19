@@ -1,0 +1,91 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DISCGRP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **DISCGRP**, sets up a VSAM Key-Sequenced Data Set (KSDS) for storing Disclosure Group data within the CardDemo application. It first deletes any existing instance of the VSAM file to ensure a clean slate, then defines a new KSDS cluster with fixed 50-byte records and a 16-byte key on volume AWSHJ1. Finally, it populates the newly created VSAM file by copying records from an existing flat file (Physical Sequential dataset), effectively initializing the Disclosure Group reference data for use by the application.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "DISCGRP",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, scheduling, and referencing the job in the JES spool and system logs."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'DEFINE DISCLOSURE GROUP FILE'",
+          "description": "A positional parameter providing accounting or descriptive information for the job. This string is used for job identification and may be used by the installation for accounting or billing purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input class) that determines which initiator will pick up and execute the job. Class A typically represents a general-purpose or default execution class, affecting job scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listing, allocation/deallocation messages, and job completion information. Class 0 directs the job log to a specific output destination defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes, whether it completes successfully or abnormally."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing VSAM KSDS cluster named AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS if it already exists, then resets the maximum condition code to 0 to allow subsequent steps to proceed regardless of whether the delete succeeded.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE command for AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS CLUSTER)",
+        "outputs": "Deletes AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS (CLUSTER); SYSPRINT"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM Key-Sequenced Data Set (KSDS) cluster named AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS with specific attributes including size, key definition, record size, and share options.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE CLUSTER command specifying NAME=AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, CYLINDERS(1 5), VOLUMES(AWSHJ1), KEYS(16 0), RECORDSIZE(50 50), SHAREOPTIONS(2 3), ERASE, INDEXED)",
+        "outputs": "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS (CLUSTER), AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.DATA (DATA component), AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.INDEX (INDEX component); SYSPRINT"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies records from the flat file (Physical Sequential) source dataset AWS.M2.CARDDEMO.DISCGRP.PS into the newly defined VSAM KSDS file AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS using the REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "DISCGRP: AWS.M2.CARDDEMO.DISCGRP.PS (flat file source, DISP=SHR); SYSIN (REPRO INFILE(DISCGRP) OUTFILE(DISCVSAM))",
+        "outputs": "DISCVSAM: AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS (populated VSAM KSDS, DISP=OLD); SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS if it already exists. MAXCC is set to 0 to suppress any error if the dataset does not exist."
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS, AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines a new VSAM KSDS cluster named AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS on volume AWSHJ1 with 1 primary and 5 secondary cylinders, 16-byte keys at offset 0, fixed record size of 50 bytes, share options (2 3), ERASE, and INDEXED attributes. Also defines the DATA component AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.DATA and INDEX component AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.INDEX."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) dataset AWS.M2.CARDDEMO.DISCGRP.PS as the input source for the REPRO operation."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the VSAM KSDS dataset AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS as the output target of the REPRO operation, copying all data from the flat file."
+      }
+    ]
+  }
+}

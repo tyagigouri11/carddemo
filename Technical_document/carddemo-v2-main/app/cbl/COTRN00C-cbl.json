@@ -1,0 +1,357 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COTRN00C.cbl",
+        "type": "cobol",
+        "transaction_id": "CT00"
+      },
+      "overview": "COTRN00C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program serves as the transaction listing screen, acting as a navigation hub that allows users to browse and select credit card transactions for further review. The program provides a paginated list view of transactions from the TRANSACT file, displaying up to 10 transactions per page with forward and backward navigation, and allowing users to select individual transactions to view their full details via the COTRN01C program.",
+      "key_features": [
+        {
+          "feature": "Paginated Transaction List",
+          "description": "Displays up to 10 transactions per page, showing transaction ID, date, description, and amount for each entry"
+        },
+        {
+          "feature": "Forward Navigation (PF8)",
+          "description": "Allows users to page forward through the transaction file to view the next set of 10 transactions"
+        },
+        {
+          "feature": "Backward Navigation (PF7)",
+          "description": "Allows users to page backward through the transaction file to view the previous set of 10 transactions"
+        },
+        {
+          "feature": "Transaction Selection",
+          "description": "Users can select a transaction by entering 'S' next to it, which transfers control to the transaction detail program (COTRN01C)"
+        },
+        {
+          "feature": "Transaction ID Search",
+          "description": "Users can enter a numeric transaction ID to start browsing the list from a specific transaction"
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that entered transaction IDs are numeric and that selection flags contain valid values, displaying appropriate error messages"
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Maintains page number, first/last transaction IDs on the current page, and navigation state across screen interactions via the COMMAREA"
+        },
+        {
+          "feature": "Return Navigation (PF3)",
+          "description": "Allows users to exit the transaction list and return to the main menu (COMEN01C)"
+        },
+        {
+          "feature": "Dynamic Screen Header",
+          "description": "Populates screen headers with current date, time, program name, and transaction ID on every screen send"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRANSACT",
+        "type": "Read",
+        "description": "Transaction file - browsed sequentially (forward and backward) using STARTBR, READNEXT, READPREV, and ENDBR to retrieve and display paginated lists of transaction records including transaction ID, date, description, and amount"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN to determine if this is a fresh invocation or re-entry. If EIBCALEN=0, redirects to sign-on screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA for state restoration.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Screen Receive and AID Key Evaluation",
+          "description": "On re-entry, the BMS map COTRN0A is received into COTRN0AI, capturing user input including transaction ID search field and row selection flags. EIBAID is evaluated to route to the appropriate key handler.",
+          "records": [
+            "COTRN0AI",
+            "TRNIDINI",
+            "SEL0001I-SEL0010I",
+            "TRNID01I-TRNID10I",
+            "EIBAID"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "User Selection Processing",
+          "description": "PROCESS-ENTER-KEY evaluates each of the 10 selection fields (SEL0001I through SEL0010I). If a valid selection is found, the corresponding transaction ID is captured into CDEMO-CT00-TRN-SELECTED and the selection flag into CDEMO-CT00-TRN-SEL-FLG.",
+          "records": [
+            "SEL0001I-SEL0010I",
+            "TRNID01I-TRNID10I",
+            "CDEMO-CT00-TRN-SEL-FLG",
+            "CDEMO-CT00-TRN-SELECTED"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Transaction Detail Navigation via XCTL",
+          "description": "If selection flag is 'S' or 's' and a transaction ID is selected, program transfers control to COTRN01C via CICS XCTL, passing the COMMAREA with the selected transaction ID and context information.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Transaction ID Input Validation",
+          "description": "The entered transaction ID (TRNIDINI) is validated to be numeric. If blank or low-values, TRAN-ID is set to LOW-VALUES for a start-of-file browse. If non-numeric, an error flag is set and the screen is re-sent with an error message.",
+          "records": [
+            "TRNIDINI",
+            "TRAN-ID",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "TRNIDINL"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "TRANSACT File Browse Initialization (STARTBR)",
+          "description": "CICS STARTBR is issued against the TRANSACT dataset using TRAN-ID as the RIDFLD key. Response codes are evaluated; NOTFND sets EOF flag and sends a message, other errors set the error flag.",
+          "records": [
+            "WS-TRANSACT-FILE",
+            "TRAN-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-TRANSACT-EOF"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Forward Page Read (READNEXT)",
+          "description": "PROCESS-PAGE-FORWARD reads up to 10 transaction records sequentially using CICS READNEXT. Each record is read into TRAN-RECORD. An additional lookahead read determines if a next page exists, setting NEXT-PAGE-YES or NEXT-PAGE-NO accordingly.",
+          "records": [
+            "TRAN-RECORD",
+            "TRAN-ID",
+            "TRAN-AMT",
+            "TRAN-ORIG-TS",
+            "TRAN-DESC",
+            "WS-IDX",
+            "CDEMO-CT00-PAGE-NUM",
+            "CDEMO-CT00-TRNID-FIRST",
+            "CDEMO-CT00-TRNID-LAST"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Backward Page Read (READPREV)",
+          "description": "PROCESS-PAGE-BACKWARD reads up to 10 transaction records in reverse using CICS READPREV, filling screen slots from index 10 down to 1. Page number is decremented if prior pages exist.",
+          "records": [
+            "TRAN-RECORD",
+            "TRAN-ID",
+            "TRAN-AMT",
+            "TRAN-ORIG-TS",
+            "TRAN-DESC",
+            "WS-IDX",
+            "CDEMO-CT00-PAGE-NUM",
+            "CDEMO-CT00-TRNID-FIRST"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Transaction Data Population into Screen Map",
+          "description": "POPULATE-TRAN-DATA formats TRAN-AMT into WS-TRAN-AMT and extracts date components from TRAN-ORIG-TS timestamp into WS-TRAN-DATE. Each of the 10 screen rows (TRNID01I-TRNID10I, TDATE01I-TDATE10I, TDESC01I-TDESC10I, TAMT001I-TAMT010I) is populated based on WS-IDX.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-AMT",
+            "TRAN-ORIG-TS",
+            "TRAN-DESC",
+            "WS-TRAN-AMT",
+            "WS-TRAN-DATE",
+            "TRNID01I-TRNID10I",
+            "TDATE01I-TDATE10I",
+            "TDESC01I-TDESC10I",
+            "TAMT001I-TAMT010I",
+            "CDEMO-CT00-TRNID-FIRST",
+            "CDEMO-CT00-TRNID-LAST"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Browse Termination (ENDBR)",
+          "description": "After all required records are read, CICS ENDBR is issued to release the browse cursor on the TRANSACT dataset.",
+          "records": [
+            "WS-TRANSACT-FILE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Header Population and Screen Send",
+          "description": "POPULATE-HEADER-INFO retrieves the current date and time using FUNCTION CURRENT-DATE, formats them, and moves title, transaction ID, program name, date, and time into the output map COTRN0AO. The map is then sent via CICS SEND with or without ERASE based on WS-SEND-ERASE-FLG.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-TRANID",
+            "WS-PGMNAME",
+            "CURDATEO",
+            "CURTIMEO",
+            "COTRN0AO",
+            "ERRMSGO",
+            "PAGENUMI",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "CICS RETURN with COMMAREA",
+          "description": "Program issues CICS RETURN specifying transaction ID 'CT00' and the updated CARDDEMO-COMMAREA, preserving pagination state (page number, first/last transaction IDs, next-page flag, selected transaction) for the next invocation.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-CT00-PAGE-NUM",
+            "CDEMO-CT00-TRNID-FIRST",
+            "CDEMO-CT00-TRNID-LAST",
+            "CDEMO-CT00-NEXT-PAGE-FLG",
+            "CDEMO-CT00-TRN-SEL-FLG",
+            "CDEMO-CT00-TRN-SELECTED"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA presence for program re-entry",
+          "description": "EIBCALEN must be non-zero for the program to process any user input. A zero EIBCALEN unconditionally redirects to COSGN00C, making all transaction listing logic dependent on a valid passed COMMAREA."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER flag for first-pass vs. subsequent processing",
+          "description": "The CDEMO-PGM-REENTER flag in CARDDEMO-COMMAREA distinguishes the first entry (where the screen is built and sent without receiving input) from subsequent entries (where user input is received and processed). Incorrect state of this flag would cause the program to skip input processing or attempt to receive before sending."
+        },
+        {
+          "dependency": "TRAN-ID key value for STARTBR positioning",
+          "description": "The STARTBR browse position is entirely dependent on the value of TRAN-ID at the time of the call. For forward paging, CDEMO-CT00-TRNID-LAST is used; for backward paging, CDEMO-CT00-TRNID-FIRST is used. These values must be accurately preserved in the COMMAREA across pseudo-conversational returns."
+        },
+        {
+          "dependency": "CDEMO-CT00-TRNID-FIRST and CDEMO-CT00-TRNID-LAST COMMAREA state",
+          "description": "Correct backward (PF7) and forward (PF8) pagination depends on the first and last transaction IDs of the currently displayed page being accurately stored in the COMMAREA. Corruption or loss of these values would cause incorrect page positioning."
+        },
+        {
+          "dependency": "CDEMO-CT00-NEXT-PAGE-FLG for PF8 boundary enforcement",
+          "description": "The PF8 (page forward) handler checks NEXT-PAGE-YES before proceeding. This flag is set during the previous page read operation and persisted in the COMMAREA. If the flag is not correctly set, the user may receive a false 'bottom of page' message or attempt to read beyond the file end."
+        },
+        {
+          "dependency": "CDEMO-CT00-PAGE-NUM for PF7 boundary enforcement",
+          "description": "The PF7 (page backward) handler checks that CDEMO-CT00-PAGE-NUM is greater than 1 before performing a backward read. This prevents attempting to page backward from the first page."
+        },
+        {
+          "dependency": "WS-ERR-FLG state preventing file operations",
+          "description": "The error flag WS-ERR-FLG is checked throughout PROCESS-PAGE-FORWARD and PROCESS-PAGE-BACKWARD. Once set to 'Y', all subsequent file read loops and population steps are skipped, making all file I/O dependent on a clean error state."
+        },
+        {
+          "dependency": "WS-TRANSACT-EOF flag for read loop termination",
+          "description": "The READNEXT and READPREV loops depend on the TRANSACT-EOF condition being correctly set upon DFHRESP(ENDFILE). Failure to set this flag would cause an infinite loop or over-read condition."
+        },
+        {
+          "dependency": "Numeric validation of TRNIDINI before STARTBR",
+          "description": "The transaction ID entered by the user must pass numeric validation before being moved to TRAN-ID and used as the STARTBR key. Non-numeric input causes an early screen re-send, preventing any file browse from occurring."
+        },
+        {
+          "dependency": "CICS browse cursor serialization",
+          "description": "STARTBR must be successfully completed before READNEXT or READPREV can be issued, and ENDBR must be called to release the browse. The program does not issue ENDBR on error paths within STARTBR, which means browse resources may not be released if STARTBR itself fails with an unexpected response."
+        },
+        {
+          "dependency": "WS-IDX loop counter for 10-row page population",
+          "description": "The screen population logic in POPULATE-TRAN-DATA uses WS-IDX (1-10) to determine which screen row to populate. The loop in PROCESS-PAGE-FORWARD increments WS-IDX after each successful read, while PROCESS-PAGE-BACKWARD decrements from 10. Correct initialization of WS-IDX before each loop is critical to proper screen layout."
+        },
+        {
+          "dependency": "CDEMO-CT00-TRN-SEL-FLG and CDEMO-CT00-TRN-SELECTED for XCTL transfer",
+          "description": "The XCTL to COTRN01C is conditional on both CDEMO-CT00-TRN-SEL-FLG being 'S'/'s' and CDEMO-CT00-TRN-SELECTED being non-blank. Both must be populated correctly from the screen input for the detail navigation to succeed."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction Processing Monitor",
+          "purpose": "Provides the pseudo-conversational execution environment. Used for BMS map SEND and RECEIVE (screen I/O via COTRN0A/COTRN00), VSAM file browsing (STARTBR, READNEXT, READPREV, ENDBR) against the TRANSACT dataset, program-to-program transfer (XCTL to COTRN01C, COMEN01C, COSGN00C), and pseudo-conversational RETURN with TRANSID and COMMAREA to maintain session state."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        },
+        {
+          "name": "COTRN01C.cbl",
+          "purpose": "COTRN01C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program operates within the transaction inquiry workflow, allowing authorized users to look up and view detailed information about individual credit card transactions. The program serves as a read-only transaction viewer, enabling customer service or back-office staff to retrieve and display full transaction details from the TRANSACT file by entering a transaction ID, supporting research, dispute resolution, and audit activities."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates transaction ID input for numeric content; if non-numeric, sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive error, positions cursor to the input field via TRNIDINL=-1, and immediately performs SEND-TRNLST-SCREEN to redisplay with the error message. Invalid selection codes (not 'S' or 's') produce an inline error message but do not set the error flag."
+      },
+      {
+        "category": "Invalid Key / Unsupported PF Key Errors",
+        "description": "Handled in the EVALUATE EIBAID block under the WHEN OTHER clause. Sets WS-ERR-FLG to 'Y', moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, positions cursor, and calls SEND-TRNLST-SCREEN to inform the user that the key pressed is not valid."
+      },
+      {
+        "category": "File Browse Start Errors (STARTBR)",
+        "description": "Checks WS-RESP-CD after EXEC CICS STARTBR. NORMAL response continues processing. NOTFND sets TRANSACT-EOF flag and displays a 'top of page' informational message via SEND-TRNLST-SCREEN without setting the error flag. Any other response sets WS-ERR-FLG to 'Y', issues a DISPLAY of response/reason codes to the CICS log, sets a generic 'Unable to lookup transaction' message, and calls SEND-TRNLST-SCREEN. Subsequent logic guards further processing with IF NOT ERR-FLG-ON checks."
+      },
+      {
+        "category": "File Read Forward Errors (READNEXT)",
+        "description": "Checks WS-RESP-CD after EXEC CICS READNEXT. NORMAL continues. ENDFILE sets TRANSACT-EOF flag and displays a 'bottom of page' informational message without setting the error flag, allowing graceful end-of-file handling. Any other response sets WS-ERR-FLG to 'Y', issues a DISPLAY of response/reason codes, sets a generic error message, and calls SEND-TRNLST-SCREEN."
+      },
+      {
+        "category": "File Read Backward Errors (READPREV)",
+        "description": "Mirrors READNEXT handling. NORMAL continues. ENDFILE sets TRANSACT-EOF and displays a 'top of page' informational message. Any other response sets WS-ERR-FLG to 'Y', issues a DISPLAY of response/reason codes, sets a generic error message, and calls SEND-TRNLST-SCREEN."
+      },
+      {
+        "category": "Session / Communication Area Errors",
+        "description": "If EIBCALEN equals zero (no commarea present), the program immediately transfers control to the sign-on program COSGN00C via RETURN-TO-PREV-SCREEN rather than attempting to process, preventing null-pointer-style access to DFHCOMMAREA."
+      },
+      {
+        "category": "Pagination Boundary Errors",
+        "description": "Attempting to page backward when already on page 1 displays 'You are already at the top of the page...' in WS-MESSAGE and sets SEND-ERASE-NO to avoid a full screen erase, then calls SEND-TRNLST-SCREEN. Attempting to page forward when NEXT-PAGE-YES is not set displays 'You are already at the bottom of the page...' similarly, providing user-friendly boundary feedback without setting the hard error flag."
+      },
+      {
+        "category": "Error Propagation and Guard Pattern",
+        "description": "A central WS-ERR-FLG (88-level conditions ERR-FLG-ON/ERR-FLG-OFF) acts as a gate throughout page processing routines. After any file operation error sets the flag, subsequent PERFORM blocks are wrapped in IF NOT ERR-FLG-ON / IF ERR-FLG-OFF guards, preventing cascading operations on a failed file browse. The flag is reset to 'N' at program entry in MAIN-PARA."
+      },
+      {
+        "category": "Diagnostic Logging",
+        "description": "For unexpected CICS response codes (WHEN OTHER) in STARTBR, READNEXT, and READPREV handlers, a DISPLAY statement writes the raw WS-RESP-CD and WS-REAS-CD values to the CICS job log, providing low-level diagnostic information for operations staff while a user-friendly message is shown on screen."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COTRN00",
+        "map_name": "COTRN0A",
+        "business_function": "Displays a paginated list of credit card transactions from the TRANSACT file. Users can browse up to 10 transactions per page, search by Transaction ID, and select a transaction (using 'S') to view its full details via the COTRN01C program. Supports forward and backward pagination through the transaction file."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COTRN00 - Transaction List</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background-color:#000;color:#fff;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff5555;} .turquoise{color:#00ffff;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .row{white-space:pre;height:1.5em;} input.field{background-color:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:14px;outline:none;padding:0;margin:0;vertical-align:baseline;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CT00</span><span>                </span><span class='yellow bright'>CardDemo - Transaction List      </span><span>        </span><span class='blue'>Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COTRN00C</span><span>                </span><span class='yellow bright'>AWS CardDemo Application         </span><span>        </span><span class='blue'>Time: </span><span class='blue'>23:12:34</span></div><div class='row'>&nbsp;</div><div class='row'><span>                             </span><span class='neutral bright'>List Transactions</span><span>                        </span><span class='turquoise bright'>Page: </span><span class='blue'>       1</span></div><div class='row'>&nbsp;</div><div class='row'><span>    </span><span class='turquoise'>Search Tran ID: </span><input class='field underline' type='text' maxlength='16' size='16' value='' placeholder='________________'></div><div class='row'>&nbsp;</div><div class='row'><span class='neutral'>  Sel</span><span>  </span><span class='neutral'> Transaction ID  </span><span>  </span><span class='neutral'>  Date  </span><span>  </span><span class='neutral'>     Description          </span><span>  </span><span class='neutral'>   Amount   </span></div><div class='row'><span class='neutral'>  ---</span><span>  </span><span class='neutral'>----------------</span><span>  </span><span class='neutral'>--------</span><span>  </span><span class='neutral'>--------------------------</span><span>  </span><span class='neutral'>------------</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000001</span><span>  </span><span class='blue'>07/19/22</span><span>  </span><span class='blue'>GROCERY STORE PURCHASE    </span><span>  </span><span class='blue'>  +00125.50</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000002</span><span>  </span><span class='blue'>07/18/22</span><span>  </span><span class='blue'>GAS STATION FILL UP       </span><span>  </span><span class='blue'>  +00045.00</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000003</span><span>  </span><span class='blue'>07/17/22</span><span>  </span><span class='blue'>ONLINE SHOPPING ORDER     </span><span>  </span><span class='blue'>  +00230.75</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000004</span><span>  </span><span class='blue'>07/16/22</span><span>  </span><span class='blue'>RESTAURANT DINNER         </span><span>  </span><span class='blue'>  +00078.20</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000005</span><span>  </span><span class='blue'>07/15/22</span><span>  </span><span class='blue'>PHARMACY PURCHASE         </span><span>  </span><span class='blue'>  +00032.10</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000006</span><span>  </span><span class='blue'>07/14/22</span><span>  </span><span class='blue'>UTILITY BILL PAYMENT      </span><span>  </span><span class='blue'>  +00150.00</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000007</span><span>  </span><span class='blue'>07/13/22</span><span>  </span><span class='blue'>COFFEE SHOP               </span><span>  </span><span class='blue'>  +00012.50</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000008</span><span>  </span><span class='blue'>07/12/22</span><span>  </span><span class='blue'>BOOKSTORE PURCHASE        </span><span>  </span><span class='blue'>  +00055.99</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000009</span><span>  </span><span class='blue'>07/11/22</span><span>  </span><span class='blue'>STREAMING SERVICE         </span><span>  </span><span class='blue'>  +00015.99</span></div><div class='row'><span>  </span><input class='field underline' type='text' maxlength='1' size='1' value=' '><span>  </span><span class='blue'>0000000010000010</span><span>  </span><span class='blue'>07/10/22</span><span>  </span><span class='blue'>HARDWARE STORE            </span><span>  </span><span class='blue'>  +00089.45</span></div><div class='row'>&nbsp;</div><div class='row'><span>           </span><span class='neutral bright'>Type 'S' to View Transaction details from the list</span></div><div class='row'>&nbsp;</div><div class='row'><span class='red bright'>                                                                              </span></div><div class='row'><span class='yellow'>ENTER=Continue  F3=Back  F7=Backward  F8=Forward</span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the current screen input. If a Search Tran ID is entered, browse the TRANSACT file starting from that ID. If a selection field contains 'S' or 's', transfer control to COTRN01C to view the full transaction details for the selected row."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen (COMEN01C - Main Menu)."
+        },
+        {
+          "key": "F7",
+          "action": "Page backward through the transaction list, displaying the previous 10 transactions. Displays message 'You are already at the top of the page...' if already on page 1."
+        },
+        {
+          "key": "F8",
+          "action": "Page forward through the transaction list, displaying the next 10 transactions. Displays message 'You are already at the bottom of the page...' if no more records exist."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,345 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COPAUS1C.cbl",
+        "type": "cobol",
+        "transaction_id": "CPVD"
+      },
+      "overview": "COPAUS1C is part of the CardDemo credit card authorization module, operating within a CICS/IMS environment to support back-office authorization review workflows. It serves as the detail view screen for pending authorization records, allowing authorized users to inspect individual transaction authorizations and take action on suspected fraudulent activity. The program retrieves authorization summary and detail records from an IMS database, displays comprehensive transaction information on a BMS screen, and enables users to navigate through authorization records or flag/unflag them as fraudulent by linking to a downstream fraud processing program (COPAUS2C).",
+      "key_features": [
+        {
+          "feature": "Authorization Detail Display",
+          "description": "Retrieves and displays full details of a selected pending authorization record including card number, amount, date/time, merchant information, and response codes."
+        },
+        {
+          "feature": "Fraud Flagging",
+          "description": "Allows users to mark or remove a fraud flag on an authorization record via PF5, linking to the COPAUS2C fraud processing program and updating the IMS database accordingly."
+        },
+        {
+          "feature": "Decline Reason Lookup",
+          "description": "Uses a built-in table of decline reason codes (e.g., insufficient funds, card fraud, lost card) to translate numeric response codes into human-readable descriptions on the screen."
+        },
+        {
+          "feature": "Sequential Record Navigation",
+          "description": "Supports PF8 key to advance to the next authorization detail record for the same account, enabling sequential review of multiple pending authorizations."
+        },
+        {
+          "feature": "IMS Database Integration",
+          "description": "Reads authorization summary (root) and detail (child) segments from an IMS hierarchical database using DLI GU and GNP calls, with PSB scheduling and syncpoint management."
+        },
+        {
+          "feature": "Transaction Rollback Support",
+          "description": "Implements CICS SYNCPOINT ROLLBACK to undo database changes if a fraud update operation fails, ensuring data integrity."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the authorization summary screen (COPAUS0C), maintaining a consistent navigation flow within the authorization module."
+        },
+        {
+          "feature": "Approval Status Indicator",
+          "description": "Visually distinguishes approved authorizations (green 'A') from declined ones (red 'D') on the detail screen based on the authorization response code."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "PSBPAUTB / PAUTSUM0 (IMS DB - Pending Authorization Summary)",
+        "type": "Read",
+        "description": "IMS database segment read via DLI GU call to retrieve the Pending Authorization Summary root segment, keyed by account ID (PA-ACCT-ID). Used to establish parentage for reading child detail segments."
+      },
+      {
+        "name": "PSBPAUTB / PAUTDTL1 (IMS DB - Pending Authorization Details)",
+        "type": "Read-Write",
+        "description": "IMS database segment read via DLI GNP call to retrieve a specific Pending Authorization Detail record by authorization key (PA-AUTHORIZATION-KEY). Also updated via DLI REPL when fraud status is toggled (marked or removed) by PF5 key action."
+      },
+      {
+        "name": "COPAUS2C (CICS LINK - Fraud Program)",
+        "type": "Read-Write",
+        "description": "External CICS program linked to via EXEC CICS LINK when PF5 is pressed to mark or remove fraud on an authorization record. Passes WS-FRAUD-DATA commarea containing account ID, customer ID, auth record data, and fraud action flag; receives back fraud update status and action message."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN; if zero, initializes CARDDEMO-COMMAREA and transfers control back to the authorization summary program (COPAUS0C). Otherwise, loads the passed COMMAREA and clears fraud data fields.",
+          "records": [
+            "EIBCALEN",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-CPVD-FRAUD-DATA",
+            "CDEMO-PGM-REENTER"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "AID Key Evaluation and Routing",
+          "description": "On re-entry, the screen is received and the terminal AID key is evaluated. ENTER triggers detail processing, PF3 returns to summary, PF5 triggers fraud marking, PF8 advances to the next authorization record, and any other key displays an invalid key message.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "DFHPF5",
+            "DFHPF8",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Schedule IMS PSB",
+          "description": "Before any IMS database access, the PSB named PSBPAUTB is scheduled using DLI SCHD. If already scheduled (TC status), it is terminated and rescheduled. Failure sets the error flag and sends an error screen.",
+          "records": [
+            "PSB-NAME",
+            "IMS-RETURN-CODE",
+            "WS-IMS-PSB-SCHD-FLG",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Authorization Summary Record (IMS GU)",
+          "description": "A Get Unique (GU) DLI call retrieves the root PAUTSUM0 segment from the IMS database using the account ID as the key. EOF or not-found conditions set the AUTHS-EOF flag; other errors set the error flag and send an error screen.",
+          "records": [
+            "PA-ACCT-ID",
+            "PENDING-AUTH-SUMMARY",
+            "WS-ACCT-ID",
+            "IMS-RETURN-CODE",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Read Authorization Detail Record (IMS GNP)",
+          "description": "A Get Next within Parent (GNP) DLI call retrieves the child PAUTDTL1 segment using the authorization key. This provides the full detail record for the selected pending authorization.",
+          "records": [
+            "PA-AUTHORIZATION-KEY",
+            "PENDING-AUTH-DETAILS",
+            "WS-AUTH-KEY",
+            "IMS-RETURN-CODE",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read Next Authorization Record (IMS GNP - PF8)",
+          "description": "On PF8, after positioning via GU/GNP, a subsequent GNP call retrieves the next sibling PAUTDTL1 segment under the same parent, enabling forward navigation through authorization records.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PA-AUTHORIZATION-KEY",
+            "WS-AUTHS-EOF",
+            "IMS-RETURN-CODE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Populate Authorization Detail Screen Fields",
+          "description": "Authorization detail fields from PENDING-AUTH-DETAILS are formatted and moved to the BMS output map (COPAU1AO). This includes card number, date/time formatting, amount, response code, decline reason lookup via binary search, merchant info, fraud status, and expiry date formatting.",
+          "records": [
+            "PA-CARD-NUM",
+            "PA-AUTH-ORIG-DATE",
+            "PA-AUTH-ORIG-TIME",
+            "PA-APPROVED-AMT",
+            "PA-AUTH-RESP-CODE",
+            "PA-AUTH-RESP-REASON",
+            "PA-FRAUD-CONFIRMED",
+            "PA-MERCHANT-NAME",
+            "PA-MERCHANT-ID",
+            "PA-MERCHANT-CITY",
+            "PA-MERCHANT-STATE",
+            "PA-MERCHANT-ZIP",
+            "DECL-CODE",
+            "DECL-DESC",
+            "COPAU1AO"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Mark or Remove Fraud Flag (PF5)",
+          "description": "On PF5, the current authorization detail is read. If already fraud-confirmed, the fraud flag is toggled to removed; otherwise it is set to confirmed. The updated record and account/customer IDs are packaged into WS-FRAUD-DATA and passed to the fraud program COPAUS2C via CICS LINK.",
+          "records": [
+            "PA-FRAUD-CONFIRMED",
+            "PA-FRAUD-REMOVED",
+            "WS-FRAUD-AUTH-RECORD",
+            "WS-FRD-ACCT-ID",
+            "WS-FRD-CUST-ID",
+            "WS-FRD-ACTION",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CUST-ID"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Update Authorization Detail Record (IMS REPL)",
+          "description": "If the fraud program (COPAUS2C) returns a success status, the updated PENDING-AUTH-DETAILS segment is written back to the IMS database using a DLI REPL call. Success triggers a CICS SYNCPOINT; failure triggers a ROLLBACK and error message.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "WS-FRAUD-AUTH-RECORD",
+            "IMS-RETURN-CODE",
+            "DIBSTAT",
+            "WS-FRD-UPDT-SUCCESS"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "IMS Syncpoint or Rollback",
+          "description": "After successful IMS updates, CICS SYNCPOINT is issued to commit changes. On errors during fraud update or IMS REPL failure, CICS SYNCPOINT ROLLBACK is issued to undo all database changes in the current unit of work.",
+          "records": [
+            "IMS-RETURN-CODE",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Send Authorization Detail Screen",
+          "description": "The BMS map COPAU1A from mapset COPAU01 is sent to the terminal. If SEND-ERASE-YES is set, the screen is sent with ERASE; otherwise it is sent without erase (used for PF8 end-of-records scenario). Header info including current date/time, transaction ID, and program name is populated before sending.",
+          "records": [
+            "COPAU1AO",
+            "WS-MESSAGE",
+            "ERRMSGO",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Return to CICS with COMMAREA",
+          "description": "Program issues CICS RETURN with transaction ID CPVD and the updated CARDDEMO-COMMAREA, preserving state for the next user interaction cycle.",
+          "records": [
+            "WS-CICS-TRANID",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-CPVD-PAU-SELECTED",
+            "CDEMO-CPVD-FRAUD-DATA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA presence required for normal processing",
+          "description": "If EIBCALEN is zero (no COMMAREA passed), the program cannot function and immediately transfers control to the summary program COPAUS0C. All subsequent logic depends on a valid CARDDEMO-COMMAREA being present."
+        },
+        {
+          "dependency": "CDEMO-ACCT-ID must be numeric and PAU-SELECTED must be non-blank",
+          "description": "In PROCESS-ENTER-KEY, both CDEMO-ACCT-ID being numeric and CDEMO-CPVD-PAU-SELECTED being non-spaces/low-values are required before any IMS read is attempted. Failure sets ERR-FLG-ON and skips database access."
+        },
+        {
+          "dependency": "IMS PSB must be successfully scheduled before any DLI call",
+          "description": "SCHEDULE-PSB must complete with STATUS-OK before GU, GNP, or REPL calls are made. If PSB scheduling fails, the error flag is set and the screen is sent immediately, preventing any database operation."
+        },
+        {
+          "dependency": "IMS GU must succeed before GNP for detail record",
+          "description": "In READ-AUTH-RECORD, the GNP call to retrieve PAUTDTL1 is only executed if the preceding GU call for PAUTSUM0 returns STATUS-OK (AUTHS-NOT-EOF). The GNP relies on the IMS cursor position established by the GU."
+        },
+        {
+          "dependency": "READ-AUTH-RECORD must precede READ-NEXT-AUTH-RECORD in PF8 flow",
+          "description": "In PROCESS-PF8-KEY, READ-AUTH-RECORD is called first to position the IMS cursor on the current record, then READ-NEXT-AUTH-RECORD issues a GNP to advance to the next sibling segment. Skipping the initial GU/GNP would yield incorrect positioning."
+        },
+        {
+          "dependency": "COPAUS2C fraud program response determines IMS update execution",
+          "description": "The IMS REPL update in UPDATE-AUTH-DETAILS is only performed if CICS LINK to COPAUS2C returns DFHRESP(NORMAL) and WS-FRD-UPDT-SUCCESS is set. A failed or abnormal response triggers ROLLBACK instead of update."
+        },
+        {
+          "dependency": "Fraud flag state controls toggle direction",
+          "description": "In MARK-AUTH-FRAUD, the current value of PA-FRAUD-CONFIRMED in the retrieved IMS record determines whether the fraud action is a new report (set confirmed) or a removal (set removed). The IMS record must be read before this decision is made."
+        },
+        {
+          "dependency": "SYNCPOINT dependency on IMS PSB schedule flag",
+          "description": "TAKE-SYNCPOINT is only called when IMS-PSB-SCHD is true, ensuring a syncpoint is not issued unless the PSB was actually scheduled and database operations were performed. This prevents spurious commits."
+        },
+        {
+          "dependency": "Decline reason binary search depends on sorted table",
+          "description": "SEARCH ALL on WS-DECLINE-REASON-TAB requires the table to be in ascending order by DECL-CODE (as declared). The table is statically defined in working storage and must remain sorted for correct binary search results."
+        },
+        {
+          "dependency": "WS-FRAUD-AUTH-RECORD must be populated before COPAUS2C LINK",
+          "description": "Before linking to COPAUS2C, PENDING-AUTH-DETAILS (modified with new fraud flag) must be moved to WS-FRAUD-AUTH-RECORD, and account/customer IDs must be set in WS-FRD-ACCT-ID and WS-FRD-CUST-ID. These fields form the COMMAREA passed to the fraud program."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS (Customer Information Control System)",
+          "type": "Transaction processing middleware",
+          "purpose": "Manages terminal I/O via BMS maps (SEND/RECEIVE for COPAU1A/COPAU01), controls program flow via XCTL and LINK, maintains conversational state via RETURN with COMMAREA and transaction ID CPVD, and provides unit-of-work management via SYNCPOINT and SYNCPOINT ROLLBACK."
+        },
+        {
+          "system": "IMS (Information Management System)",
+          "type": "Hierarchical database",
+          "purpose": "Stores and retrieves pending authorization data via PSB PSBPAUTB. DLI calls perform GU (get unique) on PAUTSUM0 root segments by account ID, GNP (get next within parent) on PAUTDTL1 child segments by authorization key, and REPL (replace) to update authorization detail records with fraud status changes."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COPAUS0C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COPAUS2C.cbl",
+          "purpose": "COPAUS2C is part of the CardDemo Authorization Module, operating within a financial card transaction processing system that handles real-time payment authorizations. It serves as a fraud flagging service invoked when a customer or system identifies a previously processed authorization message as fraudulent or when a fraud flag needs to be removed. The program receives authorization transaction details and a fraud action indicator via its communication area, then persists or updates a fraud record in the DB2 AUTHFRDS table, enabling downstream fraud management and reporting workflows to act on flagged transactions."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates that CDEMO-ACCT-ID is numeric and CDEMO-CPVD-PAU-SELECTED is not spaces or low-values before processing. On failure, sets ERR-FLG-ON (WS-ERR-FLG = 'Y') and skips screen population via the ERR-FLG-OFF guard in POPULATE-AUTH-DETAILS, effectively displaying a blank detail screen without an explicit message."
+      },
+      {
+        "category": "IMS PSB Scheduling Errors",
+        "description": "In SCHEDULE-PSB, after each DLI SCHD call, DIBSTAT is moved to IMS-RETURN-CODE. If the PSB is already scheduled (TC), it is terminated with DLI TERM and rescheduled. If the final status is not STATUS-OK, WS-ERR-FLG is set to 'Y', a descriptive error message including the IMS return code is built via STRING into WS-MESSAGE, and SEND-AUTHVIEW-SCREEN is performed immediately to display the error to the user."
+      },
+      {
+        "category": "IMS Database Read Errors",
+        "description": "In READ-AUTH-RECORD and READ-NEXT-AUTH-RECORD, DIBSTAT is evaluated after each DLI GU and GNP call. SEGMENT-NOT-FOUND and END-OF-DB set AUTHS-EOF flag to control navigation flow. Any other unexpected status sets WS-ERR-FLG to 'Y', builds a context-specific error message (e.g., 'System error while reading Auth Summary/Details/next Auth: Code: XX') using STRING, and immediately calls SEND-AUTHVIEW-SCREEN to surface the error."
+      },
+      {
+        "category": "IMS Database Update Errors",
+        "description": "In UPDATE-AUTH-DETAILS, after the DLI REPL call, DIBSTAT is evaluated. On STATUS-OK, a CICS SYNCPOINT is taken and a success message is set. On any other status, ROLL-BACK (CICS SYNCPOINT ROLLBACK) is performed, WS-ERR-FLG is set to 'Y', a rollback error message including the IMS return code is built into WS-MESSAGE, and SEND-AUTHVIEW-SCREEN is called to notify the user."
+      },
+      {
+        "category": "CICS LINK / External Program Errors",
+        "description": "In MARK-AUTH-FRAUD, after EXEC CICS LINK to the fraud program (COPAUS2C) with NOHANDLE, EIBRESP is checked against DFHRESP(NORMAL). If the link fails (non-normal response), ROLL-BACK is performed immediately. If the link succeeds but the fraud sub-program returns WS-FRD-UPDT-FAILED, the failure message from WS-FRD-ACT-MSG is moved to WS-MESSAGE and ROLL-BACK is also performed."
+      },
+      {
+        "category": "Transaction Flow / Navigation Errors",
+        "description": "In MAIN-PARA, if EIBCALEN is zero (no commarea), the program redirects to the authorization summary screen (COPAUS0C) via RETURN-TO-PREV-SCREEN without processing. Invalid PF key presses are caught in the WHEN OTHER branch of the EVALUATE on EIBAID, which processes the enter key logic and sets CCDA-MSG-INVALID-KEY into WS-MESSAGE before sending the screen."
+      },
+      {
+        "category": "Fraud Toggle State Errors",
+        "description": "In MARK-AUTH-FRAUD, the current fraud state (PA-FRAUD-CONFIRMED or PA-FRAUD-REMOVED) is checked before toggling. If the fraud update sub-program reports failure via WS-FRD-UPDT-FAILED, the specific action message (WS-FRD-ACT-MSG) is surfaced to the user and a database rollback is issued, preventing partial or inconsistent fraud state updates."
+      },
+      {
+        "category": "End-of-Data Navigation Handling",
+        "description": "In PROCESS-PF8-KEY, after attempting to read the next authorization record, the AUTHS-EOF flag is checked. If set, SEND-ERASE-NO is set to prevent screen erasure and the message 'Already at the last Authorization...' is placed in WS-MESSAGE, providing user-friendly boundary feedback without treating it as a hard error."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COPAU01",
+        "map_name": "COPAU1A",
+        "business_function": "Displays detailed information for a single pending credit card authorization record. The screen presents full transaction details including card number, authorization date/time, response code, decline reason, transaction amount, POS entry mode, message source, MCC code, card expiry, authorization type, transaction ID, match status, fraud status, and complete merchant details (name, ID, city, state, zip). Users can navigate back to the authorization summary, mark or remove a fraud flag on the authorization, or advance to the next authorization record."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COPAU01 - View Authorization Details</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;width:80ch;border:1px solid #444;padding:4px 0;line-height:1.35;font-size:15px;} .row{white-space:pre;height:1.35em;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .pink{color:#ff55ff;} .red{color:#ff5555;} .green{color:#00cc00;} .neutral{color:#aaaaaa;} .bright{font-weight:bold;} .field-pink{color:#ff55ff;background:#000;} .field-blue{color:#aaaaff;background:#000;} .field-red{color:#ff5555;background:#000;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CPVD</span><span class='blue'>             </span><span class='yellow'>CardDemo - Pending Authorizations       </span><span class='blue'>Date: </span><span class='blue'>07/14/25</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COPAUS1C</span><span class='blue'>             </span><span class='yellow'>Authorization Module - Detail View      </span><span class='blue'>Time: </span><span class='blue'>14:32:07</span></div><div class='row'></div><div class='row'><span class='neutral'>                          </span><span class='neutral bright'>View Authorization Details</span></div><div class='row'></div><div class='row'></div><div class='row'><span class='turquoise'> Card #: </span><span class='field-pink'>4111222233334444</span><span class='turquoise'>       Auth Date: </span><span class='field-pink'>07/14/25  </span><span class='turquoise'> Auth Time: </span><span class='field-pink'>14:30:00  </span></div><div class='row'></div><div class='row'><span class='turquoise'> Auth Resp: </span><span class='field-pink green'>A</span><span class='turquoise'>   Resp Reason: </span><span class='field-blue'>0000-APPROVED       </span><span class='turquoise'> Auth Code: </span><span class='field-blue'>000000</span></div><div class='row'></div><div class='row'><span class='turquoise'> Amount:  </span><span class='field-blue'>      125.99</span><span class='turquoise'>         POS Entry Mode: </span><span class='field-blue'>0010</span><span class='turquoise'> Source   : </span><span class='field-blue'>ONLINE    </span></div><div class='row'></div><div class='row'><span class='turquoise'> MCC Code: </span><span class='field-blue'>5411</span><span class='turquoise'>         Card Exp. Date: </span><span class='field-blue'>12/27</span><span class='turquoise'> Auth Type: </span><span class='field-blue'>PURCHASE      </span></div><div class='row'></div><div class='row'><span class='turquoise'> Tran Id:  </span><span class='field-blue'>TXN20250714001 </span><span class='turquoise'> Match Status: </span><span class='field-red'>Y</span><span class='turquoise'> Fraud Status: </span><span class='field-red'>-         </span></div><div class='row'></div><div class='row'><span class='neutral'>  Merchant Details -------------------------------------------------------</span></div><div class='row'></div><div class='row'><span class='turquoise'> Name: </span><span class='field-blue'>WHOLE FOODS MARKET       </span><span class='turquoise'>  Merchant ID: </span><span class='field-blue'>MER123456789001</span></div><div class='row'></div><div class='row'><span class='turquoise'> City: </span><span class='field-blue'>SEATTLE                  </span><span class='turquoise'>  State: </span><span class='field-blue'>WA</span><span class='turquoise'> Zip: </span><span class='field-blue'>98101-2345</span></div><div class='row'></div><div class='row'><span class='red bright'>                                                                              </span></div><div class='row'><span class='yellow'> F3=Back  F5=Mark/Remove Fraud  F8=Next Auth                                 </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "F3",
+          "action": "Return to the Authorization Summary screen (COPAUS0C)"
+        },
+        {
+          "key": "F5",
+          "action": "Toggle fraud flag on the current authorization record: if not flagged, marks it as confirmed fraud; if already flagged as fraud, removes the fraud designation. Calls the fraud processing program (COPAUS2C) and updates the IMS database accordingly."
+        },
+        {
+          "key": "F8",
+          "action": "Advance to the next authorization detail record for the same account in the IMS database"
+        },
+        {
+          "key": "Enter",
+          "action": "Refresh and redisplay the current authorization detail record"
+        }
+      ]
+    }
+  }
+}

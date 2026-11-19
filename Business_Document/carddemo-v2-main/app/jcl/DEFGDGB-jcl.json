@@ -1,0 +1,76 @@
+{
+    "created_on": "2026-11-05",
+    "name": "DEFGDGB.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/DEFGDGB.jcl",
+    "type": "jcl",
+    "description": "This JCL job defines six Generation Data Group (GDG) bases for the CardDemo application, establishing versioned data storage structures for transaction backups, daily transactions, transaction reports, category balance backups, system transactions, and combined transactions. Each GDG is configured to retain a maximum of 5 generations, with older generations automatically scratched (deleted) when the limit is exceeded. If a GDG already exists (condition code 12), the error is suppressed to allow safe re-execution.Key Functionalities:\nDefines a GDG base named AWS.M2.CARDDEMO.TRANSACT.BKUP with a limit of 5 generations and automatic scratch of oldest generation upon overflow, used for transaction backup data.\nDefines a GDG base named AWS.M2.CARDDEMO.TRANSACT.DALY with a limit of 5 generations and automatic scratch, used for daily transaction data.\nDefines a GDG base named AWS.M2.CARDDEMO.TRANREPT with a limit of 5 generations and automatic scratch, used for transaction reports.\nDefines a GDG base named AWS.M2.CARDDEMO.TCATBALF.BKUP with a limit of 5 generations and automatic scratch, used for transaction category balance backup data.\nDefines a GDG base named AWS.M2.CARDDEMO.SYSTRAN with a limit of 5 generations and automatic scratch, used for system transaction data.\nDefines a GDG base named AWS.M2.CARDDEMO.TRANSACT.COMBINED with a limit of 5 generations and automatic scratch, used for combined transaction data.\nSuppresses condition code 12 (already exists error) for each GDG definition, ensuring the job completes successfully even if the GDG bases were previously defined.",
+    "rules": [
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for transaction backup data and the system catalog is accessible",
+                "When": "The system attempts to register the Transaction Backup versioned file group (AWS.M2.CARDDEMO.TRANSACT.BKUP) in the catalog",
+                "Then": "1. The Transaction Backup versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the Transaction Backup versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues to the next file group registration without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register Transaction Backup Versioned File Group",
+            "Rule_Description": "Registers the Transaction Backup versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for daily transaction data and the system catalog is accessible",
+                "When": "The system attempts to register the Daily Transaction versioned file group (AWS.M2.CARDDEMO.TRANSACT.DALY) in the catalog",
+                "Then": "1. The Daily Transaction versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the Daily Transaction versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues to the next file group registration without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register Daily Transaction Versioned File Group",
+            "Rule_Description": "Registers the Daily Transaction versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for transaction report data and the system catalog is accessible",
+                "When": "The system attempts to register the Transaction Report versioned file group (AWS.M2.CARDDEMO.TRANREPT) in the catalog",
+                "Then": "1. The Transaction Report versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the Transaction Report versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues to the next file group registration without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register Transaction Report Versioned File Group",
+            "Rule_Description": "Registers the Transaction Report versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for transaction category balance backup data and the system catalog is accessible",
+                "When": "The system attempts to register the Transaction Category Balance Backup versioned file group (AWS.M2.CARDDEMO.TCATBALF.BKUP) in the catalog",
+                "Then": "1. The Transaction Category Balance Backup versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the Transaction Category Balance Backup versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues to the next file group registration without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register Transaction Category Balance Backup Versioned File Group",
+            "Rule_Description": "Registers the Transaction Category Balance Backup versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for system-level transaction data and the system catalog is accessible",
+                "When": "The system attempts to register the System Transaction versioned file group (AWS.M2.CARDDEMO.SYSTRAN) in the catalog",
+                "Then": "1. The System Transaction versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the System Transaction versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues to the next file group registration without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register System Transaction Versioned File Group",
+            "Rule_Description": "Registers the System Transaction versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-DEFGDGB-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo system requires versioned storage management for combined transaction data and the system catalog is accessible",
+                "When": "The system attempts to register the Combined Transaction versioned file group (AWS.M2.CARDDEMO.TRANSACT.COMBINED) in the catalog",
+                "Then": "1. The Combined Transaction versioned file group is registered in the system catalog. 2. The group is configured to retain a maximum of 5 versions at any time. 3. When a new version is added and the total count exceeds 5, the oldest version is automatically deleted from the system without manual intervention. 4. If the Combined Transaction versioned file group already exists in the catalog, the registration attempt is treated as successful and processing continues without raising an error."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Register Combined Transaction Versioned File Group",
+            "Rule_Description": "Registers the Combined Transaction versioned file group in the system catalog, enforcing a maximum of 5 retained versions with automatic deletion of the oldest version, while allowing safe re-registration if the group already exists.",
+            "Rule_Type": "Action Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCardDemo GDG Catalog Initialization]):::start\n\n    A --> B\n\n    B[_STEP05 \u2013 IDCAMS\nDefine Generation Data Group Catalog Entries\nRegister 6 Versioned File Groups in System Catalog\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u2022 AWS.M2.CARDDEMO.TRANSACT.BKUP \u2013 Transaction Backup Files\n\u2022 AWS.M2.CARDDEMO.TRANSACT.DALY \u2013 Daily Transaction Files\n\u2022 AWS.M2.CARDDEMO.TRANREPT \u2013 Transaction Report Files\n\u2022 AWS.M2.CARDDEMO.TCATBALF.BKUP \u2013 Transaction Category Balance Backup Files\n\u2022 AWS.M2.CARDDEMO.SYSTRAN \u2013 System Transaction Files\n\u2022 AWS.M2.CARDDEMO.TRANSACT.COMBINED \u2013 Combined Transaction Files\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nEach Group Retains Last 5 Versions \u2013 Oldest Auto-Deleted_]:::process\n\n    B --> C{Return Code = 12?\nGDG Base Already\nExists in Catalog?}:::decision\n\n    C -->|YES \u2013 GDG Already Registered| D[_Suppress Error\nReset Max Return Code to 0\nStep Treated as Successful\nNo Re-Creation Needed_]:::process\n\n    C -->|NO \u2013 New Registration| E{Return Code\nCheck}:::decision\n\n    E -->|Return Code = 0\nAll 6 GDG Bases\nSuccessfully Defined| F([STEP05 COMPLETED SUCCESSFULLY\nAll 6 GDG Versioned File Groups\nRegistered in System Catalog\nJob Ready for Transaction Processing]):::success\n\n    E -->|Return Code > 0\nUnexpected Catalog\nRegistration Error| G([STEP05 FAILED\nGDG Catalog Registration Error\nJob Aborted \u2013 Manual Investigation Required]):::error\n\n    D --> F\n\n    classDef start fill:#ff6666,stroke:#333,color:#000,font-weight:bold\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000,font-weight:bold\n    classDef success fill:#22c55e,stroke:#333,color:#000,font-weight:bold\n    classDef error fill:#ef4444,stroke:#333,color:#fff,font-weight:bold"
+}

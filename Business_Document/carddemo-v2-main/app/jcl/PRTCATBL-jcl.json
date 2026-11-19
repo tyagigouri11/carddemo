@@ -1,0 +1,87 @@
+{
+    "created_on": "2026-11-05",
+    "name": "PRTCATBL.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/PRTCATBL.jcl",
+    "type": "jcl",
+    "description": "This JCL job (PRTCATBL) extracts transaction category balance data from a VSAM file, creates a backup copy, and produces a formatted, sorted report file. The report presents transaction category balances sorted by Account ID, Transaction Type Code, and Transaction Category Code, with balances formatted to two decimal places.Key Functionalities:\nDeletes any pre-existing version of the report output file (AWS.M2.CARDDEMO.TCATBALF.REPT) before processing begins, ensuring a clean run.\nUnloads/copies the Transaction Category Balance VSAM KSDS file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) into a new Generation Data Group (GDG) backup dataset with fixed-block records of 50 bytes each.\nSorts the backup data in ascending order by Account ID (positions 1-11), Transaction Type Code (positions 12-2), and Transaction Category Code (positions 14-4).\nFormats the output report records (40 bytes, fixed-block) by arranging Account ID, Transaction Type Code, Transaction Category Code, and Transaction Category Balance (formatted as a numeric value with 2 decimal places, e.g., TTTTTTTTT.TT) separated by spaces, and saves the result as the final report file (AWS.M2.CARDDEMO.TCATBALF.REPT).",
+    "rules": [
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance Report file (TCATBALF.REPT) may or may not exist from a previous job run",
+                "When": "The Print Transaction Category Balance File job (PRTCATBL) is initiated",
+                "Then": "If the Transaction Category Balance Report file exists, it must be deleted before any new report processing begins; if the file does not exist, the system acknowledges its absence and proceeds without error \u2014 ensuring a clean state for report generation in either case"
+            },
+            "Rule_Name": "DELDEF - IEFBR14 - Delete Existing Transaction Category Balance Report Before Regeneration",
+            "Rule_Description": "Before generating a new Transaction Category Balance Report, the system must ensure any previously existing report file is removed. This guarantees that the report always reflects only the latest data and no stale or partial report data persists from prior runs.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance master VSAM file (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) exists and is accessible in read-only shared mode, and a new generation of the backup file (AWS.M2.CARDDEMO.TCATBALF.BKUP) is ready to be created with fixed-length 50-byte records",
+                "When": "The REPRO utility is executed to copy all records from the Transaction Category Balance VSAM master file to the new backup generation file",
+                "Then": "Every record from the Transaction Category Balance VSAM master file is copied as-is \u2014 without any filtering or transformation \u2014 into the new versioned backup file (generation +1); the backup file is permanently saved and cataloged upon successful completion; if the copy operation fails for any reason, the incomplete backup file is automatically discarded and not cataloged, ensuring no partial or corrupt backup data is retained"
+            },
+            "Rule_Name": "PRC001 - IDCAMS - Full Backup of Transaction Category Balance File",
+            "Rule_Description": "This step creates a new versioned backup copy of the Transaction Category Balance master file by reproducing all records from the VSAM source into a sequential backup dataset. The backup preserves the complete state of the Transaction Category Balance data before any reporting activity begins.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance Backup file (AWS.M2.CARDDEMO.TCATBALF.BKUP) is available and contains fixed-length records, where each record holds transaction category balance data for a cardholder account",
+                "When": "The system reads each record from the backup file for processing",
+                "Then": "Each record must be interpreted using the following field layout: Account ID (TRANCAT-ACCT-ID) occupies positions 1 through 11 as a numeric field; Transaction Type Code (TRANCAT-TYPE-CD) occupies positions 12 through 13 as a character field; Transaction Category Code (TRANCAT-CD) occupies positions 14 through 17 as a numeric field; Transaction Category Balance (TRAN-CAT-BAL) occupies positions 18 through 28 as a numeric field"
+            },
+            "Rule_Name": "STEP10R - SORT - Transaction Category Balance Record Layout Definition",
+            "Rule_Description": "Defines the field structure of each input record from the Transaction Category Balance Backup file, establishing the positions, lengths, and data types for all fields used in sorting and reporting.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Category Balance Backup file contains one or more records with Account ID (TRANCAT-ACCT-ID), Transaction Type Code (TRANCAT-TYPE-CD), and Transaction Category Code (TRANCAT-CD) fields",
+                "When": "The system prepares records for the Transaction Category Balance Report",
+                "Then": "All records must be sorted in the following strict priority order: first by Account ID (TRANCAT-ACCT-ID) in ascending order (lowest to highest), then within each Account ID by Transaction Type Code (TRANCAT-TYPE-CD) in ascending order (A to Z), then within each Transaction Type Code by Transaction Category Code (TRANCAT-CD) in ascending order (lowest to highest); records sharing the same Account ID, Transaction Type Code, and Transaction Category Code retain their original relative order"
+            },
+            "Rule_Name": "STEP10R - SORT - Transaction Category Balance Report Sort Order",
+            "Rule_Description": "Defines the mandatory sort sequence for all Transaction Category Balance records before they are written to the report, ensuring records are organized hierarchically by account, transaction type, and category.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A sorted Transaction Category Balance record containing Account ID (TRANCAT-ACCT-ID), Transaction Type Code (TRANCAT-TYPE-CD), Transaction Category Code (TRANCAT-CD), and Transaction Category Balance (TRAN-CAT-BAL) is ready to be written to the report",
+                "When": "The system constructs each output record for the Transaction Category Balance Report",
+                "Then": "Each output record must be structured in the following exact sequence: Account ID (TRANCAT-ACCT-ID) followed by one space separator, then Transaction Type Code (TRANCAT-TYPE-CD) followed by one space separator, then Transaction Category Code (TRANCAT-CD) followed by one space separator, then the formatted Transaction Category Balance amount, followed by 9 trailing spaces; the total output record length must be 40 bytes with fixed-length formatting"
+            },
+            "Rule_Name": "STEP10R - SORT - Transaction Category Balance Report Output Record Structure",
+            "Rule_Description": "Defines the exact structure and field arrangement of each output record written to the Transaction Category Balance Report, including field selection, ordering, and spacing between fields.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "A Transaction Category Balance (TRAN-CAT-BAL) value is an 11-digit numeric field stored in raw numeric format within the Transaction Category Balance Backup record",
+                "When": "The system formats the Transaction Category Balance amount for output in the Transaction Category Balance Report",
+                "Then": "The balance amount must be formatted using the pattern TTTTTTTTT.TT, where: leading zeros in the integer portion are suppressed and not displayed (e.g., a value of 000012345678 is displayed as 123456.78); a decimal point is inserted to separate the integer portion (up to 9 digits) from the fractional portion; exactly 2 decimal digits are always displayed after the decimal point; the resulting formatted balance occupies a fixed 12-character output field (9 integer digit positions + 1 decimal point + 2 decimal digit positions)"
+            },
+            "Rule_Name": "STEP10R - SORT - Transaction Category Balance Amount Formatting",
+            "Rule_Description": "Defines how the raw numeric Transaction Category Balance amount must be transformed into a human-readable decimal format with suppressed leading zeros and exactly two decimal places for display in the report.",
+            "Rule_Type": "Computation Rules"
+        },
+        {
+            "Rule_Id": "R-PRTCATBL-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The SORT utility has completed sorting and formatting all Transaction Category Balance records and is ready to write the output report file (AWS.M2.CARDDEMO.TCATBALF.REPT)",
+                "When": "The system finalizes the Transaction Category Balance Report generation step",
+                "Then": "If the sort and formatting operation completes successfully, the report file must be permanently saved and cataloged as AWS.M2.CARDDEMO.TCATBALF.REPT for business consumption; if the sort and formatting operation fails for any reason, the incomplete report file must be automatically discarded and not retained, ensuring no partial or incorrect report is made available to business users"
+            },
+            "Rule_Name": "STEP10R - SORT - Transaction Category Balance Report File Creation",
+            "Rule_Description": "Defines the conditions under which the Transaction Category Balance Report file is permanently saved or discarded, ensuring only a fully and successfully generated report is retained for business use.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    A([Job Start:\nTransaction Category Balance Report Generation]):::start\n\n    B[DELDEF - IEFBR14\nDelete Existing Transaction Category Balance Report File]:::process\n\n    REPT[(AWS.M2.CARDDEMO.TCATBALF.REPT\nTransaction Category Balance Report File)]:::datasource\n\n    D1{DELDEF\nCompleted Successfully?}:::decision\n\n    C[PRC001 - IDCAMS\nFull Backup of Transaction Category Balance VSAM File]:::process\n\n    VSAM[(AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS\nTransaction Category Balance VSAM File)]:::datasource\n\n    BKP[(AWS.M2.CARDDEMO.TCATBALF.BKUP\nTransaction Category Balance Versioned Backup GDG)]:::datasource\n\n    D2{PRC001\nCompleted Successfully?}:::decision\n\n    E[STEP10R - SORT\nSort by Account, Transaction Type & Category\nFormat Balance Amounts & Generate Report]:::process\n\n    D3{STEP10R\nCompleted Successfully?}:::decision\n\n    S([Job End:\nTransaction Category Balance Report\nSuccessfully Generated & Cataloged]):::success\n\n    ERR1([Job Abend:\nFailed to Clear Existing Report File\nManual Intervention Required]):::error\n    ERR2([Job Abend:\nFailed to Backup Transaction Category Balance File\nManual Intervention Required]):::error\n    ERR3([Job Abend:\nFailed to Generate Transaction Category Balance Report\nManual Intervention Required]):::error\n\n    A --> B\n    B -.->|Delete Existing Report if Present| REPT\n    B --> D1\n    D1 -->|Yes - Report File Cleared| C\n    D1 -->|No - Deletion Failed| ERR1\n\n    VSAM -.->|Read All Transaction Category Balance Records| C\n    C -.->|Write Full Copy as New Backup Generation| BKP\n    C --> D2\n    D2 -->|Yes - Backup Created Successfully| E\n    D2 -->|No - Backup Failed, Incomplete File Discarded| ERR2\n\n    BKP -.->|Read Latest Backup Generation| E\n    E -.->|Write Sorted & Formatted Report| REPT\n    E --> D3\n    D3 -->|Yes - Report Generated Successfully| S\n    D3 -->|No - Sort or Format Failed, Incomplete Report Discarded| ERR3"
+}

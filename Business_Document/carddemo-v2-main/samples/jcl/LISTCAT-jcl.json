@@ -1,0 +1,87 @@
+{
+    "created_on": "2026-11-05",
+    "name": "LISTCAT.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/LISTCAT.jcl",
+    "type": "jcl",
+    "description": "This JCL job (LISTFILS) performs a catalog listing of all datasets under the AWS.M2.CARDDEMO namespace and saves the results to a cataloged output file. It first cleans up any pre-existing version of the output file, then runs the IDCAMS utility to generate a comprehensive catalog report of all CARDDEMO-related datasets.Key Functionalities:\nDeletes any pre-existing version of the catalog listing output file (AWS.M2.CARDDEMO.LISTCAT) to ensure a clean run before generating a new report.\nExecutes the IDCAMS utility to perform a LISTCAT operation at the AWS.M2.CARDDEMO level, retrieving ALL catalog attributes (including allocation, statistics, and association details) for every dataset under that qualifier.\nSaves the complete catalog listing report to a newly cataloged sequential output file (AWS.M2.CARDDEMO.LISTCAT) with fixed-block format, 133-byte record length, for review or archival purposes.\nThe IDCAMS step runs conditionally only if the previous cleanup step completed successfully (condition: COND=(0,NE)), ensuring the report is generated only when the environment is properly prepared.",
+    "rules": [
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The LISTFILS job has been initiated for the CardDemo application AND the catalog listing report file AWS.M2.CARDDEMO.LISTCAT may or may not already exist on the system",
+                "When": "STEP01 begins execution as the first step of the job with no conditions restricting its execution",
+                "Then": "The catalog listing report file AWS.M2.CARDDEMO.LISTCAT must be deleted regardless of whether the deletion completes successfully or encounters a failure \u2014 ensuring no previously generated report remains on the system before a new report is produced"
+            },
+            "Rule_Name": "STEP01 - IEFBR14 - Delete Existing CardDemo Catalog Listing Report",
+            "Rule_Description": "Before generating a new catalog listing report for the CardDemo application, any previously existing version of the report file (AWS.M2.CARDDEMO.LISTCAT) must be unconditionally removed. This ensures every job run starts with a clean state and no stale or outdated report data is carried forward.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The LISTFILS job has been submitted and STEP01 (cleanup step) has completed execution",
+                "When": "The return code from all prior steps is evaluated before STEP05 begins",
+                "Then": "If all prior steps returned a return code of exactly 0 (success), STEP05 must execute and generate the catalog report; If any prior step returned a return code other than 0 (non-zero), STEP05 must be entirely skipped and no catalog report is generated for this job run"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Conditional Execution of Catalog Report Generation",
+            "Rule_Description": "This rule governs whether the CardDemo catalog listing report generation step is allowed to execute, based on the outcome of all preceding job steps.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "STEP05 is authorized to execute (all prior steps returned RC=0) and the system catalog is accessible",
+                "When": "The catalog listing query is executed using the LISTCAT command with LEVEL set to AWS.M2.CARDDEMO",
+                "Then": "The catalog query must retrieve information for every dataset whose name begins with the prefix AWS.M2.CARDDEMO, covering all datasets registered under the CardDemo application \u2014 no dataset within this naming scope should be excluded from the report"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Scope of CardDemo Dataset Catalog Listing",
+            "Rule_Description": "This rule defines which datasets must be included in the catalog listing report \u2014 specifically, all datasets that belong to the CardDemo application.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The catalog query has identified all datasets under the AWS.M2.CARDDEMO naming scope",
+                "When": "The LISTCAT command is executed with the ALL parameter specified",
+                "Then": "The report must include all available metadata for each dataset, encompassing dataset type and organization, creation and expiration dates, storage allocation and usage statistics, record counts and sizes, and access history information \u2014 no detail category should be omitted from the report"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Completeness of Dataset Information in Catalog Report",
+            "Rule_Description": "This rule mandates that the catalog listing report must capture the full set of available details for every CardDemo dataset \u2014 not a summary or partial view.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "STEP05 has executed and the catalog listing report (AWS.M2.CARDDEMO.LISTCAT) is being written",
+                "When": "STEP05 completes successfully with all catalog data written to the report file",
+                "Then": "The catalog listing report AWS.M2.CARDDEMO.LISTCAT must be permanently saved and registered in the system catalog, making it available for future access and review by authorized users"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Permanent Retention of Successfully Generated Catalog Report",
+            "Rule_Description": "This rule governs how the generated catalog listing report is stored \u2014 ensuring only a fully and successfully generated report is permanently retained for business use.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "STEP05 has begun execution and is writing the catalog listing report AWS.M2.CARDDEMO.LISTCAT",
+                "When": "STEP05 encounters a failure or error during catalog report generation and does not complete successfully",
+                "Then": "The partially written or incomplete catalog listing report must be automatically deleted and must not be retained or registered in the system catalog \u2014 no incomplete report should ever be accessible to business users"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Automatic Discard of Incomplete Catalog Report on Failure",
+            "Rule_Description": "This rule ensures that if the catalog report generation fails at any point, no incomplete or potentially inaccurate report is ever retained \u2014 protecting data integrity.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-LISTCAT-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "STEP05 is executing and the catalog listing report is being created",
+                "When": "The report file AWS.M2.CARDDEMO.LISTCAT is created and written",
+                "Then": "The report must be created as a brand new file (no overwriting of existing content), must be named AWS.M2.CARDDEMO.LISTCAT, must be formatted as a standard print report with each line containing up to 133 characters (132 content characters plus 1 print control character), and must be allocated with an initial storage space that can automatically expand if the report content exceeds the initial allocation"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Identity and Format of the CardDemo Catalog Listing Report",
+            "Rule_Description": "This rule defines the identity, naming, and structural format of the catalog listing report produced for the CardDemo application.",
+            "Rule_Type": "Definitional Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,color:#000\n    classDef process fill:#6699ff,color:#000\n    classDef decision fill:#ffcc00,color:#000\n    classDef datasource fill:#66ff66,color:#000\n    classDef final fill:#ae74de,color:#000\n    classDef success fill:#22c55e,color:#000\n    classDef error fill:#ef4444,color:#000\n\n    A([\ud83d\ude80 JOB START\nCardDemo Catalog Listing Job]):::start\n\n    STEP01[_STEP01 - IEFBR14\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    \ud83e\uddf9 Pre-Job Housekeeping\n    Delete any existing CardDemo\n    Catalog Listing file to ensure\n    a clean run_]:::process\n\n    DS1[(AWS.M2.CARDDEMO.LISTCAT\n    CardDemo Application\n    Catalog Listing Report File)]:::datasource\n\n    D1{_All Prior Steps\n    Completed Successfully?\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    COND='0,NE'\n    RC = 0 ?_}:::decision\n\n    STEP05[_STEP05 - IDCAMS\n    \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n    \ud83d\udccb Generate CardDemo Catalog Listing\n    Query system catalog for ALL datasets\n    belonging to AWS.M2.CARDDEMO application\n    and produce a full detail report_]:::process\n\n    D2{_STEP05\n    Completed\n    Successfully?_}:::decision\n\n    S1[_\u2705 Permanently Save\n    CardDemo Catalog Listing Report\n    to Disk for Future Reference_]:::success\n\n    E1[_\u274c Discard Incomplete\n    Catalog Listing Report\n    \u2014 File Deleted Automatically_]:::error\n\n    Z([\ud83c\udfc1 JOB END]):::final\n\n    A --> STEP01\n    STEP01 -.->|_\ud83d\uddd1\ufe0f Delete File if Exists_| DS1\n    STEP01 --> D1\n    D1 -->|_\u2705 YES \u2014 RC = 0\nProceed to Next Step_| STEP05\n    D1 -->|_\u274c NO \u2014 RC \u2260 0\nStep Bypassed_| Z\n    STEP05 -.->|_\ud83d\udcdd Write Full Catalog\nListing Report_| DS1\n    STEP05 --> D2\n    D2 -->|_\u2705 Success\nCATLG File_| S1\n    D2 -->|_\u274c Failure\nDELETE File_| E1\n    S1 --> Z\n    E1 --> Z"
+}

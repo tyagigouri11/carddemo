@@ -1,0 +1,377 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CICCMP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job automates the compilation and deployment of a CICS COBOL program within an IBM mainframe environment. It compiles the specified COBOL source code using a predefined build procedure (BUILDONL), then issues a CICS NEWCOPY command to refresh the program in the running CICS region without requiring a restart. The job streamlines the development and deployment cycle for CICS-based business applications, ensuring the latest version of the compiled program is immediately available for transaction processing.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Compile CICS Program'",
+          "description": "The accounting information or programmer name field. Here it provides a description label 'Compile CICS Program' identifying the purpose of the job to the system and operators."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to job class A, which determines scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (JES message log). MSGCLASS=H routes the system messages and job log to output class H, which controls where the job's log is sent (e.g., held for online viewing or printed)."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including allocation/termination messages to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job is allowed to use. REGION=0M means the job can use the maximum available region size, effectively removing memory constraints on the job's execution."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a system symbolic that resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. TIME=1440 sets the limit to 1440 minutes (24 hours), effectively allowing the job to run without a practical CPU time restriction."
+        }
+      ],
+      "procedures": [
+        "BUILDONL"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "COB",
+        "purpose": "Compiles a CICS COBOL source program using the IBM Enterprise COBOL compiler with CICS preprocessing enabled. The compiled output is passed as a temporary dataset for subsequent linking.",
+        "programs": "IGYCRCTL*",
+        "inputs": "SYSLIB: AWS.M2.CARDDEMO.CPY (copybook library), OEM.CICSTS.V05R06M0.CICS.SDFHCOB (CICS COBOL copy members), CEE.SCEESAMP (Language Environment samples); SYSIN: AWS.M2.CARDDEMO.CBL(CICSPGMN) (COBOL source member)",
+        "outputs": "SYSPRINT: AWS.M2.CARDDEMO.LST(CICSPGMN) (compiler listing); SYSLIN: &&LOADSET (temporary object deck passed to linker); SYSUT1-SYSUT15, SYSMDECK: temporary work datasets on 3390"
+      },
+      {
+        "step": "DISPLIST",
+        "purpose": "Copies the compiler listing dataset to SYSOUT so that the compilation output is displayed in the job log for review.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.LST(CICSPGMN) (compiler listing produced in COB step)",
+        "outputs": "SYSUT2: SYSOUT=* (compiler listing printed to job output); SYSPRINT: SYSOUT=*"
+      },
+      {
+        "step": "COPYLINK",
+        "purpose": "Copies the CICS stub member DFHEILID from the CICS sample library into a temporary dataset to be included during the link-edit step.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: OEM.CICSTS.V05R06M0.CICS.SDFHSAMP(DFHEILID) (CICS EIL stub member)",
+        "outputs": "SYSUT2: &&COPYLINK (temporary dataset, LRECL=80, BLKSIZE=400, RECFM=FB, passed to LKED step); SYSPRINT: SYSOUT=*"
+      },
+      {
+        "step": "LKED",
+        "purpose": "Link-edits the compiled COBOL object deck together with the CICS stub to produce an executable load module, using AMODE(31) and RMODE(ANY) with LIST, XREF, LET, and MAP options.",
+        "programs": "HEWL*",
+        "inputs": "SYSLIB: OEM.CICSTS.V05R06M0.CICS.SDFHLOAD, SYS1.LINKLIB, CSF.SCSFMOD0, CEE.SCEELKED, CEE.SCEELKEX, AWS.M2.CARDDEMO.LOADLIB (link libraries); SYSLIN: &&LOADSET (object deck from COB step), &&COPYLINK (CICS stub from COPYLINK step)",
+        "outputs": "SYSLMOD: AWS.M2.CARDDEMO.LOADLIB(CICSPGMN) (executable load module); SYSPRINT: SYSOUT=* (link-edit map and cross-reference listing); SYSUT1: temporary work dataset on 3390"
+      },
+      {
+        "step": "NEWCOPY",
+        "purpose": "Issues a CICS CEMT SET PROG NEWCOPY command via SDSF to refresh the newly linked program in the running CICS region, making the updated load module active without requiring a CICS restart. This step executes only if the previous steps completed with a return code less than 4.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN DD *: inline command '/MODIFY CICSAWSA,\\'CEMT SET PROG(CICSPGMN) NEWCOPY\\'' (operator modify command targeting CICS region CICSAWSA)",
+        "outputs": "ISFOUT: SYSOUT=* (SDSF output); CMDOUT: SYSOUT=* (command response output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "IGY.SIGYCOMP.V63",
+        "operations": "READ",
+        "description": "STEPLIB: COBOL compiler load library read for program execution"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "STEPLIB: CICS load library read for CICS translator modules"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "CICSPGMN.CARDDEMO.CPY",
+        "operations": "READ",
+        "description": "SYSLIB: Copybook library read during COBOL compilation for COPY statements"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHCOB",
+        "operations": "READ",
+        "description": "SYSLIB: CICS COBOL copybook library read during compilation"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "CEE.SCEESAMP",
+        "operations": "READ",
+        "description": "SYSLIB: Language Environment sample library read during compilation"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(CICSPGMN)",
+        "operations": "WRITE",
+        "description": "SYSPRINT: Compiler listing output written to partitioned dataset member"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CBL(CICSPGMN)",
+        "operations": "READ",
+        "description": "SYSIN: COBOL source code member read as input to the compiler"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "WRITE",
+        "description": "SYSLIN: Temporary dataset created and passed to hold compiled object code (MOD,PASS)"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT1: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT2 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT2: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT3 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT3: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT4 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT4: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT5 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT5: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT6 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT6: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT7 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT7: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT8 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT8: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT9 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT9: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT10 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT10: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT11 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT11: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT12 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT12: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT13 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT13: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT14 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT14: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSUT15 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT15: Compiler work dataset on 3390 unit"
+      },
+      {
+        "step": "COB",
+        "type": "Dataset",
+        "objects": "SYSMDECK (temporary)",
+        "operations": "WRITE",
+        "description": "SYSMDECK: Compiler modified source deck work dataset on 3390 unit"
+      },
+      {
+        "step": "DISPLIST",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(CICSPGMN)",
+        "operations": "READ",
+        "description": "SYSUT1: IEBGENER reads the compiler listing from the partitioned dataset member"
+      },
+      {
+        "step": "DISPLIST",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSUT2: IEBGENER copies the compiler listing to SYSOUT for display"
+      },
+      {
+        "step": "COPYLINK",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHSAMP(DFHEILID)",
+        "operations": "READ",
+        "description": "SYSUT1: IEBGENER reads the CICS DFHEILID member from SDFHSAMP library"
+      },
+      {
+        "step": "COPYLINK",
+        "type": "Dataset",
+        "objects": "&&COPYLINK",
+        "operations": "WRITE",
+        "description": "SYSUT2: IEBGENER copies DFHEILID to a new temporary dataset passed to the linkage editor (NEW,PASS), LRECL=80, BLKSIZE=400, RECFM=FB"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches CICS load library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYS1.LINKLIB",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches system link library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CSF.SCSFMOD0",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches CSF library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKED",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches Language Environment link library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKEX",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches Language Environment exit library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "SYSLIB: Linkage editor searches application load library for external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "READ",
+        "description": "SYSLIN: Linkage editor reads compiled object code from temporary dataset passed from COB step (OLD,DELETE)"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&COPYLINK",
+        "operations": "READ",
+        "description": "SYSLIN: Linkage editor reads DFHEILID object from temporary dataset passed from COPYLINK step (OLD,DELETE)"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB(CICSPGMN)",
+        "operations": "WRITE",
+        "description": "SYSLMOD: Linkage editor writes the linked load module into the application load library member"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "SYSUT1: Linkage editor work dataset on 3390 unit, BLKSIZE=1024"
+      },
+      {
+        "step": "NEWCOPY",
+        "type": "Dataset",
+        "objects": "ISFOUT (SYSOUT)",
+        "operations": "WRITE",
+        "description": "SDSF ISFOUT: SDSF output written to SYSOUT"
+      },
+      {
+        "step": "NEWCOPY",
+        "type": "Dataset",
+        "objects": "CMDOUT (SYSOUT)",
+        "operations": "WRITE",
+        "description": "SDSF CMDOUT: SDSF command output written to SYSOUT"
+      },
+      {
+        "step": "NEWCOPY",
+        "type": "Dataset",
+        "objects": "ISFIN (inline)",
+        "operations": "READ",
+        "description": "SDSF ISFIN: Inline MODIFY command read to issue CEMT SET PROG(CICSPGMN) NEWCOPY against CICS region CICSAWSA, refreshing the newly linked load module in CICS"
+      }
+    ]
+  }
+}

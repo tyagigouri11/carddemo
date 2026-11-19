@@ -1,0 +1,86 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANCATG.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TRANCATG**, sets up a VSAM Key-Sequenced Data Set (KSDS) to store **Transaction Category** data for the CardDemo application. It first deletes any existing version of the VSAM file, recreates it with defined storage and key specifications, and then populates it by copying records from a flat file (Physical Sequential dataset). The overall business purpose is to initialize and load the transaction category reference data used by the card transaction processing system.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'DEFINE TRAN CATEGORY'",
+          "description": "The JOB statement marks the beginning of a job and the accounting information or job description. Here it provides a description 'DEFINE TRAN CATEGORY' identifying the purpose of the job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to job class A, which determines scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages. MSGCLASS=0 directs the job's system output messages (JES job log) to output class 0, determining where the job's log is routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing Transaction Category VSAM KSDS cluster if it already exists, and resets the maximum condition code to 0 to allow subsequent steps to proceed regardless of whether the delete succeeded.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE command for AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS CLUSTER)",
+        "outputs": "SYSPRINT (execution log); deletes AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS if it exists"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM Key-Sequenced Data Set (KSDS) cluster for Transaction Category data with specified space allocation, key definition, record size, and share options on volume AWSHJ1.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE CLUSTER command specifying NAME=AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS, CYLINDERS(1 5), VOLUMES(AWSHJ1), KEYS(6 0), RECORDSIZE(60 60), SHAREOPTIONS(2 3), ERASE, INDEXED)",
+        "outputs": "SYSPRINT (execution log); creates AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS (cluster), AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.DATA (data component), AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.INDEX (index component)"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies all records from the Transaction Category flat file (Physical Sequential dataset) into the newly defined VSAM KSDS cluster using the IDCAMS REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "TRANCATG: AWS.M2.CARDDEMO.TRANCATG.PS (source flat file, DISP=SHR); SYSIN (REPRO INFILE(TRANCATG) OUTFILE(TCATVSAM) command)",
+        "outputs": "TCATVSAM: AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS (target VSAM KSDS, populated with records); SYSPRINT (execution log)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS using IDCAMS. MAXCC is set to 0 to suppress errors if the dataset does not exist."
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS, AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.INDEX",
+        "operations": "DEFINE CLUSTER",
+        "description": "Defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS with 1 primary and 5 secondary cylinders on volume AWSHJ1, key length 6 at offset 0, fixed record size of 60 bytes, share options (2 3), ERASE, and INDEXED. Also defines the DATA component AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.DATA and INDEX component AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS.INDEX."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) AWS.M2.CARDDEMO.TRANCATG.PS as the input source for the REPRO operation via DD name TRANCATG."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the VSAM KSDS file AWS.M2.CARDDEMO.TRANCATG.VSAM.KSDS as the output target of the REPRO operation via DD name TCATVSAM, copying all data from the flat file."
+      }
+    ]
+  }
+}

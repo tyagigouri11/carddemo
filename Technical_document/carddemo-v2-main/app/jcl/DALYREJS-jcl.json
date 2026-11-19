@@ -1,0 +1,56 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DALYREJS.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **DALYREJS**, is designed to define a Generation Data Group (GDG) in the system's catalog for storing daily rejection records related to the CardDemo credit card application. It uses the IDCAMS utility to create a GDG base entry named **AWS.M2.CARDDEMO.DALYREJS** with a retention limit of 5 generations, meaning only the 5 most recent datasets will be kept, with older ones automatically scratched (deleted). This is a one-time setup job that establishes the GDG infrastructure needed to manage and track daily transaction rejection files in a controlled, versioned manner.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "DALYREJS",
+          "description": "The JOB statement marks the beginning of a job and assigns the job name 'DALYREJS', which uniquely identifies this job to the system."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'DEF GDG FOR REJS'",
+          "description": "The first positional parameter on the JOB statement providing accounting information. It is used for job accounting and billing purposes, describing the job as defining a GDG for REJS."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class 'A', which determines the job entry subsystem (JES) input queue where the job is placed. It controls scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class '0' for the job log and system messages. This determines where the job's JES message output (job log) is routed, such as to a printer, spool, or held queue, as defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user whose user ID is stored in the symbolic parameter &SYSUID (the submitting user) will receive a TSO notification message when the job completes, informing them of the job's completion status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Defines a Generation Data Group (GDG) named AWS.M2.CARDDEMO.DALYREJS with a limit of 5 generations and the SCRATCH option, which automatically deletes the oldest generation dataset when the limit is exceeded.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE GENERATIONDATAGROUP command)",
+        "outputs": "GDG base entry AWS.M2.CARDDEMO.DALYREJS defined in the catalog; SYSPRINT (command execution report)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DALYREJS",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group (GDG) named AWS.M2.CARDDEMO.DALYREJS with a LIMIT of 5 generations and SCRATCH option, using IDCAMS utility"
+      }
+    ]
+  }
+}

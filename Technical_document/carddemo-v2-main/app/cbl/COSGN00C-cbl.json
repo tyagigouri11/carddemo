@@ -1,0 +1,333 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COSGN00C.cbl",
+        "type": "cobol",
+        "transaction_id": "CC00"
+      },
+      "overview": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application.",
+      "key_features": [
+        {
+          "feature": "Signon Screen Display",
+          "description": "Presents a formatted BMS signon screen with application title, current date/time, system ID, and input fields for User ID and Password."
+        },
+        {
+          "feature": "Credential Validation",
+          "description": "Reads the USRSEC security file to verify the entered User ID exists and that the provided password matches the stored value."
+        },
+        {
+          "feature": "Role-Based Routing",
+          "description": "After successful authentication, transfers control to the admin program (COADM01C) for admin users or the standard menu program (COMEN01C) for regular users."
+        },
+        {
+          "feature": "Input Field Validation",
+          "description": "Checks that both User ID and Password fields are populated before attempting file lookup, prompting the user with specific messages if either is missing."
+        },
+        {
+          "feature": "Error Handling",
+          "description": "Handles distinct error scenarios including wrong password, user not found (RESP code 13), and general file access failures, each with a descriptive message returned to the screen."
+        },
+        {
+          "feature": "Session Initialization",
+          "description": "Populates the shared CARDDEMO-COMMAREA with user ID, user type, originating transaction, and program context to support downstream program communication."
+        },
+        {
+          "feature": "PF3 Exit Support",
+          "description": "Allows users to exit the application gracefully by pressing PF3, displaying a thank-you message and returning without further processing."
+        },
+        {
+          "feature": "Transaction Continuity",
+          "description": "Returns control to the CC00 transaction with the COMMAREA after each interaction, maintaining conversational state across screen interactions."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "USRSEC",
+        "type": "Read",
+        "description": "User security file - reads user credentials (password and user type) to authenticate the user during signon. Keyed by User ID."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Program starts, clears error flag and message fields. Checks EIBCALEN to determine if this is a fresh invocation or a return from a previous transaction.",
+          "records": [
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "ERRMSGO",
+            "EIBCALEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Initial Screen Display",
+          "description": "If EIBCALEN is zero (first invocation), clears the output map, sets cursor to User ID field, and sends the signon screen to the terminal.",
+          "records": [
+            "COSGN0AO",
+            "USERIDL",
+            "COSGN0AI"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "AID Key Evaluation",
+          "description": "On subsequent invocations, evaluates the EIBAID to determine user action: Enter key triggers credential processing, PF3 sends a thank-you message and exits, any other key sets error flag and redisplays the screen.",
+          "records": [
+            "EIBAID",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "CCDA-MSG-THANK-YOU",
+            "CCDA-MSG-INVALID-KEY"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Receive Signon Map",
+          "description": "On Enter key press, receives the BMS map COSGN0A from mapset COSGN00, capturing user-entered User ID and Password fields from the terminal.",
+          "records": [
+            "COSGN0AI",
+            "USERIDI",
+            "PASSWDI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Input Validation",
+          "description": "Validates that both User ID and Password fields are non-blank and non-low-values. Sets error flag and redisplays screen with appropriate message if either field is empty.",
+          "records": [
+            "USERIDI",
+            "PASSWDI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "USERIDL",
+            "PASSWDL"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Credential Normalization",
+          "description": "Converts User ID and Password to uppercase using FUNCTION UPPER-CASE. Stores normalized User ID into both WS-USER-ID and CDEMO-USER-ID in the shared commarea.",
+          "records": [
+            "USERIDI",
+            "PASSWDI",
+            "WS-USER-ID",
+            "WS-USER-PWD",
+            "CDEMO-USER-ID"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "User Security File Read",
+          "description": "Reads the USRSEC file using WS-USER-ID as the key to retrieve the stored user security record containing password and user type.",
+          "records": [
+            "WS-USRSEC-FILE",
+            "SEC-USER-DATA",
+            "WS-USER-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Password Verification",
+          "description": "Compares the stored password (SEC-USR-PWD) from the security file against the entered password (WS-USER-PWD). On mismatch, sets error message and redisplays screen.",
+          "records": [
+            "SEC-USR-PWD",
+            "WS-USER-PWD",
+            "WS-MESSAGE",
+            "PASSWDL"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "User Not Found Handling",
+          "description": "If CICS READ returns response code 13 (NOTFND), sets error flag and displays 'User not found' message, repositioning cursor to User ID field.",
+          "records": [
+            "WS-RESP-CD",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "USERIDL"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Commarea Population on Successful Login",
+          "description": "On successful authentication, populates the shared CARDDEMO-COMMAREA with transaction ID, program name, user ID, user type, and resets program context to zero.",
+          "records": [
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-USER-ID",
+            "CDEMO-USER-TYPE",
+            "CDEMO-PGM-CONTEXT",
+            "WS-TRANID",
+            "WS-PGMNAME",
+            "SEC-USR-TYPE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Role-Based Program Transfer",
+          "description": "Transfers control to COADM01C for admin users or COMEN01C for regular users via CICS XCTL, passing the populated CARDDEMO-COMMAREA.",
+          "records": [
+            "CDEMO-USRTYP-ADMIN",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Header Population",
+          "description": "Populates screen header fields including application titles, transaction name, program name, current date/time, APPLID, and SYSID before sending the signon screen.",
+          "records": [
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-TRANID",
+            "WS-PGMNAME",
+            "WS-CURDATE-DATA",
+            "WS-CURDATE-MM-DD-YY",
+            "WS-CURTIME-HH-MM-SS",
+            "APPLIDO",
+            "SYSIDO",
+            "CURDATEO",
+            "CURTIMEO",
+            "TRNNAMEO",
+            "PGMNAMEO"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "CICS RETURN with Commarea",
+          "description": "Returns control to CICS with transaction ID CC00 and the CARDDEMO-COMMAREA, ensuring state is preserved for the next interaction cycle.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN Initial Check",
+          "description": "The entire flow branches on EIBCALEN being zero or non-zero. A zero value forces a fresh screen display regardless of any other state, making this the primary entry-point discriminator."
+        },
+        {
+          "dependency": "Error Flag State Gate",
+          "description": "WS-ERR-FLG must be 'N' (ERR-FLG-OFF) for READ-USER-SEC-FILE to be invoked. Any validation failure in PROCESS-ENTER-KEY sets it to 'Y', short-circuiting the file read and preventing unnecessary I/O."
+        },
+        {
+          "dependency": "Sequential Validation Order",
+          "description": "User ID is validated before Password. If User ID is blank, the program redisplays the screen without ever checking the Password field, establishing a strict left-to-right validation dependency."
+        },
+        {
+          "dependency": "USRSEC File Record Availability",
+          "description": "Successful authentication depends entirely on the existence and correctness of the user record in the USRSEC VSAM file. The program cannot authenticate if the file is unavailable or the record is missing (RESP 13)."
+        },
+        {
+          "dependency": "Password Case Sensitivity Normalization",
+          "description": "Both the entered password (WS-USER-PWD) and the stored password (SEC-USR-PWD) must be in the same case for comparison to succeed. The entered password is uppercased, implying the stored password must also be uppercase for correct matching."
+        },
+        {
+          "dependency": "CARDDEMO-COMMAREA Population Before XCTL",
+          "description": "CDEMO-FROM-TRANID, CDEMO-FROM-PROGRAM, CDEMO-USER-ID, CDEMO-USER-TYPE, and CDEMO-PGM-CONTEXT must all be set before XCTL is issued. The receiving programs (COADM01C, COMEN01C) depend on this commarea being fully populated."
+        },
+        {
+          "dependency": "SEC-USR-TYPE Drives Role-Based Routing",
+          "description": "The value of SEC-USR-TYPE read from the USRSEC file is moved to CDEMO-USER-TYPE and evaluated via CDEMO-USRTYP-ADMIN condition. The routing to admin vs. regular menu is entirely dependent on this field's value."
+        },
+        {
+          "dependency": "BMS Map Receive Before Field Access",
+          "description": "USERIDI and PASSWDI fields in COSGN0AI are only valid after the CICS RECEIVE MAP command completes successfully. Any access to these fields before the receive would yield unpredictable data."
+        },
+        {
+          "dependency": "CICS ASSIGN for APPLID and SYSID",
+          "description": "APPLIDO and SYSIDO in the output map are populated via CICS ASSIGN commands during header population. These values are runtime-dependent and cannot be statically defined, creating a dependency on the CICS system environment."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS BMS (Basic Mapping Support)",
+          "type": "Terminal I/O middleware",
+          "purpose": "Sends and receives the COSGN0A signon screen map (mapset COSGN00) to/from the 3270 terminal, handling field-level cursor positioning and screen erasure."
+        },
+        {
+          "system": "CICS VSAM File Control",
+          "type": "Managed file I/O service",
+          "purpose": "Performs keyed READ operations against the USRSEC dataset to retrieve user security records (password and user type) for authentication."
+        },
+        {
+          "system": "CICS Program Control (XCTL)",
+          "type": "Inter-program transfer service",
+          "purpose": "Transfers control to COADM01C (admin menu) or COMEN01C (regular user menu) after successful authentication, passing the populated CARDDEMO-COMMAREA."
+        },
+        {
+          "system": "CICS ASSIGN Service",
+          "type": "System information service",
+          "purpose": "Retrieves runtime system values APPLID and SYSID from the CICS environment for display in the screen header."
+        },
+        {
+          "system": "CICS RETURN",
+          "type": "Transaction management service",
+          "purpose": "Returns control to CICS specifying transaction ID CC00 and commarea, enabling pseudo-conversational transaction cycling and state preservation between user interactions."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": "COADM01C is part of the CardDemo application, a credit card management system that provides administrative functions for managing card accounts and users. This program serves as the administrative navigation hub, presenting a menu of administrative options exclusively to admin-level users within the CICS online transaction environment. The program displays a dynamic menu of up to 10 administrative options, captures the user's selection, validates it, and transfers control to the appropriate administrative sub-program, acting as the central dispatcher for all admin workflows in the CardDemo system."
+        },
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates User ID and Password fields for blank or low-value input before processing. Sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive prompt (e.g., 'Please enter User ID ...'), positions the cursor on the offending field using USERIDL/PASSWDL set to -1, and redisplays the signon screen via SEND-SIGNON-SCREEN. Subsequent processing is gated by checking ERR-FLG-ON to prevent further execution when validation fails."
+      },
+      {
+        "category": "Invalid Key / Unsupported AID Errors",
+        "description": "Handles unexpected attention identifier keys (anything other than ENTER or PF3) in the EVALUATE EIBAID block. Sets WS-ERR-FLG to 'Y', moves the predefined CCDA-MSG-INVALID-KEY message to WS-MESSAGE, and redisplays the signon screen to inform the user of the unsupported key press."
+      },
+      {
+        "category": "Authentication Errors",
+        "description": "After a successful file read (RESP code 0), compares SEC-USR-PWD against WS-USER-PWD. On mismatch, sets WS-MESSAGE to 'Wrong Password. Try again ...', positions the cursor on the password field (PASSWDL = -1), and redisplays the signon screen. No error flag is set for wrong password, distinguishing it from system-level errors."
+      },
+      {
+        "category": "File Operation Errors - Record Not Found",
+        "description": "Checks CICS READ RESP code for value 13 (NOTFND condition). Sets WS-ERR-FLG to 'Y', moves 'User not found. Try again ...' to WS-MESSAGE, positions the cursor on the User ID field (USERIDL = -1), and redisplays the signon screen to prompt re-entry of credentials."
+      },
+      {
+        "category": "File Operation Errors - Unexpected/System Errors",
+        "description": "Handles all non-zero, non-13 RESP codes from the CICS READ via the WHEN OTHER clause. Sets WS-ERR-FLG to 'Y', moves 'Unable to verify the User ...' to WS-MESSAGE, positions the cursor on the User ID field (USERIDL = -1), and redisplays the signon screen. Raw RESP and RESP2 codes are captured in WS-RESP-CD and WS-REAS-CD but are not surfaced directly to the user."
+      },
+      {
+        "category": "Session Initialization Handling",
+        "description": "Detects a fresh session by checking EIBCALEN = 0. Initializes the screen map to LOW-VALUES, positions the cursor on the User ID field (USERIDL = -1), and sends the signon screen. This prevents processing stale or uninitialized COMMAREA data and ensures a clean starting state."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COSGN00",
+        "map_name": "COSGN0A",
+        "business_function": "Provides the signon/login screen for the CardDemo mainframe application. Users enter their User ID and Password to authenticate. Upon successful authentication, admin users are transferred to the admin menu (COADM01C) and regular users to the main menu (COMEN01C). The screen includes decorative ASCII art styled as a currency note representing the fictional 'United States of KICSLAND'."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COSGN00 - CardDemo Signon Screen</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}#terminal{background-color:#000;color:#fff;width:80ch;font-size:16px;line-height:1.5;padding:10px;border:1px solid #444;white-space:pre;position:relative;}.blue{color:#5555ff;}.yellow{color:#ffff00;}.green{color:#00cc00;}.red{color:#ff5555;}.turquoise{color:#00cdcd;}.neutral{color:#aaaaaa;}.bright{font-weight:bold;}.input-field{background-color:#000;border:none;border-bottom:1px solid #00cc00;color:#00cc00;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;}.password-field{background-color:#000;border:none;border-bottom:1px solid #00cc00;color:#000;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;}.error-field{color:#ff5555;font-weight:bold;}</style></head><body><div id='terminal'><span class='blue'>Tran : </span><span class='blue'>CC00</span>    <span class='yellow'>    AWS CardDemo                          </span>   <span class='blue'>Date : </span><span class='blue'>07/19/22</span>\n<span class='blue'>Prog : </span><span class='blue'>COSGN00C</span>    <span class='yellow'>    Credit Card Demo Application          </span>   <span class='blue'>Time : </span><span class='blue'>23:12:33</span>\n<span class='blue'>AppID:</span><span class='blue'>CARDDEMO</span>                                                               <span class='blue'>SysID:</span><span class='blue'>SYS1    </span>\n\n     <span class='neutral'>This is a Credit Card Demo Application for Mainframe Modernization</span>\n\n                    <span class='blue'>+========================================+</span>\n                    <span class='blue'>|%%%%%%%  NATIONAL RESERVE NOTE  %%%%%%%%|</span>\n                    <span class='blue'>|%(1)  THE UNITED STATES OF KICSLAND (1)%|</span>\n                    <span class='blue'>|%$$              ___       ********  $$%|</span>\n                    <span class='blue'>|%$    {x}       (o o)                 $%|</span>\n                    <span class='blue'>|%$     ******  (  V  )      O N E     $%|</span>\n                    <span class='blue'>|%(1)          ---m-m---             (1)%|</span>\n                    <span class='blue'>|%%~~~~~~~~~~~ ONE DOLLAR ~~~~~~~~~~~~~%%|</span>\n                    <span class='blue'>+========================================+</span>\n\n               <span class='turquoise'>Type your User ID and Password, then press ENTER:</span>\n\n             <span class='turquoise'>User ID     :</span> <input class='input-field' type='text' maxlength='8' size='8' value=''> <span class='blue'>(8 Char)</span>\n             <span class='turquoise'>Password    :</span> <input class='password-field' type='password' maxlength='8' size='8' value=''> <span class='blue'>(8 Char)</span>\n\n<span class='error-field'>                                                                              </span>\n<span class='yellow'>ENTER=Sign-on  F3=Exit</span></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Submit User ID and Password for authentication. Validates credentials against the USRSEC file. On success, transfers admin users to COADM01C (Admin Menu) or regular users to COMEN01C (Main Menu). Displays error messages for blank User ID, blank Password, wrong password, or user not found."
+        },
+        {
+          "key": "F3",
+          "action": "Exit the application. Displays a 'Thank You' message and returns without transferring to another program."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COPAUS2C.cbl",
+        "type": "cobol"
+      },
+      "overview": "COPAUS2C is part of the CardDemo Authorization Module, operating within a financial card transaction processing system that handles real-time payment authorizations. It serves as a fraud flagging service invoked when a customer or system identifies a previously processed authorization message as fraudulent or when a fraud flag needs to be removed. The program receives authorization transaction details and a fraud action indicator via its communication area, then persists or updates a fraud record in the DB2 AUTHFRDS table, enabling downstream fraud management and reporting workflows to act on flagged transactions.",
+      "key_features": [
+        {
+          "feature": "Fraud Record Creation",
+          "description": "Inserts a complete authorization transaction record into the CARDDEMO.AUTHFRDS DB2 table, marking it with a fraud status indicator (Report or Remove)."
+        },
+        {
+          "feature": "Duplicate Record Handling",
+          "description": "Detects duplicate key violations (SQLCODE -803) and automatically falls back to updating the existing fraud record rather than failing the operation."
+        },
+        {
+          "feature": "Fraud Status Update",
+          "description": "Updates the AUTH_FRAUD flag and FRAUD_RPT_DATE on an existing record when the transaction has already been stored, supporting both fraud reporting and fraud removal actions."
+        },
+        {
+          "feature": "Timestamp Formatting",
+          "description": "Converts the original authorization date and time fields from the audit record into a formatted DB2-compatible timestamp for accurate record identification and storage."
+        },
+        {
+          "feature": "Current Date Stamping",
+          "description": "Captures and stores the current processing date as the fraud report date using both CICS ASKTIME/FORMATTIME and DB2 CURRENT DATE functions."
+        },
+        {
+          "feature": "Operation Status Feedback",
+          "description": "Returns a success or failure status along with a descriptive message back to the calling program via the communication area, including DB2 error codes when failures occur."
+        },
+        {
+          "feature": "Full Transaction Detail Preservation",
+          "description": "Carries over all relevant authorization attributes — merchant details, transaction amounts, card information, response codes — into the fraud record for complete audit traceability."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDDEMO.AUTHFRDS",
+        "type": "Read/Write",
+        "description": "DB2 table storing fraud authorization records. The program attempts to INSERT a new fraud record into this table. If a duplicate key error (SQLCODE -803) occurs, it performs an UPDATE to set the AUTH_FRAUD flag and FRAUD_RPT_DATE for the matching CARD_NUM and AUTH_TS."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Receive Communication Area",
+          "description": "Program receives DFHCOMMAREA from the calling program containing account ID, customer ID, the authorization audit record (CIPAUDTY), and the fraud action/status record indicating whether to report or remove fraud.",
+          "records": [
+            "WS-ACCT-ID",
+            "WS-CUST-ID",
+            "WS-FRAUD-AUTH-RECORD (CIPAUDTY)",
+            "WS-FRD-ACTION",
+            "WS-FRD-UPDATE-STATUS",
+            "WS-FRD-ACT-MSG"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Capture Current Timestamp via CICS ASKTIME",
+          "description": "Invokes CICS ASKTIME to retrieve the current absolute time into WS-ABS-TIME, which is then formatted into MM/DD/YY format using CICS FORMATTIME for use as the fraud report date.",
+          "records": [
+            "WS-ABS-TIME",
+            "WS-CUR-DATE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Format Fraud Report Date",
+          "description": "Moves the formatted current date (WS-CUR-DATE) into the PA-FRAUD-RPT-DATE field of the authorization audit record to stamp when the fraud was reported.",
+          "records": [
+            "WS-CUR-DATE",
+            "PA-FRAUD-RPT-DATE"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Reconstruct Authorization Timestamp",
+          "description": "Extracts year, month, and day from PA-AUTH-ORIG-DATE and computes the authorization time by subtracting PA-AUTH-TIME-9C from 999999999, then parses hours, minutes, seconds, and milliseconds into WS-AUTH-TS composite timestamp field.",
+          "records": [
+            "PA-AUTH-ORIG-DATE",
+            "PA-AUTH-TIME-9C",
+            "WS-AUTH-TIME",
+            "WS-AUTH-TS",
+            "WS-AUTH-YY",
+            "WS-AUTH-MM",
+            "WS-AUTH-DD",
+            "WS-AUTH-HH",
+            "WS-AUTH-MI",
+            "WS-AUTH-SS",
+            "WS-AUTH-SSS"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Populate DB2 Host Variables from Authorization Record",
+          "description": "Maps all fields from the incoming CIPAUDTY authorization audit record and the DFHCOMMAREA fraud fields into the AUTHFRDS DB2 host variable structure, including card number, timestamp, transaction amounts, merchant details, match status, fraud action flag, account ID, and customer ID.",
+          "records": [
+            "PA-CARD-NUM",
+            "PA-AUTH-TYPE",
+            "PA-CARD-EXPIRY-DATE",
+            "PA-MESSAGE-TYPE",
+            "PA-MESSAGE-SOURCE",
+            "PA-AUTH-ID-CODE",
+            "PA-AUTH-RESP-CODE",
+            "PA-AUTH-RESP-REASON",
+            "PA-PROCESSING-CODE",
+            "PA-TRANSACTION-AMT",
+            "PA-APPROVED-AMT",
+            "PA-MERCHANT-CATAGORY-CODE",
+            "PA-ACQR-COUNTRY-CODE",
+            "PA-POS-ENTRY-MODE",
+            "PA-MERCHANT-ID",
+            "PA-MERCHANT-NAME",
+            "PA-MERCHANT-CITY",
+            "PA-MERCHANT-STATE",
+            "PA-MERCHANT-ZIP",
+            "PA-TRANSACTION-ID",
+            "PA-MATCH-STATUS",
+            "WS-FRD-ACTION",
+            "WS-ACCT-ID",
+            "WS-CUST-ID",
+            "CARD-NUM",
+            "AUTH-TS",
+            "AUTH-FRAUD",
+            "ACCT-ID",
+            "CUST-ID"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Attempt DB2 INSERT into AUTHFRDS",
+          "description": "Executes a DB2 INSERT statement into CARDDEMO.AUTHFRDS table with all populated host variables. The AUTH_TS column is converted using TIMESTAMP_FORMAT and FRAUD_RPT_DATE is set to CURRENT DATE. SQLCODE is evaluated to determine success or failure.",
+          "records": [
+            "CARD-NUM",
+            "AUTH-TS",
+            "AUTH-TYPE",
+            "CARD-EXPIRY-DATE",
+            "MESSAGE-TYPE",
+            "MESSAGE-SOURCE",
+            "AUTH-ID-CODE",
+            "AUTH-RESP-CODE",
+            "AUTH-RESP-REASON",
+            "PROCESSING-CODE",
+            "TRANSACTION-AMT",
+            "APPROVED-AMT",
+            "MERCHANT-CATAGORY-CODE",
+            "ACQR-COUNTRY-CODE",
+            "POS-ENTRY-MODE",
+            "MERCHANT-ID",
+            "MERCHANT-NAME",
+            "MERCHANT-CITY",
+            "MERCHANT-STATE",
+            "MERCHANT-ZIP",
+            "TRANSACTION-ID",
+            "MATCH-STATUS",
+            "AUTH-FRAUD",
+            "ACCT-ID",
+            "CUST-ID",
+            "SQLCODE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Evaluate INSERT Result and Branch",
+          "description": "If SQLCODE = 0, sets WS-FRD-UPDT-SUCCESS and writes 'ADD SUCCESS' to WS-FRD-ACT-MSG. If SQLCODE = -803 (duplicate key), branches to FRAUD-UPDATE paragraph. For any other SQLCODE, sets WS-FRD-UPDT-FAILED and formats an error message with SQLCODE and SQLSTATE.",
+          "records": [
+            "SQLCODE",
+            "SQLSTATE",
+            "WS-FRD-UPDT-SUCCESS",
+            "WS-FRD-UPDT-FAILED",
+            "WS-FRD-ACT-MSG",
+            "WS-SQLCODE",
+            "WS-SQLSTATE"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Perform DB2 UPDATE on Duplicate Record (FRAUD-UPDATE)",
+          "description": "When a duplicate key error (-803) is detected, executes a DB2 UPDATE on CARDDEMO.AUTHFRDS to update AUTH_FRAUD and FRAUD_RPT_DATE for the matching CARD_NUM and AUTH_TS. Sets success or failure status and message accordingly.",
+          "records": [
+            "AUTH-FRAUD",
+            "CARD-NUM",
+            "AUTH-TS",
+            "SQLCODE",
+            "SQLSTATE",
+            "WS-FRD-UPDT-SUCCESS",
+            "WS-FRD-UPDT-FAILED",
+            "WS-FRD-ACT-MSG",
+            "WS-SQLCODE",
+            "WS-SQLSTATE"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Return Control to Caller via CICS RETURN",
+          "description": "Executes CICS RETURN to pass control back to the calling program. The DFHCOMMAREA is implicitly returned with the updated WS-FRD-UPDATE-STATUS and WS-FRD-ACT-MSG fields reflecting the outcome of the fraud marking operation.",
+          "records": [
+            "WS-FRD-UPDATE-STATUS",
+            "WS-FRD-ACT-MSG"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "DFHCOMMAREA Input Completeness",
+          "description": "The program relies entirely on the calling program to populate DFHCOMMAREA with a valid WS-ACCT-ID, WS-CUST-ID, a fully populated CIPAUDTY authorization record, and a valid WS-FRD-ACTION ('F' for report fraud or 'R' for remove fraud). No internal validation is performed on these inputs; missing or malformed data will result in incorrect DB2 operations."
+        },
+        {
+          "dependency": "AUTHFRDS DB2 Table Availability",
+          "description": "The program depends on the CARDDEMO.AUTHFRDS DB2 table being accessible and writable. Both the INSERT and UPDATE operations target this table. If the table is unavailable or locked, the program will set WS-FRD-UPDT-FAILED and return an error message without retry logic."
+        },
+        {
+          "dependency": "Duplicate Key Handling (SQLCODE -803)",
+          "description": "The upsert logic depends on SQLCODE -803 being returned by DB2 to detect a duplicate primary key (CARD_NUM + AUTH_TS). If a duplicate exists, the program switches from INSERT to UPDATE. This assumes the primary key constraint is defined on CARD_NUM and AUTH_TS in CARDDEMO.AUTHFRDS."
+        },
+        {
+          "dependency": "Authorization Timestamp Reconstruction Accuracy",
+          "description": "The AUTH_TS value used as the primary key lookup in both INSERT and UPDATE depends on correctly reconstructing the timestamp from PA-AUTH-ORIG-DATE and PA-AUTH-TIME-9C. The time computation (999999999 - PA-AUTH-TIME-9C) must produce a valid HHMMSSMMM value. Any mismatch in timestamp format will cause the UPDATE in FRAUD-UPDATE to fail to locate the correct row."
+        },
+        {
+          "dependency": "CIPAUDTY Copybook Field Alignment",
+          "description": "All PA-prefixed fields (e.g., PA-CARD-NUM, PA-AUTH-ORIG-DATE, PA-TRANSACTION-AMT) are sourced from the CIPAUDTY copybook included in DFHCOMMAREA. The program assumes these fields are correctly populated by the caller and that the copybook layout matches the AUTHFRDS host variable structure defined in the AUTHFRDS include."
+        },
+        {
+          "dependency": "AUTHFRDS SQL Include Host Variable Alignment",
+          "description": "The EXEC SQL INCLUDE AUTHFRDS directive must define host variables (CARD-NUM, AUTH-TS, AUTH-TYPE, etc.) that exactly match the column definitions of CARDDEMO.AUTHFRDS. Any mismatch in data types or lengths will cause DB2 SQL errors at runtime."
+        },
+        {
+          "dependency": "CICS ASKTIME and FORMATTIME Sequencing",
+          "description": "CICS FORMATTIME depends on WS-ABS-TIME being populated by CICS ASKTIME first. These two calls must execute in sequence before PA-FRAUD-RPT-DATE is set. If ASKTIME fails silently (NOHANDLE), WS-ABS-TIME may be zero, resulting in an incorrect fraud report date."
+        },
+        {
+          "dependency": "WS-FRD-ACTION Value Validity",
+          "description": "The AUTH-FRAUD column in CARDDEMO.AUTHFRDS is set directly from WS-FRD-ACTION. The program defines valid values as 'F' (report fraud) and 'R' (remove fraud) via 88-level condition names, but does not validate the value before writing it to the database. An invalid value passed by the caller will be persisted without error."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction Processing Monitor",
+          "purpose": "Provides runtime environment for the program. CICS ASKTIME retrieves the current absolute time, CICS FORMATTIME converts it to a human-readable date for the fraud report date stamp, and CICS RETURN transfers control back to the calling CICS transaction after fraud marking is complete."
+        },
+        {
+          "system": "IBM DB2",
+          "type": "Relational Database Management System",
+          "purpose": "Persists fraud-marked authorization records into the CARDDEMO.AUTHFRDS table. The program performs an INSERT to create a new fraud record or, on duplicate key detection (SQLCODE -803), performs an UPDATE to modify the AUTH_FRAUD flag and FRAUD_RPT_DATE on the existing record. SQLCA is used to capture and evaluate DB2 return codes and state information."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "DB2 Insert Duplicate Key Errors (SQLCODE -803)",
+        "description": "When an INSERT fails due to a duplicate key violation (SQLCODE -803), the program does not treat it as a fatal error. Instead, it branches to the FRAUD-UPDATE paragraph to perform an UPDATE on the existing record, effectively implementing an upsert pattern. This allows fraud status changes (report or remove) to be applied to already-existing authorization records."
+      },
+      {
+        "category": "DB2 Insert General Errors (non-zero, non-803 SQLCODE)",
+        "description": "Any INSERT failure other than a duplicate key sets the WS-FRD-UPDT-FAILED flag (value 'F') on the WS-FRD-UPDATE-STATUS field in the COMMAREA. The SQLCODE and SQLSTATE values are captured into WS-SQLCODE and WS-SQLSTATE, then formatted into a descriptive error message string ('SYSTEM ERROR DB2: CODE: ..., STATE: ...') stored in WS-FRD-ACT-MSG, which is returned to the calling program via the COMMAREA."
+      },
+      {
+        "category": "DB2 Update Errors (FRAUD-UPDATE paragraph)",
+        "description": "If the UPDATE operation in FRAUD-UPDATE fails (non-zero SQLCODE), the WS-FRD-UPDT-FAILED flag is set. SQLCODE and SQLSTATE are captured and formatted into a descriptive message ('UPDT ERROR DB2: CODE: ..., STATE: ...') stored in WS-FRD-ACT-MSG, which is passed back to the caller via the COMMAREA."
+      },
+      {
+        "category": "Successful Operation Signaling",
+        "description": "On successful INSERT or UPDATE (SQLCODE = 0), the WS-FRD-UPDT-SUCCESS flag (value 'S') is set and a success message ('ADD SUCCESS' or 'UPDT SUCCESS') is placed in WS-FRD-ACT-MSG. This status is communicated back to the calling program through the COMMAREA, allowing the caller to determine outcome without inspecting DB2 codes directly."
+      },
+      {
+        "category": "CICS Command Errors (ASKTIME, FORMATTIME)",
+        "description": "CICS commands ASKTIME and FORMATTIME are both issued with the NOHANDLE option, meaning CICS exceptions are suppressed and no explicit error handling is performed for these operations. Failures in time retrieval or formatting are silently ignored, which could result in incorrect or blank timestamp values being stored in the fraud record."
+      },
+      {
+        "category": "Input Validation Errors",
+        "description": "There is no explicit input validation performed on the COMMAREA fields (account ID, customer ID, fraud action, or authorization record fields) before processing. The WS-ERR-FLG field is defined in working storage but is never set or evaluated in the procedure division, indicating that input validation error handling is absent or delegated entirely to the calling program."
+      }
+    ]
+  }
+}

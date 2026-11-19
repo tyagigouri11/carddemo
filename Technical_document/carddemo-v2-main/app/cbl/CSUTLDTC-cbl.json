@@ -1,0 +1,202 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CSUTLDTC.cbl",
+        "type": "cobol"
+      },
+      "overview": "This program is a utility component within the CardDemo financial application, serving as a reusable date validation service that can be called by other programs in the system. It operates as a shared infrastructure module in the date processing workflow, providing centralized date validation capabilities. The program validates whether a given date string conforms to a specified format by invoking the IBM Language Environment (LE) API CEEDAYS, which converts a date into a Lillian date (a standardized integer representation). It solves the problem of consistent, reliable date validation across the application by wrapping the CEEDAYS API call and translating its feedback codes into human-readable result messages that calling programs can interpret.",
+      "key_features": [
+        {
+          "feature": "Date Validation",
+          "description": "Accepts a date string and format mask from calling programs and validates whether the date is legitimate and well-formed"
+        },
+        {
+          "feature": "CEEDAYS API Integration",
+          "description": "Calls the IBM Language Environment CEEDAYS API to convert the input date to a Lillian date format, leveraging system-level date processing capabilities"
+        },
+        {
+          "feature": "Flexible Format Support",
+          "description": "Accepts a configurable date format mask (e.g., YYYY-MM-DD) allowing validation of dates in multiple formats"
+        },
+        {
+          "feature": "Detailed Error Classification",
+          "description": "Interprets CEEDAYS feedback codes and maps them to descriptive error messages covering conditions such as invalid date, bad date value, invalid era, unsupported range, invalid month, bad picture string, non-numeric data, and year-in-era-zero"
+        },
+        {
+          "feature": "Standardized Result Reporting",
+          "description": "Returns a structured 80-character result message to the calling program containing severity, message code, validation result, test date, and format mask used"
+        },
+        {
+          "feature": "Return Code Propagation",
+          "description": "Sets the RETURN-CODE to the severity value from the CEEDAYS feedback, enabling calling programs to programmatically check success or failure"
+        },
+        {
+          "feature": "Reusable Subprogram Design",
+          "description": "Implemented as a called subprogram with a Linkage Section interface, making it a reusable utility across multiple programs in the CardDemo application"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "LS-DATE",
+        "type": "Read",
+        "description": "Input date string (up to 10 characters) passed via Linkage Section to be validated and converted to Lillian date format by the CEEDAYS API"
+      },
+      {
+        "name": "LS-DATE-FORMAT",
+        "type": "Read",
+        "description": "Input date format mask (up to 10 characters) passed via Linkage Section specifying the picture string format of the input date (e.g., YYYY-MM-DD)"
+      },
+      {
+        "name": "LS-RESULT",
+        "type": "Write",
+        "description": "Output message (80 characters) returned via Linkage Section containing severity code, message code, validation result description, test date, and mask used"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Receive Input Parameters",
+          "description": "Program receives three linkage section parameters from the calling program: a date string, a date format mask, and a result buffer.",
+          "records": [
+            "LS-DATE",
+            "LS-DATE-FORMAT",
+            "LS-RESULT"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Initialize Working Storage",
+          "description": "WS-MESSAGE and WS-DATE are initialized/cleared to ensure no residual data affects processing.",
+          "records": [
+            "WS-MESSAGE",
+            "WS-DATE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Populate CEEDAYS Input Structures",
+          "description": "The input date and format mask are moved into variable-length string structures (Vstring) required by the CEEDAYS API, including setting the Vstring-length fields from the LENGTH OF the linkage parameters.",
+          "records": [
+            "WS-DATE-TO-TEST",
+            "WS-DATE-FORMAT",
+            "Vstring-length",
+            "Vstring-text",
+            "WS-DATE",
+            "WS-DATE-FMT"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Initialize Output Field",
+          "description": "OUTPUT-LILLIAN is set to zero before the CEEDAYS call to ensure a clean output field.",
+          "records": [
+            "OUTPUT-LILLIAN"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Call CEEDAYS API",
+          "description": "The IBM Language Environment CEEDAYS callable service is invoked to convert the input date string (using the provided format mask) into a Lilian date integer. The feedback code is populated with success or error information.",
+          "records": [
+            "WS-DATE-TO-TEST",
+            "WS-DATE-FORMAT",
+            "OUTPUT-LILLIAN",
+            "FEEDBACK-CODE"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Extract Feedback Code Details",
+          "description": "SEVERITY and MSG-NO are extracted from the FEEDBACK-CODE structure and moved into the WS-MESSAGE fields for inclusion in the result output.",
+          "records": [
+            "FEEDBACK-CODE",
+            "SEVERITY",
+            "MSG-NO",
+            "WS-SEVERITY-N",
+            "WS-MSG-NO-N"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Evaluate Feedback Code and Set Result Text",
+          "description": "The FEEDBACK-TOKEN-VALUE is evaluated against known condition codes (88-level values) to determine the outcome of the date validation. A human-readable result string is placed into WS-RESULT based on the matched condition.",
+          "records": [
+            "FEEDBACK-TOKEN-VALUE",
+            "WS-RESULT",
+            "FC-INVALID-DATE",
+            "FC-INSUFFICIENT-DATA",
+            "FC-BAD-DATE-VALUE",
+            "FC-INVALID-ERA",
+            "FC-UNSUPP-RANGE",
+            "FC-INVALID-MONTH",
+            "FC-BAD-PIC-STRING",
+            "FC-NON-NUMERIC-DATA",
+            "FC-YEAR-IN-ERA-ZERO"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Populate Result and Return Code",
+          "description": "The fully assembled WS-MESSAGE (containing severity, message code, result text, test date, and format mask) is moved to LS-RESULT for return to the caller. WS-SEVERITY-N is set as the RETURN-CODE to signal success or failure numerically.",
+          "records": [
+            "WS-MESSAGE",
+            "LS-RESULT",
+            "WS-SEVERITY-N",
+            "RETURN-CODE"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Vstring-length must be set before Vstring-text",
+          "description": "The variable-length string structures WS-DATE-TO-TEST and WS-DATE-FORMAT require Vstring-length to be populated before Vstring-text is moved, as the OCCURS DEPENDING ON clause uses the length field to define the active size of the character array passed to CEEDAYS."
+        },
+        {
+          "dependency": "CEEDAYS call must precede feedback evaluation",
+          "description": "The EVALUATE block that interprets FEEDBACK-TOKEN-VALUE and sets WS-RESULT is entirely dependent on the CEEDAYS call having completed and populated FEEDBACK-CODE with valid condition data."
+        },
+        {
+          "dependency": "OUTPUT-LILLIAN initialization before CEEDAYS call",
+          "description": "OUTPUT-LILLIAN must be zeroed before calling CEEDAYS to prevent stale data from a prior invocation being misinterpreted if the API does not overwrite it on error paths."
+        },
+        {
+          "dependency": "LS-DATE and LS-DATE-FORMAT must be provided by caller",
+          "description": "The program has no internal default values for the date or format mask; both must be supplied correctly by the calling program via the LINKAGE SECTION, or CEEDAYS will return an error feedback code."
+        },
+        {
+          "dependency": "Feedback code interpretation order",
+          "description": "The EVALUATE TRUE construct checks 88-level condition names in sequence. FC-INVALID-DATE (all zeros) represents a successful conversion, so its placement first in the EVALUATE is critical to correctly distinguishing a valid date from error conditions."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM Language Environment (LE) CEEDAYS",
+          "type": "IBM z/OS Language Environment Callable Service",
+          "purpose": "Converts a character-string date in a caller-specified format mask into a Lilian date integer (days since 15 October 1582). Also provides structured feedback codes indicating validity or specific error conditions of the input date."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "CEEDAYS API Feedback Code Errors",
+        "description": "After calling the CEEDAYS API, the program inspects the FEEDBACK-CODE structure using 88-level condition names mapped to specific hexadecimal token values. Each condition (FC-INVALID-DATE, FC-INSUFFICIENT-DATA, FC-BAD-DATE-VALUE, FC-INVALID-ERA, FC-UNSUPP-RANGE, FC-INVALID-MONTH, FC-BAD-PIC-STRING, FC-NON-NUMERIC-DATA, FC-YEAR-IN-ERA-ZERO) is evaluated in an EVALUATE TRUE block, and a descriptive 15-character result message is moved to WS-RESULT. A catch-all WHEN OTHER clause handles any unrecognized feedback codes by setting WS-RESULT to 'Date is invalid'."
+      },
+      {
+        "category": "Severity and Message Code Propagation",
+        "description": "The SEVERITY and MSG-NO fields extracted from the FEEDBACK-CODE structure are moved into WS-SEVERITY-N and WS-MSG-NO-N respectively, and included in the WS-MESSAGE output. The SEVERITY value is also moved to RETURN-CODE before EXIT PROGRAM, allowing the calling program to inspect the numeric severity level as a standard return code for downstream error handling."
+      },
+      {
+        "category": "Input Date and Format Handling",
+        "description": "The program accepts the date and date format via the LINKAGE SECTION parameters LS-DATE and LS-DATE-FORMAT. No explicit input validation is performed before passing them to CEEDAYS; instead, errors resulting from invalid input (e.g., bad picture string, non-numeric data, insufficient data) are detected and reported through the CEEDAYS feedback mechanism after the call."
+      },
+      {
+        "category": "Result Communication to Caller",
+        "description": "All error and status information is consolidated into the WS-MESSAGE structure, which includes severity, message code, result description, test date, and mask used. This composite message is moved to the LS-RESULT linkage parameter before returning, providing the calling program with a structured, human-readable diagnostic string alongside the numeric RETURN-CODE for programmatic error assessment."
+      }
+    ]
+  }
+}

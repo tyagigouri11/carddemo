@@ -1,0 +1,91 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COMBTRAN.jcl",
+        "type": "jcl"
+      },
+      "overview": "The COMBTRAN job combines and consolidates credit card transaction data from two sources: a backup of the current transaction file and a system-generated transactions file. It sorts the merged transactions by Transaction ID in ascending order and writes the result to a new generation of a combined transaction dataset. Finally, it loads the combined and sorted transaction data into a VSAM KSDS (Key-Sequenced Dataset), which serves as the transaction master file for the CardDemo credit card application.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "COMBTRAN",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, scheduling, and referencing the job in the JES queue."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'COMBINE TRANSACTIONS'",
+          "description": "The first positional parameter on the JOB statement, providing accounting or descriptive information for the job. It is used for billing, documentation, and identification purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class, which determines the job entry subsystem (JES) input queue where the job is placed. Class A typically indicates a standard batch processing class, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages (JES message log). This determines where the job's system output messages are routed, such as to a printer, held queue, or sysout class."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion or failure. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending a notification message when the job finishes."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05R",
+        "purpose": "Sorts and combines the current transaction backup file and system-generated transactions into a single output file. Records are sorted in ascending order by the Transaction ID field (TRAN-ID), defined as a 16-character field starting at position 1.",
+        "programs": "SORT*",
+        "inputs": "SORTIN: AWS.M2.CARDDEMO.TRANSACT.BKUP(0) (current transaction backup), AWS.M2.CARDDEMO.SYSTRAN(0) (system-generated transactions); SYMNAMES: TRAN-ID field definition (position 1, length 16, character); SYSIN: SORT FIELDS=(TRAN-ID,A)",
+        "outputs": "SORTOUT: AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1) (new generation, cataloged, SYSDA, space 1 cylinder with 1 secondary, release unused; DCB copied from SORTIN); SYSOUT: job log"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Loads the combined and sorted transaction file into the VSAM KSDS transaction master dataset by reproducing all records from the sequential combined file into the VSAM dataset.",
+        "programs": "IDCAMS*",
+        "inputs": "TRANSACT: AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1) (combined sorted transaction file produced in STEP05R)",
+        "outputs": "TRANVSAM: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (VSAM KSDS transaction master, updated via REPRO); SYSPRINT: utility execution report"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP(0)",
+        "operations": "READ",
+        "description": "SORT reads the current generation (0) of the transaction backup file as first input dataset"
+      },
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.SYSTRAN(0)",
+        "operations": "READ",
+        "description": "SORT reads the current generation (0) of the system-generated transactions file as second input dataset"
+      },
+      {
+        "step": "STEP05R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1)",
+        "operations": "WRITE",
+        "description": "SORT writes the combined and sorted output (sorted ascending by TRAN-ID, characters 1-16) to a new generation (+1) of the combined transactions GDG dataset, newly cataloged on SYSDA"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.COMBINED(+1)",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the newly created combined transactions dataset as input (INFILE)"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO loads all records from the combined transactions dataset into the VSAM KSDS transaction master file as output (OUTFILE)"
+      }
+    ]
+  }
+}

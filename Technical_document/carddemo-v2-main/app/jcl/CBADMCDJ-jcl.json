@@ -1,0 +1,89 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBADMCDJ.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job (CBADMCDJ) creates and defines CICS resources for the CardDemo application, an AWS mainframe modernization demonstration application. It uses the CICS System Definition Utility (DFHCSDUP) to define a complete set of CICS resources — including a load library, map sets, programs, and transactions — all organized under a single CICS resource group named CARDDEMO. The resources defined support core banking functions such as user login, account management, card management, transaction processing, bill payment, and administrative operations.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "(COBOL),'AWSCODR'",
+          "description": "The JOB statement marks the beginning of a job and provides accounting information '(COBOL)' and a programmer name 'AWSCODR'. The accounting information is used for billing and tracking purposes, while the programmer name identifies who submitted the job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class 'A' which determines the job entry subsystem (JES) input queue where the job is placed. The job class controls scheduling priority and resource allocation, determining when and how the job is selected for execution."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class 'H' for the job log and system messages. This determines the JES output queue where job-related messages (JCL listing, allocation/termination messages) are directed, controlling how and where the job output is routed or printed."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value '1' specifies that all JCL statements including those from cataloged procedures are printed. The second value '1' specifies that all system messages including allocation and termination messages are printed for all steps."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter '&SYSUID' resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time limit of 1440 minutes (24 hours) allowed for the entire job across all steps. If the job exceeds this time limit, it is abnormally terminated. Setting it to 1440 effectively allows the job to run without a practical time constraint for an entire day."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP1",
+        "purpose": "Defines CICS resources for the CardDemo application in the CICS System Definition (CSD) file. This includes defining a LIBRARY (COM2DOLL), multiple MAPSETs (login, account, card, transaction, bill pay, admin, and test screens), PROGRAMs (sign-on, account management, card management, transaction, bill pay, admin, and test programs), and TRANSACTIONs (CCDM, CCT1, CCT2, CCT3, CCT4) under the CARDDEMO group, followed by a LIST of the group.",
+        "programs": "DFHCSDUP*",
+        "inputs": "DFHCSD: OEM.CICSTS.DFHCSD (CICS CSD file, READWRITE); SYSIN: DFHCSDUP control statements defining LIBRARY(COM2DOLL) with DSNAME01(AWS.M2.CARDDEMO.LOADLIB), MAPSETs (COSGN00M, COACT00S, COACTVWS, COACTUPS, COACTDES, COTRN00S, COTRNVWS, COTRNVDS, COTRNATS, COBIL00S, COADM00S, COTSTP1S, COTSTP2S, COTSTP3S, COTSTP4S), PROGRAMs (COSGN00C, COACT00C, COACTVWC, COACTUPC, COACTDEC, COTRN00C, COTRNVWC, COTRNVDC, COTRNATC, COBIL00C, COADM00C, COTSTP1C, COTSTP2C, COTSTP3C, COTSTP4C), and TRANSACTIONs (CCDM, CCT1, CCT2, CCT3, CCT4) all under GROUP(CARDDEMO)",
+        "outputs": "OEM.CICSTS.DFHCSD (updated CSD file with CARDDEMO group definitions); OUTDD: SYSOUT (DFHCSDUP output listing); SYSPRINT: SYSOUT (LIST GROUP(CARDDEMO) report and processing messages)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "STEPLIB DD references the CICS load library for the DFHCSDUP utility program"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.DFHCSD",
+        "operations": "READ/WRITE",
+        "description": "DFHCSD DD references the CICS System Definition (CSD) file opened for READWRITE to define CARDDEMO resources including LIBRARY, MAPSETs, PROGRAMs, and TRANSACTIONs"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "OUTDD DD writes DFHCSDUP output listing to SYSOUT"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSPRINT DD writes DFHCSDUP print output to SYSOUT"
+      },
+      {
+        "step": "STEP1",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "DEFINE",
+        "description": "DFHCSDUP DEFINE LIBRARY(COM2DOLL) GROUP(CARDDEMO) references AWS.M2.CARDDEMO.LOADLIB as DSNAME01 for the CICS library definition"
+      }
+    ]
+  }
+}

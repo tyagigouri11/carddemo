@@ -1,0 +1,249 @@
+{
+    "name": "COBSWAIT.cbl",
+    "program_name": "COBSWAIT.cbl",
+    "generated_at": "2026-11-05T08:39:40Z",
+    "overview": {
+        "total_key_functionalities": 4,
+        "total_rules": 8,
+        "main_flow_diagram": "flowchart TD\n    classDef start fill:#67A353,stroke:#333,color:#fff\n    classDef process fill:#08AAD2,stroke:#333,color:#fff\n    classDef decision fill:#FFE347,stroke:#333,color:#000\n    classDef datasource fill:#2EA597,stroke:#333,color:#fff\n    classDef final fill:#D13313,stroke:#333,color:#fff\n    classDef success fill:#2BB534,stroke:#333,color:#fff\n    classDef error fill:#D13313,stroke:#333,color:#fff\n\n    A[Program Start]:::start\n    B[1:Accept Wait Duration\nRead wait duration value in centiseconds\nfrom system input SYSIN]:::process\n    C[2:Convert Wait Parameter\nMove accepted input parameter value\ninto numeric wait time field for processing]:::process\n    D[3:Execute Wait\nInvoke wait utility with specified duration\nto pause program execution for given\nnumber of centiseconds]:::process\n    E[4:Terminate Program\nStop program execution after\nwait period has completed]:::final\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E",
+        "rules": [
+            {
+                "rule_id": "R-COBSWAIT-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Accept Wait Duration from System Input",
+                "rule_description": "The program reads a wait duration value, expressed in centiseconds, provided by the user or calling process at runtime via system input.",
+                "sub_graph_node_text": "1:Accept Wait Duration\nRead wait duration value in centiseconds\nfrom system input SYSIN",
+                "acceptance_criteria": {
+                    "Given": "The program has started execution and is ready to receive input",
+                    "When": "A wait duration value in centiseconds is supplied via system input (SYSIN) at runtime",
+                    "Then": "The program accepts and stores the provided wait duration value for further processing"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBSWAIT-cbl-00002",
+                "rule_type": "Definitional Rules",
+                "rule_name": "Convert Accepted Input into Wait Time Parameter",
+                "rule_description": "The accepted raw input value is transferred into a dedicated numeric wait time field so that it can be correctly passed to the wait utility for execution.",
+                "sub_graph_node_text": "2:Convert Wait Parameter\nMove accepted input parameter value\ninto numeric wait time field for processing",
+                "acceptance_criteria": {
+                    "Given": "A wait duration value has been successfully accepted from system input",
+                    "When": "The program prepares the wait time parameter for use",
+                    "Then": "The accepted input value is moved into the numeric wait time field, making it ready to be passed to the wait utility"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBSWAIT-cbl-00003",
+                "rule_type": "Action Rules",
+                "rule_name": "Invoke Wait Utility to Pause Program Execution",
+                "rule_description": "The program invokes an external wait utility, passing the specified duration in centiseconds, which causes the program to pause all processing for exactly that duration before continuing.",
+                "sub_graph_node_text": "3:Execute Wait\nInvoke wait utility with specified duration\nto pause program execution for given\nnumber of centiseconds",
+                "acceptance_criteria": {
+                    "Given": "The numeric wait time field has been populated with the desired pause duration in centiseconds",
+                    "When": "The program invokes the external wait utility (MVSWAIT) with the specified wait time value",
+                    "Then": "Program execution is paused for the exact number of centiseconds specified, and processing resumes only after the wait period has fully elapsed"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-COBSWAIT-cbl-00004",
+                "rule_type": "Process Rules",
+                "rule_name": "Terminate Program After Wait Completion",
+                "rule_description": "Once the specified wait period has fully elapsed and the wait utility returns control, the program concludes its execution with no further processing.",
+                "sub_graph_node_text": "4:Terminate Program\nStop program execution after\nwait period has completed",
+                "acceptance_criteria": {
+                    "Given": "The wait utility has completed the pause for the specified duration and has returned control to the program",
+                    "When": "No further processing steps remain",
+                    "Then": "The program terminates its execution cleanly"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "accept-wait-duration",
+            "title": "Accept Wait Duration",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A[Start: Accept Wait Duration]\n    B[Read wait duration value\\nin centiseconds\\nfrom System Input SYSIN]\n    C[Wait Duration Value\\nSuccessfully Captured]\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-COBSWAIT-cbl-00005",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Accept Wait Duration from System Input",
+                    "rule_description": "The program reads a wait duration value, expressed in centiseconds, from the system input (SYSIN) at runtime. This value represents how long the program should pause execution and must be supplied by the user or calling process before the program proceeds.",
+                    "sub_graph_node_text": "Read wait duration value in centiseconds from System Input SYSIN",
+                    "acceptance_criteria": {
+                        "Given": "The program has started execution and is ready to receive input from the system input source (SYSIN)",
+                        "When": "A wait duration value expressed in centiseconds is provided via the system input (SYSIN) at runtime",
+                        "Then": "The wait duration value is successfully captured and stored internally as the designated wait time parameter (MVSWAIT-TIME), making it available for use in the subsequent wait execution step"
+                    },
+                    "key_functionality_id": "accept-wait-duration"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Accept Wait Duration"
+        },
+        {
+            "id": "convert-wait-parameter",
+            "title": "Convert Wait Parameter",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A[Receive Accepted Input Parameter Value]\n    B[Transfer Input Parameter Value\\ninto Numeric Wait Time Field]\n    C[Wait Time Field Ready\\nfor Processing]\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-COBSWAIT-cbl-00006",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transfer Input Wait Duration into Wait Time Field",
+                    "rule_description": "When the program receives the wait duration value from the input parameter, it must transfer that value into the designated numeric wait time field so that it is ready to be used for the wait operation.",
+                    "sub_graph_node_text": "Transfer Input Parameter Value into Numeric Wait Time Field",
+                    "acceptance_criteria": {
+                        "Given": "A wait duration value has been accepted from the runtime input parameter (PARM-VALUE)",
+                        "When": "The program prepares to invoke the wait operation",
+                        "Then": "The accepted input parameter value is transferred into the numeric wait time field (MVSWAIT-TIME), making it ready for use in the subsequent wait execution step"
+                    },
+                    "key_functionality_id": "convert-wait-parameter"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Convert Wait Parameter"
+        },
+        {
+            "id": "execute-wait",
+            "title": "Execute Wait",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A[Begin Execute Wait]\n    B[Invoke Wait Utility\\nwith specified duration\\nin centiseconds]\n    C[Program Execution Paused\\nfor specified duration]\n    D[Wait Period Completed\\nResume Program Execution]\n\n    A --> B\n    B --> C\n    C --> D",
+            "rules": [
+                {
+                    "rule_id": "R-COBSWAIT-cbl-00007",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Invoke Wait Utility to Pause Program Execution",
+                    "rule_description": "When a wait duration is provided, the program invokes an external wait utility to pause all program execution for the specified number of centiseconds before resuming any further processing.",
+                    "sub_graph_node_text": "Invoke Wait Utility with specified duration in centiseconds",
+                    "acceptance_criteria": {
+                        "Given": "A wait duration value has been accepted as input and assigned to the wait time parameter",
+                        "When": "The external wait utility is invoked with the specified duration in centiseconds",
+                        "Then": "Program execution is paused for the exact duration specified, and processing resumes only after the full wait period has elapsed"
+                    },
+                    "key_functionality_id": "execute-wait"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Execute Wait"
+        },
+        {
+            "id": "terminate-program",
+            "title": "Terminate Program",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A[Wait Period Completed]\n    B[4: Terminate Program\\nStop program execution]\n    A --> B",
+            "rules": [
+                {
+                    "rule_id": "R-COBSWAIT-cbl-00008",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Program Termination After Wait Period Completion",
+                    "rule_description": "Once the specified wait period has fully elapsed, the program concludes its execution and releases control back to the calling environment or job scheduler.",
+                    "sub_graph_node_text": "4: Terminate Program\nStop program execution",
+                    "acceptance_criteria": {
+                        "Given": "The wait utility (MVSWAIT) has been invoked with the specified wait duration and the wait period has fully completed",
+                        "When": "The wait period expires and control is returned from the MVSWAIT utility back to the program",
+                        "Then": "The program terminates its execution immediately, releasing control back to the calling environment or job scheduler with no further processing performed"
+                    },
+                    "key_functionality_id": "terminate-program"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Terminate Program"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has started execution and is ready to receive input",
+                "When": "A wait duration value in centiseconds is supplied via system input (SYSIN) at runtime",
+                "Then": "The program accepts and stores the provided wait duration value for further processing"
+            },
+            "Rule_Name": "Accept Wait Duration from System Input",
+            "Rule_Description": "The program reads a wait duration value, expressed in centiseconds, provided by the user or calling process at runtime via system input."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00002",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A wait duration value has been successfully accepted from system input",
+                "When": "The program prepares the wait time parameter for use",
+                "Then": "The accepted input value is moved into the numeric wait time field, making it ready to be passed to the wait utility"
+            },
+            "Rule_Name": "Convert Accepted Input into Wait Time Parameter",
+            "Rule_Description": "The accepted raw input value is transferred into a dedicated numeric wait time field so that it can be correctly passed to the wait utility for execution."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00003",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The numeric wait time field has been populated with the desired pause duration in centiseconds",
+                "When": "The program invokes the external wait utility (MVSWAIT) with the specified wait time value",
+                "Then": "Program execution is paused for the exact number of centiseconds specified, and processing resumes only after the wait period has fully elapsed"
+            },
+            "Rule_Name": "Invoke Wait Utility to Pause Program Execution",
+            "Rule_Description": "The program invokes an external wait utility, passing the specified duration in centiseconds, which causes the program to pause all processing for exactly that duration before continuing."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00004",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The wait utility has completed the pause for the specified duration and has returned control to the program",
+                "When": "No further processing steps remain",
+                "Then": "The program terminates its execution cleanly"
+            },
+            "Rule_Name": "Terminate Program After Wait Completion",
+            "Rule_Description": "Once the specified wait period has fully elapsed and the wait utility returns control, the program concludes its execution with no further processing."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00005",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has started execution and is ready to receive input from the system input source (SYSIN)",
+                "When": "A wait duration value expressed in centiseconds is provided via the system input (SYSIN) at runtime",
+                "Then": "The wait duration value is successfully captured and stored internally as the designated wait time parameter (MVSWAIT-TIME), making it available for use in the subsequent wait execution step"
+            },
+            "Rule_Name": "Accept Wait Duration from System Input",
+            "Rule_Description": "The program reads a wait duration value, expressed in centiseconds, from the system input (SYSIN) at runtime. This value represents how long the program should pause execution and must be supplied by the user or calling process before the program proceeds."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00006",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A wait duration value has been accepted from the runtime input parameter (PARM-VALUE)",
+                "When": "The program prepares to invoke the wait operation",
+                "Then": "The accepted input parameter value is transferred into the numeric wait time field (MVSWAIT-TIME), making it ready for use in the subsequent wait execution step"
+            },
+            "Rule_Name": "Transfer Input Wait Duration into Wait Time Field",
+            "Rule_Description": "When the program receives the wait duration value from the input parameter, it must transfer that value into the designated numeric wait time field so that it is ready to be used for the wait operation."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00007",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A wait duration value has been accepted as input and assigned to the wait time parameter",
+                "When": "The external wait utility is invoked with the specified duration in centiseconds",
+                "Then": "Program execution is paused for the exact duration specified, and processing resumes only after the full wait period has elapsed"
+            },
+            "Rule_Name": "Invoke Wait Utility to Pause Program Execution",
+            "Rule_Description": "When a wait duration is provided, the program invokes an external wait utility to pause all program execution for the specified number of centiseconds before resuming any further processing."
+        },
+        {
+            "Rule_Id": "R-COBSWAIT-cbl-00008",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The wait utility (MVSWAIT) has been invoked with the specified wait duration and the wait period has fully completed",
+                "When": "The wait period expires and control is returned from the MVSWAIT utility back to the program",
+                "Then": "The program terminates its execution immediately, releasing control back to the calling environment or job scheduler with no further processing performed"
+            },
+            "Rule_Name": "Program Termination After Wait Period Completion",
+            "Rule_Description": "Once the specified wait period has fully elapsed, the program concludes its execution and releases control back to the calling environment or job scheduler."
+        }
+    ],
+    "description": "COBSWAIT is a batch utility program within the CardDemo application that introduces a controlled pause/wait in program execution. It accepts a wait duration value (in centiseconds) from SYSIN input and delegates the actual wait operation to an external routine called MVSWAIT. This program is typically used to introduce deliberate delays between batch processing steps.\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: None\n- **MQ Calls**: No\n- **Module Type**: Main/Driver module\n\n<br>\n\n### Key Functionalities:\n\n1: Accept Wait Duration - Read the wait duration value (in centiseconds) from the system input (SYSIN)\n\n2: Convert Wait Parameter - Move the accepted input parameter value into the numeric wait time field for processing\n\n3: Execute Wait - Invoke the wait utility with the specified duration to pause program execution for the given number of centiseconds\n\n4: Terminate Program - Stop the program execution after the wait period has completed\n\n"
+}

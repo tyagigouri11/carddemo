@@ -1,0 +1,189 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANFILE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TRANFILE**, defines and initializes the Transaction Master VSAM file for the CardDemo application. It manages the full lifecycle of the file setup: closing the related CICS files, deleting any existing VSAM cluster and alternate index, recreating the KSDS cluster, loading transaction data from a flat file source, and building an alternate index on the processed timestamp field. Once the file structure is established and populated, the job reopens the CICS files to restore online transaction processing availability.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "TRANFILE",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It is the first positional parameter on the JOB statement."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'DEFINE TRANSACTION MASTER'",
+          "description": "A positional parameter providing accounting or descriptive information for the job. This text appears in job logs and is used for documentation or billing purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class, which determines the initiator queue the job is submitted to. Class A typically represents a general-purpose execution class and influences scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listing, allocation/deallocation messages, and job completion information. Class 0 directs the job log to a specific output destination defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "CLCIFIL",
+        "purpose": "Closes the TRANSACT and CXACAIX files in the CICS region (CICSAWSA) using CEMT SET FILE CLOSE commands, preparing them for deletion and redefinition.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (CEMT commands: /F CICSAWSA,'CEMT SET FIL(TRANSACT ) CLO' and /F CICSAWSA,'CEMT SET FIL(CXACAIX ) CLO')",
+        "outputs": "ISFOUT (SDSF output, SYSOUT=*), CMDOUT (command output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing Transaction Master VSAM KSDS cluster and its alternate index if they already exist, suppressing condition codes up to 8 to allow the job to continue even if the objects do not exist.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE commands for AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS CLUSTER and AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX ALTERNATEINDEX)",
+        "outputs": "SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM Key-Sequenced Data Set (KSDS) cluster for the Transaction Master file with a 16-byte key at offset 0, fixed record size of 350 bytes, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE CLUSTER command for AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS with DATA component AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA and INDEX component AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX)",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS (VSAM KSDS cluster), AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX; SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies data from the flat file (sequential PS dataset) into the newly defined VSAM KSDS cluster to populate the Transaction Master file with initial data.",
+        "programs": "IDCAMS*",
+        "inputs": "TRANSACT (AWS.M2.CARDDEMO.DALYTRAN.PS.INIT, DISP=SHR — source flat file)",
+        "outputs": "TRANVSAM (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, DISP=SHR — target VSAM KSDS populated with records); SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP20",
+        "purpose": "Defines an Alternate Index (AIX) on the Transaction Master VSAM KSDS based on the processed timestamp field, using a 26-byte key at offset 304, with non-unique keys and upgrade enabled, allocated on volume AWSHJ1.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE ALTERNATEINDEX command relating AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX to AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, with DATA component AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA and INDEX component AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX)",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX (Alternate Index cluster), AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA, AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX; SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP25",
+        "purpose": "Defines a PATH to relate the Alternate Index to the base VSAM KSDS cluster, enabling access to the Transaction Master file via the alternate index.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE PATH command: NAME(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH), PATHENTRY(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX))",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH (PATH object); SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "STEP30",
+        "purpose": "Builds the Alternate Index cluster by extracting key values from the base VSAM KSDS and populating the Alternate Index dataset, making the alternate index usable for keyed access.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (BLDINDEX command: INDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS), OUTDATASET(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX))",
+        "outputs": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX (populated Alternate Index); SYSPRINT (utility output, SYSOUT=*)"
+      },
+      {
+        "step": "OPCIFIL",
+        "purpose": "Opens the TRANSACT and CXACAIX files in the CICS region (CICSAWSA) using CEMT SET FILE OPEN commands, making the newly defined and populated VSAM files available for CICS transaction processing.",
+        "programs": "SDSF*",
+        "inputs": "ISFIN (CEMT commands: /F CICSAWSA,'CEMT SET FIL(TRANSACT ) OPE' and /F CICSAWSA,'CEMT SET FIL(CXACAIX ) OPE')",
+        "outputs": "ISFOUT (SDSF output, SYSOUT=*), CMDOUT (command output, SYSOUT=*)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "TRANSACT",
+        "operations": "CLOSE",
+        "description": "Closes the TRANSACT file in CICS region CICSAWSA using CEMT SET FIL(TRANSACT) CLO command via SDSF"
+      },
+      {
+        "step": "CLCIFIL",
+        "type": "Dataset",
+        "objects": "CXACAIX",
+        "operations": "CLOSE",
+        "description": "Closes the CXACAIX file in CICS region CICSAWSA using CEMT SET FIL(CXACAIX) CLO command via SDSF"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the existing VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS if it exists; sets MAXCC=0 if return code is 8 or less"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "DELETE",
+        "description": "Deletes the existing alternate index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX if it exists; sets MAXCC=0 if return code is 8 or less"
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines a new VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS with 16-byte key at offset 0, fixed record size of 350 bytes, 1 primary cylinder on volume AWSHJ1, with DATA and INDEX components"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DALYTRAN.PS.INIT",
+        "operations": "READ",
+        "description": "Reads transaction data from flat file AWS.M2.CARDDEMO.DALYTRAN.PS.INIT as input to REPRO operation"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes transaction records into VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS via IDCAMS REPRO from flat file input"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA, AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines alternate index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX related to base cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS with 26-byte key at offset 304, non-unique key, upgrade enabled, 350-byte records on volume AWSHJ1"
+      },
+      {
+        "step": "STEP25",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+        "operations": "DEFINE",
+        "description": "Defines path AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH relating the alternate index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX to the base cluster"
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Reads the base VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS as input dataset for building the alternate index"
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "WRITE",
+        "description": "Builds and populates the alternate index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX from the base cluster using IDCAMS BLDINDEX"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "TRANSACT",
+        "operations": "OPEN",
+        "description": "Opens the TRANSACT file in CICS region CICSAWSA using CEMT SET FIL(TRANSACT) OPE command via SDSF"
+      },
+      {
+        "step": "OPCIFIL",
+        "type": "Dataset",
+        "objects": "CXACAIX",
+        "operations": "OPEN",
+        "description": "Opens the CXACAIX file in CICS region CICSAWSA using CEMT SET FIL(CXACAIX) OPE command via SDSF"
+      }
+    ]
+  }
+}

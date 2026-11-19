@@ -1,0 +1,169 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "UNLDPADB.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **UNLDPADB**, is designed to unload data from an IMS database related to a credit card demo application (CARDDEMO). It first cleans up any existing output files by deleting them in STEP0, then executes an IMS DL/I program (PAUDBUNL) in STEP01 to extract and unload IMS database records from the Payment Authorization database (PAUTHDB) into two sequential output files — one for root segments (PAUTDB.ROOT.FILEO) and one for child segments (PAUTDB.CHILD.FILEO). The business purpose is to create flat-file extracts of IMS hierarchical database data, likely for migration, backup, or downstream processing purposes.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "UNLDPADB",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It is the first positional parameter on the JOB statement."
+        },
+        {
+          "name": "PROGRAMMER NAME / ACCOUNTING",
+          "value": "M2APP",
+          "description": "The first positional parameter on the JOB statement, representing accounting information or programmer name. Used for billing and identification purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class, which determines the job entry subsystem (JES) input queue where the job is placed. It controls scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (JCL and system messages). Class H determines where the job's message output is routed, typically to a specific output queue or sysout destination."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) specifies that all JCL statements including those from procedures are printed. The second value (1) specifies that all system messages including allocation and termination messages are printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of virtual storage available to the entire job. A value of 0M indicates that the job can use the maximum available region size, effectively removing storage constraints for the job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message upon job completion."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. A value of 1440 minutes (24 hours) effectively sets the maximum allowable execution time, preventing the job from running indefinitely and protecting against infinite loops or hung jobs."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP0",
+        "purpose": "Deletes existing output files for the IMS database unload process before recreating them in the next step. The two datasets are removed using IEFBR14 with DELETE disposition.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "DD1: AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO (deleted), DD2: AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO (deleted)"
+      },
+      {
+        "step": "STEP01",
+        "purpose": "Executes the IMS DLI batch program PAUDBUNL using PSB PAUTBUNL to unload the PAUTHDB IMS database, extracting root segment (PAUTSUM0) and child segment (PAUTDTL1) records into two sequential output files for the payment authorization database.",
+        "programs": "DFSRRC00 (PAUDBUNL)*",
+        "inputs": "IMS PSB Library: OEM.IMS.IMSP.PSBLIB, IMS DBD Library: OEM.IMS.IMSP.DBDLIB, DDPAUTP0: OEM.IMS.IMSP.PAUTHDB (IMS database), DDPAUTX0: OEM.IMS.IMSP.PAUTHDBX (IMS database index), DFSVSAMP: OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB)",
+        "outputs": "OUTFIL1: AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO (new, cataloged, LRECL=100, RECFM=FB, root segment records), OUTFIL2: AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO (new, cataloged, LRECL=206, RECFM=FB, child segment records); SYSPRINT, SYSUDUMP, IMSERR"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP0",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO",
+        "operations": "DELETE",
+        "description": "IEFBR14 step deletes the existing root output file using DISP=(OLD,DELETE,DELETE), removing it on both normal and abnormal termination"
+      },
+      {
+        "step": "STEP0",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO",
+        "operations": "DELETE",
+        "description": "IEFBR14 step deletes the existing child output file using DISP=(OLD,DELETE,DELETE), removing it on both normal and abnormal termination"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "STEPLIB load library providing IMS system modules for the DLI batch region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL.V151",
+        "operations": "READ",
+        "description": "STEPLIB load library providing IMS V15.1 system modules for the DLI batch region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB customer load library from which the application program PAUDBUNL is loaded"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "DFSRESLB DD providing IMS resident library for the DLI batch region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PSBLIB",
+        "operations": "READ",
+        "description": "IMS DD providing the PSB library containing PAUTBUNL PSB definition"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.DBDLIB",
+        "operations": "READ",
+        "description": "IMS DD providing the DBD library containing database definitions for DBPAUTP0"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO",
+        "operations": "WRITE",
+        "description": "OUTFIL1 DD creates and catalogs a new fixed-block sequential output file (LRECL=100) to receive unloaded IMS root segment data; deleted on abnormal termination"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO",
+        "operations": "WRITE",
+        "description": "OUTFIL2 DD creates and catalogs a new fixed-block sequential output file (LRECL=206) to receive unloaded IMS child segment data; deleted on abnormal termination"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PAUTHDB",
+        "operations": "READ",
+        "description": "DDPAUTP0 DD provides the IMS PAUTHDB database dataset used as the primary IMS database data set for DBPAUTP0"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PAUTHDBX",
+        "operations": "READ",
+        "description": "DDPAUTX0 DD provides the IMS PAUTHDBX dataset, likely the index or overflow dataset associated with the PAUTHDB database"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB)",
+        "operations": "READ",
+        "description": "DFSVSAMP DD provides IMS buffer pool and VSAM parameters for the DLI batch region"
+      },
+      {
+        "step": "STEP01",
+        "type": "IMS",
+        "objects": "DBPAUTP0, PAUTSUM0, PAUTDTL1",
+        "operations": "READ",
+        "description": "Application program PAUDBUNL executes under PSB PAUTBUNL using DLI batch mode. PSB defines PCB for database DBPAUTP0 with PROCOPT=GOTP (Get Only with path), accessing root segment PAUTSUM0 and child segment PAUTDTL1, unloading records to OUTFIL1 and OUTFIL2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "DEFGDGB.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, **DEFGDGB**, defines six Generation Data Group (GDG) bases required by the CardDemo project, an AWS mainframe modernization demonstration application. It uses the IDCAMS utility to create catalog entries for cyclically managed datasets related to transaction backups, daily transactions, transaction reports, category balance backups, system transactions, and combined transactions. Each GDG is configured with a limit of 5 generations and the SCRATCH option, meaning the oldest generation is automatically deleted when the limit is exceeded, ensuring controlled dataset lifecycle management.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'DEF GDG BASES'",
+          "description": "The accounting information or job description string passed to the system. Here it provides a short label 'DEF GDG BASES' identifying the purpose of the job to the operator and accounting routines."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to the 'A' initiator class, which determines scheduling priority and the type of initiator that will pick up and execute the job."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), including JCL listing and system messages. MSGCLASS=0 directs the job's system output messages to output class '0', controlling where the job log is routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes, whether it completes successfully or abnormally."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Defines 6 Generation Data Group (GDG) bases required by the CardDemo project using IDCAMS. Each GDG is defined with a limit of 5 generations and SCRATCH disposition, and any return code 12 (indicating the GDG already exists) is suppressed to allow the job to continue successfully.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (IDCAMS control statements defining GDGs: AWS.M2.CARDDEMO.TRANSACT.BKUP, AWS.M2.CARDDEMO.TRANSACT.DALY, AWS.M2.CARDDEMO.TRANREPT, AWS.M2.CARDDEMO.TCATBALF.BKUP, AWS.M2.CARDDEMO.SYSTRAN, AWS.M2.CARDDEMO.TRANSACT.COMBINED)",
+        "outputs": "GDG bases created: AWS.M2.CARDDEMO.TRANSACT.BKUP (LIMIT=5, SCRATCH), AWS.M2.CARDDEMO.TRANSACT.DALY (LIMIT=5, SCRATCH), AWS.M2.CARDDEMO.TRANREPT (LIMIT=5, SCRATCH), AWS.M2.CARDDEMO.TCATBALF.BKUP (LIMIT=5, SCRATCH), AWS.M2.CARDDEMO.SYSTRAN (LIMIT=5, SCRATCH), AWS.M2.CARDDEMO.TRANSACT.COMBINED (LIMIT=5, SCRATCH); SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.BKUP",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.DALY",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANREPT",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.BKUP",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.SYSTRAN",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.COMBINED",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group base with LIMIT=5 and SCRATCH attribute. If already exists (LASTCC=12), error is suppressed."
+      }
+    ]
+  }
+}

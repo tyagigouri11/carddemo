@@ -1,0 +1,230 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANEXTR.jcl",
+    "file_path": "carddemo-v2-main/app/app-transaction-type-db2/jcl/TRANEXTR.jcl",
+    "type": "jcl",
+    "description": "This JCL job (TRANEXTR) extracts Transaction Type and Transaction Category reference data from DB2 tables in the CARDDEMO application, backs up the existing flat files, replaces them with freshly extracted data, and ensures the backup generation data sets are cataloged for recovery purposes.Key Functionalities:\nBacks up the existing Transaction Type flat file (TRANTYPE.PS) to a new generation in a Generation Data Group (GDG), creating a versioned copy with fixed-length 60-byte records.\nBacks up the existing Transaction Category flat file (TRANCATG.PS) to a new generation in a Generation Data Group (GDG), creating a versioned copy with fixed-length 60-byte records.\nDeletes the current Transaction Type (TRANTYPE.PS) and Transaction Category (TRANCATG.PS) flat files to prepare for fresh extraction.\nExtracts Transaction Type data from the DB2 table CARDDEMO.TRANSACTION_TYPE by concatenating TR_TYPE, TR_DESCRIPTION (50 characters), and 8 trailing zeros into a 60-character fixed-length record, ordered by TR_TYPE, and writes the output to a new TRANTYPE.PS sequential file.\nExtracts Transaction Category data from the DB2 table CARDDEMO.TRANSACTION_TYPE_CATEGORY by concatenating TRC_TYPE_CODE, TRC_TYPE_CATEGORY, TRC_CAT_DATA (50 characters), and 4 trailing zeros into a 60-character fixed-length record, ordered by TRC_TYPE_CODE and TRC_TYPE_CATEGORY, and writes the output to a new TRANCATG.PS sequential file.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The current Transaction Type reference file (TRANTYPE.PS) exists and is available for reading under the CARDDEMO application domain",
+                "When": "The job is initiated \u2014 this step runs unconditionally with no dependency on any prior step result",
+                "Then": "A new backup generation of the Transaction Type reference file (TRANTYPE.BKUP(+1)) must be created and permanently saved with the following specifications: each record is exactly 60 characters in fixed length format, a new generation version is added while all prior backup generations are preserved in history, and any unused allocated disk space is automatically released after the copy is complete"
+            },
+            "Rule_Name": "STEP10 - IEBGENER - Unconditional Backup of Transaction Type Reference File",
+            "Rule_Description": "At the start of every job run, the current Transaction Type reference file is unconditionally copied into a new historical backup generation before any changes or deletions are made, ensuring the existing data is always preserved.",
+            "Rule_Type": "Process Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "A new backup generation of the Transaction Type reference file is being created",
+                "When": "Records from the source Transaction Type reference file (TRANTYPE.PS) are written to the backup destination (TRANTYPE.BKUP(+1))",
+                "Then": "Every record in the backup file must be exactly 60 characters in length, all records must be of uniform fixed length with no variable-length records permitted, and the file must be permanently cataloged in the system so it is accessible for future reference or recovery"
+            },
+            "Rule_Name": "STEP10 - IEBGENER - Transaction Type Backup File Format Definition",
+            "Rule_Description": "The Transaction Type backup file must conform to a fixed record structure of exactly 60 characters per record to ensure consistency and compatibility with downstream processes that consume this reference data.",
+            "Rule_Type": "Definitional Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type reference file (TRANTYPE.PS) is available and the backup destination generation (TRANTYPE.BKUP(+1)) is ready to receive data",
+                "When": "The file copy operation is executed with no copy instructions or transformation rules provided (SYSIN is empty/dummy)",
+                "Then": "All records from the source Transaction Type reference file must be copied to the backup destination exactly as-is, with no records added, removed, filtered, or modified \u2014 the backup must be a complete and identical replica of the source file"
+            },
+            "Rule_Name": "STEP10 - IEBGENER - Exact Copy of Transaction Type Reference Data Without Transformation",
+            "Rule_Description": "The backup of the Transaction Type reference file must be a complete and unmodified copy of the source \u2014 no filtering, transformation, or selection of records is applied, ensuring the backup is a true and faithful replica of the original.",
+            "Rule_Type": "Validation Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type reference file backup (STEP10) has been executed",
+                "When": "STEP10 completed with a return code of exactly 0 (no errors, no warnings)",
+                "Then": "The Transaction Category reference file backup step is allowed to proceed; if STEP10 returned any non-zero return code (indicating any error or warning), the Transaction Category backup step is skipped entirely and no backup is created"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Conditional Execution of Transaction Category File Backup",
+            "Rule_Description": "This step controls whether the Transaction Category reference file backup should proceed, based on the success of the prior Transaction Type backup step. It enforces a strict dependency \u2014 the Transaction Category backup only runs if the Transaction Type backup completed without any errors.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The current Transaction Category reference file (TRANCATG.PS) exists and is accessible in read-only shared mode, and all prior steps have completed successfully with return code 0",
+                "When": "The Transaction Category reference file backup process is triggered",
+                "Then": "A complete, unmodified copy of the entire Transaction Category reference file is written to a new backup generation (TRANCATG.PS.BKUP(+1)); the new backup generation is permanently saved and cataloged for future access; all prior backup generations are preserved and remain unchanged; any unused allocated disk space is automatically released after the backup is written; no data transformation or filtering is applied \u2014 every record is copied exactly as-is"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Transaction Category Reference File Backup Creation",
+            "Rule_Description": "When conditions are met, this step creates a complete and unmodified backup copy of the current Transaction Category reference file as a new historical generation, permanently preserving it for recovery or audit purposes.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "A new backup generation of the Transaction Category reference file is being created",
+                "When": "The backup file is written to the catalog",
+                "Then": "Each record in the backup file must be exactly 60 characters in fixed length; every record must be the same length with no variable-length records permitted; the backup is stored as a new generation data group entry (+1), meaning each job run produces a distinct, independently retrievable backup version"
+            },
+            "Rule_Name": "STEP20 - IEBGENER - Transaction Category Backup File Format Standards",
+            "Rule_Description": "The backup copy of the Transaction Category reference file must conform to specific record format standards to ensure consistency and compatibility with downstream processes that consume this reference data.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Type reference file backup (STEP10) and the Transaction Category reference file backup (STEP20) have both been executed as part of the reference data refresh process",
+                "When": "Both STEP10 and STEP20 completed successfully with a return code of 0, confirming that valid backup copies of both reference files have been safely preserved",
+                "Then": "STEP30 is authorized to proceed and deletes the old Transaction Type and Transaction Category working files to prepare for fresh DB2 data extraction; however, if either STEP10 or STEP20 returned a non-zero return code indicating a failure, STEP30 is entirely skipped and both working files remain unchanged on the system"
+            },
+            "Rule_Name": "STEP30 - IEFBR14 - Conditional Execution of Working File Cleanup Based on Backup Success",
+            "Rule_Description": "Controls whether the old Transaction Type and Transaction Category working files are deleted, based on the success of both prior backup steps. Ensures that working files are only removed after confirmed backups exist.",
+            "Rule_Type": "Decision Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "STEP30 is authorized to execute, meaning both the Transaction Type backup (STEP10) and the Transaction Category backup (STEP20) completed successfully",
+                "When": "STEP30 runs the working file cleanup process",
+                "Then": "The Transaction Type working file (AWS.M2.CARDDEMO.TRANTYPE.PS) is permanently deleted from the system \u2014 the deletion is enforced both on successful completion and on any failure during the step, ensuring no stale copy of the file is left behind"
+            },
+            "Rule_Name": "STEP30 - IEFBR14 - Deletion of Transaction Type Working File",
+            "Rule_Description": "Permanently removes the existing Transaction Type working file from the system as part of the cleanup phase, making way for a fresh extraction from the DB2 database.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "STEP30 is authorized to execute, meaning both the Transaction Type backup (STEP10) and the Transaction Category backup (STEP20) completed successfully",
+                "When": "STEP30 runs the working file cleanup process",
+                "Then": "The Transaction Category working file (AWS.M2.CARDDEMO.TRANCATG.PS) is permanently deleted from the system \u2014 the deletion is enforced both on successful completion and on any failure during the step, ensuring no stale copy of the file is left behind"
+            },
+            "Rule_Name": "STEP30 - IEFBR14 - Deletion of Transaction Category Working File",
+            "Rule_Description": "Permanently removes the existing Transaction Category working file from the system as part of the cleanup phase, making way for a fresh extraction from the DB2 database.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "STEP30 is executing the working file cleanup process",
+                "When": "Either the Transaction Type working file (TRANTYPE.PS) or the Transaction Category working file (TRANCATG.PS), or both, do not currently exist on the system",
+                "Then": "The cleanup step still completes successfully without raising an error or causing the job to fail, ensuring the overall reference data refresh process continues uninterrupted to the subsequent DB2 extraction steps"
+            },
+            "Rule_Name": "STEP30 - IEFBR14 - Fault-Tolerant Deletion of Working Files",
+            "Rule_Description": "Ensures the cleanup step completes successfully even when the Transaction Type or Transaction Category working files do not currently exist on the system, preventing unnecessary interruption to the reference data refresh cycle.",
+            "Rule_Type": "Validation Rule"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The TRANEXTR job is running and STEP40 is about to be executed, with STEP10 (Transaction Type backup), STEP20 (Transaction Category backup), and STEP30 (old working file deletion) already completed",
+                "When": "All prior steps \u2014 STEP10, STEP20, and STEP30 \u2014 have each completed with a return code of exactly 0, meaning zero errors and zero warnings",
+                "Then": "STEP40 proceeds to extract fresh Transaction Type data from the DB2 database; If any one of the prior steps returned a non-zero return code, STEP40 is skipped entirely and no Transaction Type DB2 extraction takes place for this job run"
+            },
+            "Rule_Name": "STEP40 - IKJEFT01/DSNTIAUL - Conditional Execution of Transaction Type DB2 Extract",
+            "Rule_Description": "STEP40 is guarded by a strict condition that ensures the Transaction Type DB2 extraction only runs if all preceding backup and cleanup steps completed without any errors.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "STEP40 is executing and the DB2 system DAZ1 is accessible with the CARDDEMO.TRANSACTION_TYPE table available and readable",
+                "When": "The Transaction Type extraction process runs a SELECT query against the CARDDEMO.TRANSACTION_TYPE table",
+                "Then": "Every Transaction Type record in the table \u2014 including the Transaction Type Code (TR_TYPE) and the Transaction Description (TR_DESCRIPTION) \u2014 is retrieved; no filtering condition (WHERE clause) is applied, meaning the complete set of Transaction Types is always extracted"
+            },
+            "Rule_Name": "STEP40 - IKJEFT01/DSNTIAUL - Full Transaction Type Data Retrieval from DB2",
+            "Rule_Description": "All Transaction Type records are retrieved from the CARDDEMO.TRANSACTION_TYPE DB2 table without any filtering, to fully refresh the Transaction Type reference file.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "A Transaction Type record has been retrieved from the CARDDEMO.TRANSACTION_TYPE table, containing a Transaction Type Code (TR_TYPE) and a Transaction Description (TR_DESCRIPTION)",
+                "When": "The record is being formatted for writing to the Transaction Type output file",
+                "Then": "Each output record is constructed as exactly 60 characters in the following strict sequence: (1) the Transaction Type Code (TR_TYPE) is placed first, (2) immediately followed by the Transaction Description (TR_DESCRIPTION) cast and padded to exactly 50 characters \u2014 shorter descriptions are space-padded on the right to fill 50 characters, (3) immediately followed by 8 zeros ('00000000') as a reserved filler field; the entire combined value is then cast to a fixed total length of exactly 60 characters"
+            },
+            "Rule_Name": "STEP40 - IKJEFT01/DSNTIAUL - Transaction Type Output Record Construction",
+            "Rule_Description": "Each extracted Transaction Type record is formatted into a fixed 60-character output record by concatenating the Transaction Type Code, a padded Transaction Description, and a reserved filler of eight zeros.",
+            "Rule_Type": "Computation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "Transaction Type records have been extracted and formatted from the CARDDEMO.TRANSACTION_TYPE table",
+                "When": "Records are being written to the Transaction Type output file (AWS.M2.CARDDEMO.TRANTYPE.PS)",
+                "Then": "All records are written in ascending sequence ordered by Transaction Type Code (TR_TYPE); the output file is always delivered in this sorted order regardless of the physical storage order of records in the DB2 table"
+            },
+            "Rule_Name": "STEP40 - IKJEFT01/DSNTIAUL - Transaction Type Records Sorting",
+            "Rule_Description": "All extracted and formatted Transaction Type records are sorted in ascending order by Transaction Type Code before being written to the output file, ensuring a consistently ordered reference file.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "STEP40 is executing the Transaction Type DB2 extraction and writing formatted records to the new output file AWS.M2.CARDDEMO.TRANTYPE.PS",
+                "When": "The extraction process completes \u2014 either successfully or with a failure",
+                "Then": "If the extraction completes successfully, the output file AWS.M2.CARDDEMO.TRANTYPE.PS is permanently cataloged and made available for all downstream processing and consumers; If the extraction fails for any reason, the output file is automatically and immediately deleted to prevent incomplete, partial, or corrupt Transaction Type data from remaining in the system"
+            },
+            "Rule_Name": "STEP40 - IKJEFT01/DSNTIAUL - Transaction Type Output File Lifecycle Management",
+            "Rule_Description": "The Transaction Type output file is permanently saved and made available if the extraction succeeds, or automatically deleted if the extraction fails, ensuring no incomplete or corrupt data is ever retained.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The TRANEXTR job has executed all prior steps (STEP10 through STEP40), each producing a return code",
+                "When": "The return code from every prior step is evaluated before STEP50 begins",
+                "Then": "If ALL prior steps returned a return code of 4 or less (success or minor warnings), STEP50 proceeds to extract Transaction Category data from DB2; If ANY prior step returned a return code greater than 4 (significant failure), STEP50 is skipped entirely and no Transaction Category data extract is performed"
+            },
+            "Rule_Name": "STEP50 - DSNTIAUL - Conditional Execution of Transaction Category Data Extract",
+            "Rule_Description": "Controls whether the Transaction Category data extract from DB2 should proceed based on the success level of all preceding job steps. The extract is only allowed to run if no prior step encountered a significant failure.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO.TRANSACTION_TYPE_CATEGORY table exists in DB2 system DAZ1 and contains Transaction Category reference records",
+                "When": "The Transaction Category data extract is triggered in STEP50",
+                "Then": "All records are retrieved from the CARDDEMO.TRANSACTION_TYPE_CATEGORY table without any filtering \u2014 every Transaction Category record present in the table is included in the extract output"
+            },
+            "Rule_Name": "STEP50 - DSNTIAUL - Extraction of Transaction Category Reference Data from DB2",
+            "Rule_Description": "Defines the source of Transaction Category reference data and the scope of records to be extracted. All records from the Transaction Type Category table in the CARDDEMO database must be retrieved.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "A Transaction Category record is retrieved from CARDDEMO.TRANSACTION_TYPE_CATEGORY containing fields: Transaction Type Code (TRC_TYPE_CODE), Transaction Category Code (TRC_TYPE_CATEGORY), and Category Descriptive Data (TRC_CAT_DATA)",
+                "When": "Each retrieved record is formatted for output",
+                "Then": "The output record must be composed in the following exact sequence and format: (1) Transaction Type Code \u2014 appended as-is at the start of the record; (2) Transaction Category Code \u2014 concatenated immediately after the Transaction Type Code; (3) Category Descriptive Data \u2014 concatenated next, cast and padded to exactly 50 characters (shorter values are space-padded on the right to fill 50 characters); (4) Reserved Filler \u2014 four zero characters ('0000') appended at the end; (5) The entire combined value is cast to exactly 60 characters total; Any record that does not conform to the 60-character fixed length must not be written to the output file"
+            },
+            "Rule_Name": "STEP50 - DSNTIAUL - Transaction Category Output Record Composition and Formatting",
+            "Rule_Description": "Defines the exact structure and content of each output record written to the Transaction Category reference file. Each record must be composed by combining the Transaction Type Code, Transaction Category Code, Category Data, and a reserved filler \u2014 all formatted into a fixed 60-character record.",
+            "Rule_Type": "Computation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "Multiple Transaction Category records have been retrieved from CARDDEMO.TRANSACTION_TYPE_CATEGORY",
+                "When": "The records are prepared for writing to the output Transaction Category reference file",
+                "Then": "All records must be sorted in ascending order, applying a two-level sort: (1) Primary sort \u2014 by Transaction Type Code (TRC_TYPE_CODE) in ascending order, grouping all categories belonging to the same Transaction Type together; (2) Secondary sort \u2014 within each Transaction Type group, records are further sorted by Transaction Category Code (TRC_TYPE_CATEGORY) in ascending order; The output file must reflect this hierarchical sort sequence with no exceptions"
+            },
+            "Rule_Name": "STEP50 - DSNTIAUL - Transaction Category Records Sorting Order",
+            "Rule_Description": "Defines the mandatory sort sequence for all Transaction Category records written to the output reference file. Records must be hierarchically ordered \u2014 first grouped by their parent Transaction Type, then ordered within each group by their Category Code.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANEXTR-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "STEP50 has been initiated and a new Transaction Category reference file (TRANCATG.PS) is being created under the CARDDEMO data domain",
+                "When": "STEP50 completes execution",
+                "Then": "If STEP50 completes successfully \u2014 the Transaction Category reference file (AWS.M2.CARDDEMO.TRANCATG.PS) is permanently saved and cataloged, making it available for all downstream processes and applications; If STEP50 fails for any reason \u2014 the Transaction Category reference file is automatically and immediately deleted, ensuring no incomplete or corrupt data file is left behind in the system"
+            },
+            "Rule_Name": "STEP50 - DSNTIAUL - Transaction Category Output File Persistence Policy",
+            "Rule_Description": "Defines the retention policy for the newly created Transaction Category reference file based on whether the DB2 extract step completes successfully or encounters a failure. This ensures no incomplete or partial data files are retained in the system.",
+            "Rule_Type": "Policy Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444\n\n    A([JOB START\nTransaction Reference Data Refresh]):::start\n\n    STEP10[_STEP10 - IEBGENER\nBackup Transaction Type Reference File_]:::process\n\n    TRANTYPE_SRC[(_TRANTYPE.PS\nExisting Transaction Type File_)]:::datasource\n    TRANTYPE_BKUP[(_TRANTYPE.BKUP +1\nTransaction Type Backup\nNew Historical Generation_)]:::datasource\n\n    D1{STEP10 Completed\nSuccessfully?\nRC = 0?}:::decision\n\n    STEP20[_STEP20 - IEBGENER\nBackup Transaction Category Reference File_]:::process\n\n    TRANCATG_SRC[(_TRANCATG.PS\nExisting Transaction Category File_)]:::datasource\n    TRANCATG_BKUP[(_TRANCATG.PS.BKUP +1\nTransaction Category Backup\nNew Historical Generation_)]:::datasource\n\n    D2{STEP20 Completed\nSuccessfully?\nRC = 0?}:::decision\n\n    STEP30[_STEP30 - IEFBR14\nDelete Old Transaction Working Files\nPrepare for Fresh DB2 Extract_]:::process\n\n    STEP40[_STEP40 - IKJEFT01 / DSNTIAUL\nExtract Fresh Transaction Type Data\nfrom CARDDEMO DB2 Database_]:::process\n\n    DB2_TT[(_CARDDEMO.TRANSACTION_TYPE\nDB2 Table\nTransaction Type Codes and Descriptions_)]:::datasource\n\n    TRANTYPE_NEW[(_TRANTYPE.PS\nRefreshed Transaction Type File\nSorted by Transaction Type Code_)]:::datasource\n\n    D3{STEP40 Completed\nSuccessfully?\nRC \u2264 4?}:::decision\n\n    STEP50[_STEP50 - IKJEFT01 / DSNTIAUL\nExtract Fresh Transaction Category Data\nfrom CARDDEMO DB2 Database_]:::process\n\n    DB2_TTC[(_CARDDEMO.TRANSACTION_TYPE_CATEGORY\nDB2 Table\nTransaction Category Codes and Descriptions_)]:::datasource\n\n    TRANCATG_NEW[(_TRANCATG.PS\nRefreshed Transaction Category File\nSorted by Type Code then Category Code_)]:::datasource\n\n    SUCCESS([JOB COMPLETED SUCCESSFULLY\nTransaction Type and Category\nReference Data Fully Refreshed]):::success\n\n    ERR1([JOB ENDED WITH ERROR\nBackup Step Failed\nAll Remaining Steps Skipped\nNo Changes Made to Working Files]):::error\n\n    ERR2([JOB ENDED WITH ERROR\nDB2 Transaction Type Extract Failed\nTransaction Category Extract Skipped]):::error\n\n    A --> STEP10\n    TRANTYPE_SRC -.->|Read Existing File| STEP10\n    STEP10 -.->|Write New Backup Generation| TRANTYPE_BKUP\n    STEP10 --> D1\n\n    D1 -->|YES - RC = 0\nBackup Successful| STEP20\n    D1 -->|NO - RC \u2260 0\nBackup Failed\nSTEP20 thru STEP50 Skipped| ERR1\n\n    TRANCATG_SRC -.->|Read Existing File| STEP20\n    STEP20 -.->|Write New Backup Generation| TRANCATG_BKUP\n    STEP20 --> D2\n\n    D2 -->|YES - RC = 0\nBackup Successful| STEP30\n    D2 -->|NO - RC \u2260 0\nBackup Failed\nSTEP30 thru STEP50 Skipped| ERR1\n\n    STEP30 -.->|Delete Old File\nSafe to Remove - Backup Exists| TRANTYPE_SRC\n    STEP30 -.->|Delete Old File\nSafe to Remove - Backup Exists| TRANCATG_SRC\n    STEP30 --> STEP40\n\n    DB2_TT -.->|Extract All Transaction Type Records\nFormatted to 60 Characters per Record| STEP40\n    STEP40 -.->|Write Refreshed File\n60-Char Fixed Records\nSorted by Transaction Type Code| TRANTYPE_NEW\n    STEP40 --> D3\n\n    D3 -->|YES - RC \u2264 4\nExtract Successful| STEP50\n    D3 -->|NO - RC > 4\nExtract Failed\nSTEP50 Skipped| ERR2\n\n    DB2_TTC -.->|Extract All Transaction Category Records\nFormatted to 60 Characters per Record| STEP50\n    STEP50 -.->|Write Refreshed File\n60-Char Fixed Records\nSorted by Type Code then Category Code| TRANCATG_NEW\n    STEP50 --> SUCCESS"
+}

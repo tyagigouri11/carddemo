@@ -1,0 +1,493 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COPAUS0C.cbl",
+        "type": "cobol",
+        "transaction_id": "CPVS"
+      },
+      "overview": "COPAUS0C is part of the CardDemo credit card management application's Authorization Module, serving as the summary view screen for pending authorization messages. It operates within a CICS/IMS environment, acting as an interactive inquiry screen that allows authorized users to look up and review pending authorization activity for a given credit card account. The program retrieves and displays a paginated list of up to 5 pending authorization records at a time, showing transaction details such as approval status, amounts, dates, and types, while also presenting account-level summary statistics including approved/declined counts and balances. It solves the operational need for customer service or back-office staff to quickly review the authorization history and pending status for a specific account.",
+      "key_features": [
+        {
+          "feature": "Account Lookup",
+          "description": "Accepts a numeric account ID entered by the user and retrieves associated customer, account, and card cross-reference data from VSAM files to populate the screen header."
+        },
+        {
+          "feature": "IMS Authorization Summary Retrieval",
+          "description": "Queries an IMS database using a PSB (PSBPAUTB) to retrieve the pending authorization summary segment for the specified account, displaying aggregate counts and amounts for approved and declined authorizations."
+        },
+        {
+          "feature": "Paginated Authorization List",
+          "description": "Displays up to 5 pending authorization detail records per page, with forward (PF8) and backward (PF7) pagination support to navigate through all authorization records for an account."
+        },
+        {
+          "feature": "Authorization Detail Drill-Down",
+          "description": "Allows users to select an individual authorization record using an 'S' flag, which transfers control to the detail program (COPAUS1C) via CICS XCTL for a full detail view."
+        },
+        {
+          "feature": "Approval Status Indicator",
+          "description": "Evaluates each authorization's response code and displays a single-character status of 'A' (Approved) or 'D' (Declined) for quick visual identification."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the main menu (COMEN01C), PF7/PF8 for page navigation, and Enter to process account lookups or record selections."
+        },
+        {
+          "feature": "IMS PSB Scheduling and Termination",
+          "description": "Manages IMS PSB scheduling lifecycle, including handling the case where the PSB is already scheduled by terminating and rescheduling it, and issuing a CICS SYNCPOINT before sending the screen."
+        },
+        {
+          "feature": "Error Handling and User Messaging",
+          "description": "Provides descriptive error messages for invalid input, missing records in VSAM files, and IMS database errors, displaying them on the screen without abending the transaction."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CXACAIX",
+        "type": "Read",
+        "description": "Card cross-reference alternate index file accessed by account ID - used to look up card number and customer ID associated with a given account"
+      },
+      {
+        "name": "ACCTDAT",
+        "type": "Read",
+        "description": "Account master file - reads account details including credit limit, cash credit limit, and account status for a given account ID"
+      },
+      {
+        "name": "CUSTDAT",
+        "type": "Read",
+        "description": "Customer master file - retrieves customer information including name, address, and phone number for display on the authorization summary screen"
+      },
+      {
+        "name": "PSBPAUTB (IMS DB - PAUTSUM0 segment)",
+        "type": "Read",
+        "description": "IMS database pending authorization summary segment - reads summary data including approved/declined counts and amounts, credit balance, and cash balance for a given account"
+      },
+      {
+        "name": "PSBPAUTB (IMS DB - PAUTDTL1 segment)",
+        "type": "Read",
+        "description": "IMS database pending authorization details segment - reads individual authorization detail records including transaction ID, date, time, type, approval status, match status, and approved amount for paginated display"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN to determine if first entry or re-entry. On first entry, initializes CARDDEMO-COMMAREA and sets program to re-enter mode. On re-entry, restores state from COMMAREA passed via DFHCOMMAREA.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-PGM-REENTER",
+            "EIBCALEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Screen Input Reception",
+          "description": "Receives BMS map COPAU0A from terminal into COPAU0AI input area, capturing account ID entry and row selection flags (SEL0001I through SEL0005I).",
+          "records": [
+            "COPAU0AI",
+            "ACCTIDI",
+            "SEL0001I",
+            "SEL0002I",
+            "SEL0003I",
+            "SEL0004I",
+            "SEL0005I",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "AID Key Evaluation and Routing",
+          "description": "Evaluates EIBAID to route processing: ENTER triggers account lookup and display, PF3 returns to menu (COMEN01C), PF7 pages backward, PF8 pages forward, any other key sets error message.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "DFHPF7",
+            "DFHPF8",
+            "WS-MESSAGE",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Account ID Validation",
+          "description": "Validates entered account ID is not spaces/low-values and is numeric. Sets error flag and message if invalid. Stores valid account ID in WS-ACCT-ID and CDEMO-ACCT-ID.",
+          "records": [
+            "ACCTIDI",
+            "WS-ACCT-ID",
+            "CDEMO-ACCT-ID",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "ACCTIDL"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Row Selection Evaluation",
+          "description": "Evaluates selection flags SEL0001I through SEL0005I to determine if a row has been selected. Maps selected row to corresponding authorization key from CDEMO-CPVS-AUTH-KEYS array and stores in CDEMO-CPVS-PAU-SELECTED.",
+          "records": [
+            "SEL0001I",
+            "SEL0002I",
+            "SEL0003I",
+            "SEL0004I",
+            "SEL0005I",
+            "CDEMO-CPVS-PAU-SEL-FLG",
+            "CDEMO-CPVS-PAU-SELECTED",
+            "CDEMO-CPVS-AUTH-KEYS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Transfer to Authorization Detail Program",
+          "description": "If a valid row selection with flag 'S' is detected, performs CICS XCTL to detail program COPAUS1C, passing CARDDEMO-COMMAREA with context set to enter mode.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Card Cross-Reference Lookup by Account",
+          "description": "Reads CXACAIX alternate index file using account ID as key to retrieve card cross-reference record, obtaining customer ID and card number.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "CARD-XREF-RECORD",
+            "XREF-CUST-ID",
+            "XREF-CARD-NUM",
+            "CDEMO-CUST-ID",
+            "CDEMO-CARD-NUM"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Account Master Record Retrieval",
+          "description": "Reads ACCTDAT file using account ID from cross-reference to retrieve full account record including credit limit and cash credit limit.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Customer Master Record Retrieval",
+          "description": "Reads CUSTDAT file using customer ID from cross-reference to retrieve customer demographic data including name, address, and phone number.",
+          "records": [
+            "WS-CARD-RID-CUST-ID-X",
+            "CUSTOMER-RECORD",
+            "CUST-ID",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-PHONE-NUM-1"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "IMS PSB Scheduling",
+          "description": "Schedules IMS PSB named PSBPAUTB using DLI SCHD call. If PSB is already scheduled (TC status), terminates and reschedules. Sets IMS-PSB-SCHD flag on success.",
+          "records": [
+            "PSB-NAME",
+            "IMS-RETURN-CODE",
+            "WS-IMS-PSB-SCHD-FLG",
+            "DIBSTAT"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "IMS Authorization Summary Segment Retrieval",
+          "description": "Issues DLI GU call against PAUTSUM0 segment using account ID as qualification criteria to retrieve the pending authorization summary root segment.",
+          "records": [
+            "PA-ACCT-ID",
+            "PENDING-AUTH-SUMMARY",
+            "DIBSTAT",
+            "IMS-RETURN-CODE",
+            "WS-PAUT-SMRY-SEG-FLG"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Authorization Summary Data Population to Screen",
+          "description": "Moves summary counts and amounts from IMS summary segment to screen output fields: approved count, declined count, credit balance, cash balance, approved amount, declined amount.",
+          "records": [
+            "PA-APPROVED-AUTH-CNT",
+            "PA-DECLINED-AUTH-CNT",
+            "PA-CREDIT-BALANCE",
+            "PA-CASH-BALANCE",
+            "PA-APPROVED-AUTH-AMT",
+            "PA-DECLINED-AUTH-AMT",
+            "APPRCNTO",
+            "DECLCNTO",
+            "CREDBALO",
+            "CASHBALO",
+            "APPRAMTO",
+            "DECLAMTO"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Authorization Detail List Initialization",
+          "description": "Clears all five authorization detail rows on the screen map by setting selection attributes to protected (DFHBMPRO) and blanking transaction ID, date, time, type, approval status, match status, and amount fields.",
+          "records": [
+            "SEL0001A",
+            "SEL0002A",
+            "SEL0003A",
+            "SEL0004A",
+            "SEL0005A",
+            "TRNID01I-05I",
+            "PDATE01I-05I",
+            "PTIME01I-05I",
+            "PTYPE01I-05I",
+            "PAPRV01I-05I",
+            "PSTAT01I-05I",
+            "PAMT001I-005I"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "IMS Authorization Detail Segment Retrieval (Forward Paging)",
+          "description": "Issues DLI GNP calls to retrieve up to 5 child PAUTDTL1 segments under the current summary root. Tracks EOF condition and determines if a next page exists by attempting one additional read.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "DIBSTAT",
+            "IMS-RETURN-CODE",
+            "WS-IDX",
+            "WS-AUTHS-EOF",
+            "CDEMO-CPVS-NEXT-PAGE-FLG"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Authorization Detail Repositioning",
+          "description": "Issues DLI GNP with WHERE clause on PAUT9CTS field using saved authorization key to reposition the IMS cursor to a specific detail segment for backward or forward paging.",
+          "records": [
+            "WS-AUTH-KEY-SAVE",
+            "PA-AUTHORIZATION-KEY",
+            "PENDING-AUTH-DETAILS",
+            "DIBSTAT",
+            "IMS-RETURN-CODE"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Authorization Detail Row Population",
+          "description": "For each retrieved detail segment (index 1-5), formats date, time, and approval status, then populates corresponding screen row fields with transaction ID, date, time, type, approval status, match status, and amount. Stores authorization key in CDEMO-CPVS-AUTH-KEYS array.",
+          "records": [
+            "PA-AUTHORIZATION-KEY",
+            "PA-TRANSACTION-ID",
+            "PA-AUTH-ORIG-DATE",
+            "PA-AUTH-ORIG-TIME",
+            "PA-AUTH-TYPE",
+            "PA-AUTH-RESP-CODE",
+            "PA-MATCH-STATUS",
+            "PA-APPROVED-AMT",
+            "CDEMO-CPVS-AUTH-KEYS",
+            "CDEMO-CPVS-PAUKEY-LAST",
+            "CDEMO-CPVS-PAGE-NUM",
+            "CDEMO-CPVS-PAUKEY-PREV-PG"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Backward Page Navigation (PF7)",
+          "description": "Decrements page number, retrieves previous page start key from CDEMO-CPVS-PAUKEY-PREV-PG array, repositions IMS cursor, reinitializes display rows, and re-populates up to 5 authorization detail rows.",
+          "records": [
+            "CDEMO-CPVS-PAGE-NUM",
+            "CDEMO-CPVS-PAUKEY-PREV-PG",
+            "WS-AUTH-KEY-SAVE",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Forward Page Navigation (PF8)",
+          "description": "Uses CDEMO-CPVS-PAUKEY-LAST as the starting key for the next page, repositions IMS cursor, reinitializes display rows, and populates next set of up to 5 authorization detail rows if next page exists.",
+          "records": [
+            "CDEMO-CPVS-PAUKEY-LAST",
+            "WS-AUTH-KEY-SAVE",
+            "CDEMO-CPVS-NEXT-PAGE-FLG",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 19,
+          "process": "Screen Header Population",
+          "description": "Populates screen header with current date and time using FUNCTION CURRENT-DATE, application titles from COTTL01Y, transaction ID, and program name.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-CICS-TRANID",
+            "WS-PGM-AUTH-SMRY",
+            "CURDATEO",
+            "CURTIMEO",
+            "TRNNAMEO",
+            "PGMNAMEO"
+          ]
+        },
+        {
+          "step": 20,
+          "process": "IMS PSB Termination and Screen Send",
+          "description": "Before sending screen, issues CICS SYNCPOINT to commit IMS work and terminates PSB scheduling flag. Sends BMS map COPAU0A with ERASE option on first display or without ERASE on subsequent paging operations.",
+          "records": [
+            "WS-IMS-PSB-SCHD-FLG",
+            "COPAU0AO",
+            "WS-MESSAGE",
+            "ERRMSGO",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 21,
+          "process": "CICS Pseudo-Conversational Return",
+          "description": "Returns control to CICS with transaction ID CPVS and passes CARDDEMO-COMMAREA to preserve state for next user interaction.",
+          "records": [
+            "WS-CICS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA state preservation across pseudo-conversational cycles",
+          "description": "CDEMO-CPVS-AUTH-KEYS, CDEMO-CPVS-PAUKEY-PREV-PG, CDEMO-CPVS-PAUKEY-LAST, and CDEMO-CPVS-PAGE-NUM must be preserved in CARDDEMO-COMMAREA across CICS RETURN calls to support correct forward and backward paging of authorization detail records."
+        },
+        {
+          "dependency": "Cross-reference lookup prerequisite for account and customer reads",
+          "description": "GETCARDXREF-BYACCT must succeed before GETACCTDATA-BYACCT and GETCUSTDATA-BYCUST can execute, as XREF-ACCT-ID and XREF-CUST-ID derived from the cross-reference record are the keys used for subsequent CICS file reads."
+        },
+        {
+          "dependency": "IMS PSB scheduling prerequisite for all DLI calls",
+          "description": "SCHEDULE-PSB must complete successfully and set IMS-PSB-SCHD before any DLI GU or GNP calls are issued. If PSB scheduling fails, no IMS data access is possible and the program sends an error screen."
+        },
+        {
+          "dependency": "IMS GU root segment retrieval prerequisite for GNP child reads",
+          "description": "The DLI GU call on PAUTSUM0 (GET-AUTH-SUMMARY) must establish parentage on the correct summary root segment before DLI GNP calls on PAUTDTL1 child segments will return the correct authorization detail records for the given account."
+        },
+        {
+          "dependency": "CDEMO-ACCT-ID must be set before IMS summary retrieval",
+          "description": "PA-ACCT-ID used in the DLI GU WHERE clause is populated from CDEMO-ACCT-ID, which must be set from validated screen input or incoming COMMAREA before GET-AUTH-SUMMARY is called."
+        },
+        {
+          "dependency": "WS-AUTH-KEY-SAVE must be populated before REPOSITION-AUTHORIZATIONS",
+          "description": "REPOSITION-AUTHORIZATIONS uses WS-AUTH-KEY-SAVE as the WHERE clause value for the DLI GNP repositioning call. This field must be loaded from either CDEMO-CPVS-PAUKEY-PREV-PG (PF7) or CDEMO-CPVS-PAUKEY-LAST (PF8) before the call is made."
+        },
+        {
+          "dependency": "IMS SYNCPOINT issued before BMS screen send",
+          "description": "SEND-PAULST-SCREEN issues a CICS SYNCPOINT before sending the BMS map whenever the IMS PSB is scheduled. This ensures IMS resources are released and committed before the terminal interaction, preventing PSB holding across pseudo-conversational waits."
+        },
+        {
+          "dependency": "WS-IDX index controls both IMS read loop and screen row population",
+          "description": "WS-IDX drives the PROCESS-PAGE-FORWARD loop (1 to 5) and is also used in POPULATE-AUTH-LIST EVALUATE to determine which screen row fields to populate. Incorrect index state would cause misalignment between retrieved IMS segments and displayed rows."
+        },
+        {
+          "dependency": "ERR-FLG-ON halts page-forward processing loop",
+          "description": "The PROCESS-PAGE-FORWARD loop checks ERR-FLG-ON as a termination condition. Any error in GET-AUTHORIZATIONS or REPOSITION-AUTHORIZATIONS that sets WS-ERR-FLG to 'Y' will stop further IMS reads and screen population."
+        },
+        {
+          "dependency": "CDEMO-CPVS-PAGE-NUM boundary check for PF7 backward paging",
+          "description": "PROCESS-PF7-KEY checks that CDEMO-CPVS-PAGE-NUM is greater than 1 before attempting backward navigation. If already on page 1, an informational message is displayed and no IMS access is attempted."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Online transaction processing middleware",
+          "purpose": "Manages pseudo-conversational transaction lifecycle via CICS RETURN with TRANSID CPVS and COMMAREA, handles BMS terminal I/O (SEND/RECEIVE of map COPAU0A in mapset COPAU00), performs VSAM file reads against CXACAIX, ACCTDAT, and CUSTDAT datasets, issues SYNCPOINT for IMS coordination, and executes XCTL program transfers to COPAUS1C and COMEN01C."
+        },
+        {
+          "system": "IBM IMS/DB",
+          "type": "Hierarchical database management system",
+          "purpose": "Provides access to pending authorization data via PSB PSBPAUTB. DLI SCHD/TERM calls manage PSB lifecycle. DLI GU retrieves the PAUTSUM0 root segment by account ID for authorization summary counts and balances. DLI GNP retrieves PAUTDTL1 child segments sequentially and by repositioning for paginated display of individual authorization detail records."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COPAUS1C.cbl",
+          "purpose": "COPAUS1C is part of the CardDemo credit card authorization module, operating within a CICS/IMS environment to support back-office authorization review workflows. It serves as the detail view screen for pending authorization records, allowing authorized users to inspect individual transaction authorizations and take action on suspected fraudulent activity. The program retrieves authorization summary and detail records from an IMS database, displays comprehensive transaction information on a BMS screen, and enables users to navigate through authorization records or flag/unflag them as fraudulent by linking to a downstream fraud processing program (COPAUS2C)."
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates account ID field for blank/low-values and numeric content. Sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with descriptive text, repositions cursor to ACCTIDL field with -1, and calls SEND-PAULST-SCREEN to redisplay with error. Also validates selection flags (S/s only) with inline message for invalid values."
+      },
+      {
+        "category": "CICS File Read Errors (NOTFND)",
+        "description": "Handles DFHRESP(NOTFND) separately from system errors for XREF, ACCT, and CUST file reads. Builds a descriptive WS-MESSAGE using STRING including the key value, file name, and numeric RESP/RESP2 codes. Does NOT set WS-ERR-FLG, but repositions cursor and calls SEND-PAULST-SCREEN to display the not-found condition to the user."
+      },
+      {
+        "category": "CICS File System Errors (OTHER)",
+        "description": "Handles unexpected CICS response codes for XREF, ACCT, and CUST file reads by setting WS-ERR-FLG to 'Y', building a WS-MESSAGE string with file name, RESP, and RESP2 codes, repositioning cursor, and calling SEND-PAULST-SCREEN. Distinguishes system errors from not-found conditions with different message text."
+      },
+      {
+        "category": "IMS DLI Operation Errors",
+        "description": "Uses 88-level condition names on IMS-RETURN-CODE (STATUS-OK, SEGMENT-NOT-FOUND, END-OF-DB, etc.) evaluated after each DLI call. SEGMENT-NOT-FOUND and END-OF-DB set AUTHS-EOF or NFOUND-PAUT-SMRY-SEG flags for normal flow control. OTHER conditions set WS-ERR-FLG to 'Y', build a STRING message with the IMS status code, and call SEND-PAULST-SCREEN."
+      },
+      {
+        "category": "IMS PSB Scheduling Errors",
+        "description": "In SCHEDULE-PSB, handles PSB-SCHEDULED-MORE-THAN-ONCE (TC) by issuing TERM then re-scheduling. If final status is not STATUS-OK, sets WS-ERR-FLG to 'Y', builds a message with the IMS return code, and calls SEND-PAULST-SCREEN. Tracks scheduling state via IMS-PSB-SCHD-FLG; issues CICS SYNCPOINT and terminates PSB before screen sends."
+      },
+      {
+        "category": "Invalid Key/Function Key Errors",
+        "description": "EVALUATE EIBAID in MAIN-PARA handles only DFHENTER, DFHPF3, DFHPF7, and DFHPF8. Any other AID key falls into WHEN OTHER, which sets WS-ERR-FLG to 'Y', moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, repositions cursor, and calls SEND-PAULST-SCREEN."
+      },
+      {
+        "category": "Pagination Boundary Errors",
+        "description": "PF7 checks CDEMO-CPVS-PAGE-NUM > 1 before allowing backward navigation; if already at page 1, sets a user message 'You are already at the top of the page...' and sets SEND-ERASE-NO. PF8 checks CDEMO-CPVS-PAUKEY-LAST and NEXT-PAGE-YES flag; if at last page, sets message 'You are already at the bottom of the page...' without setting error flag."
+      },
+      {
+        "category": "Error Propagation and Guard Pattern",
+        "description": "WS-ERR-FLG (ERR-FLG-ON/ERR-FLG-OFF) acts as a global error gate. PROCESS-PAGE-FORWARD and its loop check ERR-FLG-OFF before proceeding, preventing further processing after an error. However, error-handling paragraphs call SEND-PAULST-SCREEN directly and then fall through rather than using STOP RUN or GOBACK, which may allow partial continued execution."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COPAU00",
+        "map_name": "COPAU0A",
+        "business_function": "Provides a summary view of pending authorization messages for the CardDemo Authorization Module. The screen allows users to search for authorizations by Account ID, view up to 5 authorization records per page with transaction details (ID, date, time, type, approval/decline status, match status, and amount), and navigate through pages of results. Users can select an individual authorization record to drill down into full authorization details via program COPAUS1C. The screen also displays customer information, account financial summaries including credit limits, cash limits, balances, and counts of approved and declined authorizations sourced from an IMS database."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COPAU0A - View Authorizations</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#fff;width:80ch;font-size:16px;line-height:1.5;position:relative;white-space:pre;border:1px solid #444;padding:4px;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff5555;} .turquoise{color:#00ffff;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .underline{text-decoration:underline;} .bright{font-weight:bold;} .input-field{background:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;} .sel-field{background:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:16px;outline:none;width:1ch;}</style></head><body><div class='terminal'><span class='blue'>Tran: </span><span class='blue'>CPVS</span>            <span class='yellow'>AWS CardDemo                            </span><span class='blue'>Date: </span><span class='blue'>07/15/25</span>\n<span class='blue'>Prog: </span><span class='blue'>COPAUS0C</span>        <span class='yellow'>Credit Card Demo Application            </span><span class='blue'>Time: </span><span class='blue'>14:32:10</span>\n                             <span class='neutral'>View Authorizations</span>\n\n   <span class='turquoise'>Search Acct Id: </span><input class='input-field underline' type='text' maxlength='11' size='11' value='00000001001'>\n<span class='white'>Name: </span><span class='blue'>John A Smith             </span>   <span class='white'>Customer Id: </span><span class='blue'>000000001</span>\n      <span class='blue'>123 Main St, Apt 4B      </span>   <span class='white'>Acct Status: </span><span class='blue'>Y</span>\n      <span class='blue'>Chicago, IL, 60601       </span>\n      <span class='white'>PH:</span>   <span class='blue'>312-555-1234 </span>         <span class='white'>Approval # : </span><span class='blue'>003</span>  <span class='white'>Decline #:</span><span class='blue'>001</span>\n\n      <span class='white'>Credit Lim:</span> <span class='blue'>  10000.00   </span>  <span class='white'>Cash Lim:</span> <span class='blue'> 2000.00 </span>  <span class='white'>Appr Amt:</span> <span class='blue'>  1500.00  </span>\n      <span class='white'>Credit Bal:</span> <span class='blue'>   8500.00   </span>  <span class='white'>Cash Bal:</span> <span class='blue'>  500.00 </span>  <span class='white'>Decl Amt:</span> <span class='blue'>   250.00  </span>\n\n<span class='neutral'>Sel</span>  <span class='neutral'> Transaction ID  </span>  <span class='neutral'>  Date  </span>  <span class='neutral'>  Time  </span>  <span class='neutral'>Type </span> <span class='neutral'>A/D</span> <span class='neutral'>STS</span> <span class='neutral'>   Amount   </span>\n<span class='neutral'>---</span>  <span class='neutral'>----------------</span>  <span class='neutral'>--------</span>  <span class='neutral'>--------</span>  <span class='neutral'>----</span>  <span class='neutral'>---</span> <span class='neutral'>---</span> <span class='neutral'>------------</span>\n<input class='sel-field' type='text' maxlength='1' value=' '>  <span class='blue'>TXN0000000000001</span>  <span class='blue'>07/14/25</span>  <span class='blue'>10:22:05</span>  <span class='blue'>SALE</span>  <span class='blue'>A</span>   <span class='blue'>M</span>   <span class='blue'>     -500.00 </span>\n<input class='sel-field' type='text' maxlength='1' value=' '>  <span class='blue'>TXN0000000000002</span>  <span class='blue'>07/14/25</span>  <span class='blue'>11:45:30</span>  <span class='blue'>SALE</span>  <span class='blue'>A</span>   <span class='blue'>M</span>   <span class='blue'>     -750.00 </span>\n<input class='sel-field' type='text' maxlength='1' value=' '>  <span class='blue'>TXN0000000000003</span>  <span class='blue'>07/14/25</span>  <span class='blue'>13:10:55</span>  <span class='blue'>SALE</span>  <span class='blue'>D</span>   <span class='blue'>U</span>   <span class='blue'>     -250.00 </span>\n<input class='sel-field' type='text' maxlength='1' value=' '>  <span class='blue'>TXN0000000000004</span>  <span class='blue'>07/15/25</span>  <span class='blue'>08:05:12</span>  <span class='blue'>SALE</span>  <span class='blue'>A</span>   <span class='blue'>M</span>   <span class='blue'>     -250.00 </span>\n<input class='sel-field' type='text' maxlength='1' value=' '>  <span class='blue'>TXN0000000000005</span>  <span class='blue'>07/15/25</span>  <span class='blue'>09:30:44</span>  <span class='blue'>RETN</span>  <span class='blue'>A</span>   <span class='blue'>M</span>   <span class='blue'>      100.00 </span>\n\n            <span class='neutral bright'>Type 'S' to View Authorization details from the list</span>\n<span class='red bright'>                                                                              </span>\n<span class='yellow'>ENTER=Continue  F3=Back  F7=Backward  F8=Forward</span>\n</div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Submit the screen - validates Account ID input, processes any row selection (value 'S' or 's') to navigate to authorization detail screen (COPAUS1C), and refreshes the authorization list for the entered account"
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen / main menu (COMEN01C)"
+        },
+        {
+          "key": "F7",
+          "action": "Scroll backward to the previous page of authorization records"
+        },
+        {
+          "key": "F8",
+          "action": "Scroll forward to the next page of authorization records"
+        }
+      ]
+    }
+  }
+}

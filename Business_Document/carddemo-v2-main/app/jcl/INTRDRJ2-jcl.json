@@ -1,0 +1,43 @@
+{
+    "created_on": "2026-11-05",
+    "name": "INTRDRJ2.JCL",
+    "file_path": "carddemo-v2-main/app/jcl/INTRDRJ2.JCL",
+    "type": "jcl",
+    "description": "This JCL job copies data from a backup file to an internal reader file within the CardDemo application, effectively reproducing or resubmitting stored job streams or data records from a backup source to a target dataset designated for internal reader processing.Key Functionalities:\nReads data from the CardDemo FTP test backup dataset (AWS.M2.CARDEMO.FTP.TEST.BKUP) as the source input.\nCopies all records from the input backup file to the internal reader target dataset (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR) using the REPRO function.\nThe REPRO operation performs a direct, complete reproduction of all records from the source to the destination without any filtering or transformation.",
+    "rules": [
+        {
+            "Rule_Id": "R-INTRDRJ2-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo FTP Test Backup file (AWS.M2.CARDEMO.FTP.TEST.BKUP) is available and contains records to be processed",
+                "When": "The IDCAMS REPRO command is executed to transfer data from the Card Demo FTP Test Backup file to the Internal Reader file",
+                "Then": "Every record from the Card Demo FTP Test Backup is copied completely and without any modification or transformation to the Card Demo FTP Backup Internal Reader file (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR); no records are skipped, filtered, or altered during the transfer"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS REPRO - Complete Record Transfer from Card Demo FTP Backup to Internal Reader",
+            "Rule_Description": "All records from the Card Demo FTP Test Backup file must be fully copied to the Internal Reader file without any modification, filtering, or selection criteria applied.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-INTRDRJ2-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The IDCAMS REPRO job step is initiated to transfer Card Demo FTP Backup data to the Internal Reader",
+                "When": "The system attempts to access the source file (AWS.M2.CARDEMO.FTP.TEST.BKUP) and the destination file (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR)",
+                "Then": "Both the Card Demo FTP Test Backup file and the Internal Reader file must already exist and be accessible in shared mode; if either file is unavailable or inaccessible, the data transfer must not proceed and the entire job must be treated as failed"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS REPRO - Pre-existence of Source and Destination Files",
+            "Rule_Description": "Both the Card Demo FTP Test Backup (source) and the Internal Reader (destination) files must already exist and be accessible in shared mode before the data transfer operation can proceed.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-INTRDRJ2-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "All records from the Card Demo FTP Test Backup have been successfully copied to the Internal Reader file (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR)",
+                "When": "The data transfer to the Card Demo FTP Backup Internal Reader is completed without errors",
+                "Then": "The transferred data must be available in the Internal Reader, enabling downstream automated job submission or processing to be triggered using the Card Demo FTP Backup data"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS REPRO - Internal Reader Activation for Downstream Processing",
+            "Rule_Description": "Upon successful completion of the data transfer, the Card Demo FTP Backup data written to the Internal Reader file becomes available to trigger downstream automated processing or job submission.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444\n\n    A([Start: Card Demo FTP Backup Submission Job]):::start\n\n    B[_IDCAMS - IDCAMS Utility\n    Copy Card Demo FTP Test Backup Data\n    into Internal Reader for Processing_]:::process\n\n    C{IDCAMS Copy\n    Operation\n    Successful?}:::decision\n\n    D([End: Card Demo FTP Backup Data\n    Successfully Loaded into\n    Internal Reader for Submission]):::success\n\n    E([End: Copy Operation Failed -\n    Card Demo FTP Backup Data\n    Not Submitted to Internal Reader]):::error\n\n    A --> B\n    B --> C\n    C -->|Return Code = 0 - Success| D\n    C -->|Return Code > 0 - Failure| E"
+}

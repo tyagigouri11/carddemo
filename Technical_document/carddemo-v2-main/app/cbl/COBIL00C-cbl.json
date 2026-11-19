@@ -1,0 +1,339 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COBIL00C.cbl",
+        "type": "cobol",
+        "transaction_id": "CB00"
+      },
+      "overview": "COBIL00C is part of the CardDemo credit card management application, operating within the online bill payment workflow as a CICS interactive transaction (CB00). It serves customers who need to pay their outstanding credit card balance in full through an online self-service interface. The program manages the complete bill payment lifecycle: it presents the current account balance to the user, collects and validates a payment confirmation, creates a formal transaction record, and updates the account balance to zero upon successful payment. It solves the need for a controlled, auditable online payment process that ensures data integrity across account and transaction files.",
+      "key_features": [
+        {
+          "feature": "Account Balance Lookup",
+          "description": "Reads the account master file (ACCTDAT) to retrieve and display the current outstanding balance for a given account ID."
+        },
+        {
+          "feature": "Payment Confirmation Workflow",
+          "description": "Requires explicit user confirmation (Y/N) before processing payment, preventing accidental full-balance payments."
+        },
+        {
+          "feature": "Transaction Record Creation",
+          "description": "Generates a new transaction record in the TRANSACT file with type 'BILL PAYMENT - ONLINE', auto-incrementing the transaction ID from the last existing record."
+        },
+        {
+          "feature": "Account Balance Update",
+          "description": "Rewrites the account record in ACCTDAT, reducing the current balance by the full payment amount after successful transaction write."
+        },
+        {
+          "feature": "Card Cross-Reference Lookup",
+          "description": "Reads the CXACAIX alternate index file to resolve the card number associated with the account, linking it to the transaction record."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that the account ID is not empty, the confirmation value is Y or N, and that the account has a positive balance before allowing payment."
+        },
+        {
+          "feature": "Timestamp Generation",
+          "description": "Uses CICS ASKTIME and FORMATTIME to capture the current date and time, stamping both the origination and processing timestamps on the transaction record."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the previous program, PF4 to clear the screen, and Enter to process input, with invalid keys producing an error message."
+        },
+        {
+          "feature": "Error Handling",
+          "description": "Provides user-friendly error messages for conditions such as account not found, zero balance, duplicate transaction ID, and file I/O failures."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "ACCTDAT",
+        "type": "Read/Write",
+        "description": "Account master file - reads account record by account ID to retrieve current balance, and updates the account record after bill payment by reducing the current balance by the transaction amount"
+      },
+      {
+        "name": "CXACAIX",
+        "type": "Read",
+        "description": "Card cross-reference alternate index file - reads by account ID to retrieve the associated card number, which is then used when creating the transaction record"
+      },
+      {
+        "name": "TRANSACT",
+        "type": "Read/Write",
+        "description": "Transaction file - browsed in reverse order to determine the last transaction ID for generating the next sequential transaction ID, and a new transaction record is written to record the bill payment"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN; if zero, redirects to sign-on screen. Otherwise, loads CARDDEMO-COMMAREA from DFHCOMMAREA and determines if this is a first-time entry or re-entry.",
+          "records": [
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-CB00-TRN-SELECTED",
+            "EIBCALEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Send Initial Bill Payment Screen",
+          "description": "On first entry, initializes the COBIL0AO map to LOW-VALUES, optionally pre-populates the account ID from the communication area if a transaction was pre-selected, then sends the bill payment BMS screen to the terminal.",
+          "records": [
+            "COBIL0AO",
+            "COBIL0AI",
+            "ACTIDINI",
+            "ACTIDINL",
+            "CDEMO-CB00-TRN-SELECTED"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive Bill Payment Screen Input",
+          "description": "On re-entry, receives user input from the BMS map COBIL0A into COBIL0AI, capturing account ID and confirmation flag entered by the user.",
+          "records": [
+            "COBIL0AI",
+            "ACTIDINI",
+            "CONFIRMI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Evaluate AID Key and Route Processing",
+          "description": "Evaluates EIBAID to determine user action: ENTER triggers payment processing, PF3 returns to previous screen, PF4 clears the screen, any other key sets an error flag and redisplays the screen.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "DFHPF4",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Validate Account ID Input",
+          "description": "Checks that the account ID field (ACTIDINI) is not spaces or LOW-VALUES. If empty, sets error flag and redisplays screen with an error message.",
+          "records": [
+            "ACTIDINI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "ACTIDINL"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read Account Data File",
+          "description": "Issues a CICS READ with UPDATE against the ACCTDAT file using ACCT-ID as the key to retrieve and lock the account record. Handles NOTFND and other error conditions by setting error flag and redisplaying screen.",
+          "records": [
+            "ACCOUNT-RECORD",
+            "ACCT-ID",
+            "ACCT-CURR-BAL",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Validate Confirmation Flag and Balance",
+          "description": "Evaluates the CONFIRMI field for Y/N/spaces. If Y, proceeds to payment; if N, clears screen; if spaces, reads account data. Also validates that ACCT-CURR-BAL is greater than zero before allowing payment.",
+          "records": [
+            "CONFIRMI",
+            "ACCT-CURR-BAL",
+            "WS-CURR-BAL",
+            "CURBALI",
+            "CONF-PAY-FLG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Read Card-to-Account Cross-Reference File",
+          "description": "When payment is confirmed, reads the CXACAIX alternate index file using XREF-ACCT-ID to retrieve the card number associated with the account, which is needed for the transaction record.",
+          "records": [
+            "CARD-XREF-RECORD",
+            "XREF-ACCT-ID",
+            "XREF-CARD-NUM",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Browse Transaction File to Determine Next Transaction ID",
+          "description": "Sets TRAN-ID to HIGH-VALUES and starts a backward browse on the TRANSACT file. Reads the previous (highest-keyed) record to obtain the last used transaction ID, then ends the browse. Increments by 1 to generate the new transaction ID.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-RECORD",
+            "WS-TRAN-ID-NUM",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Get Current Timestamp",
+          "description": "Issues CICS ASKTIME to get absolute time, then CICS FORMATTIME to format it into date (YYYYMMDD) and time (HH:MM:SS) components. Assembles WS-TIMESTAMP for use in the transaction record.",
+          "records": [
+            "WS-ABS-TIME",
+            "WS-CUR-DATE-X10",
+            "WS-CUR-TIME-X08",
+            "WS-TIMESTAMP",
+            "WS-TIMESTAMP-TM-MS6"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Build and Write Transaction Record",
+          "description": "Initializes TRAN-RECORD and populates all fields: new transaction ID, type code '02', category code 2, source 'POS TERM', description 'BILL PAYMENT - ONLINE', amount equal to current balance, card number from XREF, merchant ID 999999999, and timestamps. Writes the record to the TRANSACT file.",
+          "records": [
+            "TRAN-RECORD",
+            "TRAN-ID",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-SOURCE",
+            "TRAN-DESC",
+            "TRAN-AMT",
+            "TRAN-CARD-NUM",
+            "TRAN-MERCHANT-ID",
+            "TRAN-MERCHANT-NAME",
+            "TRAN-MERCHANT-CITY",
+            "TRAN-MERCHANT-ZIP",
+            "TRAN-ORIG-TS",
+            "TRAN-PROC-TS"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Update Account Balance",
+          "description": "Computes the new account balance by subtracting the transaction amount from ACCT-CURR-BAL (resulting in zero for full payment). Issues a CICS REWRITE to update the locked ACCTDAT record with the new balance.",
+          "records": [
+            "ACCOUNT-RECORD",
+            "ACCT-CURR-BAL",
+            "TRAN-AMT",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Display Payment Success and Return",
+          "description": "On successful write, initializes all screen fields, sets the message color to green, and builds a success message containing the new transaction ID. Sends the updated bill payment screen. Program then returns via CICS RETURN with transaction ID CB00 and the updated COMMAREA.",
+          "records": [
+            "WS-MESSAGE",
+            "ERRMSGC",
+            "TRAN-ID",
+            "COBIL0AO",
+            "CARDDEMO-COMMAREA",
+            "WS-TRANID"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "ACCTDAT Exclusive Lock Before Update",
+          "description": "The ACCTDAT file is read with the UPDATE option, which places an exclusive lock on the account record. This lock must be held continuously until the REWRITE in UPDATE-ACCTDAT-FILE completes. Any failure between READ and REWRITE (e.g., screen send for error) may leave the record locked, causing contention for other transactions accessing the same account."
+        },
+        {
+          "dependency": "XREF-CARD-NUM Dependency on CXACAIX Read",
+          "description": "The transaction record field TRAN-CARD-NUM is populated from XREF-CARD-NUM, which is only available after a successful READ of the CXACAIX file. If the cross-reference read fails, the transaction cannot be written with a valid card number."
+        },
+        {
+          "dependency": "Transaction ID Sequencing via Backward Browse",
+          "description": "The new TRAN-ID is derived by reading the last (highest-keyed) record in the TRANSACT file and incrementing by 1. This is not atomic; concurrent sessions could read the same last transaction ID and generate duplicate IDs, leading to DUPKEY/DUPREC errors on write."
+        },
+        {
+          "dependency": "CONF-PAY-YES State Required for Payment Execution",
+          "description": "The full payment workflow (CXACAIX read, transaction browse, transaction write, account update) is only executed when CONF-PAY-YES is TRUE. This flag is set only when CONFIRMI equals 'Y' or 'y'. All prior steps (account read, balance validation) must complete without error before this branch is reached."
+        },
+        {
+          "dependency": "ERR-FLG-ON Guards All Processing Stages",
+          "description": "Each major processing block is guarded by IF NOT ERR-FLG-ON. Any error in an earlier stage (empty account ID, account not found, zero balance, XREF not found) sets WS-ERR-FLG to 'Y' and short-circuits all subsequent processing, preventing partial updates."
+        },
+        {
+          "dependency": "ACCT-CURR-BAL Must Be Positive Before Payment",
+          "description": "The program explicitly checks that ACCT-CURR-BAL is greater than zero before allowing a payment to proceed. A zero or negative balance causes an error message and prevents transaction creation and account update."
+        },
+        {
+          "dependency": "COMMAREA Continuity Across CICS Returns",
+          "description": "The program uses CICS RETURN with TRANSID(CB00) and COMMAREA(CARDDEMO-COMMAREA) to maintain state across user interactions. The CDEMO-PGM-REENTER flag within the COMMAREA distinguishes first entry from subsequent entries, controlling screen initialization versus input processing."
+        },
+        {
+          "dependency": "TRAN-AMT Equals Full Account Balance",
+          "description": "The transaction amount is set directly to ACCT-CURR-BAL before the account balance is updated. The subsequent COMPUTE sets ACCT-CURR-BAL to zero (ACCT-CURR-BAL - TRAN-AMT). This assumes full balance payment only; no partial payment logic exists."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS Transaction Server",
+          "type": "Online Transaction Processing (OLTP) Middleware",
+          "purpose": "Provides the runtime environment for all program operations including terminal I/O (SEND/RECEIVE MAP), file I/O (READ, REWRITE, WRITE, STARTBR, READPREV, ENDBR), program control (XCTL, RETURN), and time services (ASKTIME, FORMATTIME). All data access and screen interactions are mediated through CICS commands."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates account ID for empty/low-values and confirmation field for valid Y/N values. On failure, sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive message, positions cursor via ACTIDINL or CONFIRML set to -1, and calls SEND-BILLPAY-SCREEN to redisplay the form. Also checks for zero or negative account balance before allowing payment."
+      },
+      {
+        "category": "File Read Errors (ACCTDAT, CXACAIX)",
+        "description": "After each CICS READ, evaluates WS-RESP-CD. DFHRESP(NORMAL) continues processing. DFHRESP(NOTFND) sets error flag and displays 'Account ID NOT found...' message. Any other response code logs RESP and REAS codes via DISPLAY to SYSOUT and shows 'Unable to lookup Account/XREF AIX file...' message, then redisplays the screen."
+      },
+      {
+        "category": "File Update Errors (ACCTDAT REWRITE)",
+        "description": "After CICS REWRITE, evaluates WS-RESP-CD. DFHRESP(NORMAL) continues. DFHRESP(NOTFND) sets error flag with 'Account ID NOT found...' message. Other responses log RESP/REAS codes via DISPLAY and show 'Unable to Update Account...' message, repositioning cursor to account ID field and redisplaying the screen."
+      },
+      {
+        "category": "Transaction File Browse Errors (STARTBR, READPREV, ENDBR)",
+        "description": "STARTBR evaluates NOTFND and OTHER responses, setting error flag and appropriate messages. READPREV handles DFHRESP(ENDFILE) gracefully by setting TRAN-ID to zeros (allowing new sequence start), while OTHER responses set error flag and display message. ENDBR has no error handling, treating it as non-critical."
+      },
+      {
+        "category": "Transaction File Write Errors (WRITE-TRANSACT-FILE)",
+        "description": "On DFHRESP(NORMAL), clears fields, sets message color to DFHGREEN, and builds a success message including the transaction ID. DFHRESP(DUPKEY) and DFHRESP(DUPREC) are grouped together, setting error flag with 'Tran ID already exist...' message. OTHER responses log RESP/REAS codes via DISPLAY and show 'Unable to Add Bill pay Transaction...' message."
+      },
+      {
+        "category": "Navigation and Session Errors",
+        "description": "If EIBCALEN is zero (no commarea), the program redirects to the sign-on screen COSGN00C via XCTL. Invalid AID key presses (not ENTER, PF3, or PF4) set error flag and display CCDA-MSG-INVALID-KEY message. If CDEMO-TO-PROGRAM is empty during navigation, defaults to COSGN00C as a fallback."
+      },
+      {
+        "category": "Error State Propagation and Guard Pattern",
+        "description": "Uses a cascading guard pattern with WS-ERR-FLG (88-level conditions ERR-FLG-ON/OFF). Subsequent processing blocks are wrapped in 'IF NOT ERR-FLG-ON' checks, preventing further execution once an error is detected. This avoids compound errors but does not implement rollback; partial file updates may occur if an error arises mid-transaction."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COBIL00",
+        "map_name": "COBIL0A",
+        "business_function": "Bill Payment screen for the CardDemo application. Allows cardholders to view their current account balance and pay their account balance in full online. The user enters an Account ID, views the current balance, and confirms payment with a Y/N response. Upon confirmation, a bill payment transaction record is written and the account balance is updated to zero."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COBIL00 - Bill Payment</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background-color:#000;color:#00ff00;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .blue{color:#4444ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff0000;} .turquoise{color:#00ffff;} .neutral{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background-color:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:14px;outline:none;} .row{white-space:pre;height:1.5em;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CB00</span><span class='blue'>              </span><span class='yellow'>CardDemo Bill Payment           </span><span class='blue'>  Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COBIL00C</span><span class='blue'>              </span><span class='yellow'>                                        </span><span class='blue'>  Time: </span><span class='blue'>23:12:32</span></div><div class='row'>&nbsp;</div><div class='row'><span class='neutral bright'>                                   Bill Payment</span></div><div class='row'>&nbsp;</div><div class='row'><span class='green'>     Enter Acct ID: </span><input class='input-field underline green' type='text' maxlength='11' size='11' value='0000000001'></div><div class='row'>&nbsp;</div><div class='row'><span class='yellow'>     ----------------------------------------------------------------------</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='turquoise'>     Your current balance is: </span><span class='blue'>  +1500.00    </span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='turquoise'>     Do you want to pay your balance now. Please confirm: </span><input class='input-field underline green' type='text' maxlength='1' size='1' value='Y'><span class='neutral'> (Y/N)</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='red bright'>Payment successful.  Your Transaction ID is 0000000000000042.</span></div><div class='row'><span class='yellow'>ENTER=Continue  F3=Back  F4=Clear</span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the bill payment request. Validates the Account ID, retrieves the current balance, and if confirmation is Y, writes a bill payment transaction and updates the account balance to zero."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen. If a calling program is identified in the commarea, control is transferred back to that program; otherwise defaults to the main menu (COMEN01C)."
+        },
+        {
+          "key": "F4",
+          "action": "Clear the current screen. Resets all input fields (Account ID, Current Balance, Confirm) to spaces and re-displays the blank bill payment screen."
+        }
+      ]
+    }
+  }
+}

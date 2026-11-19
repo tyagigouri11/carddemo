@@ -1,0 +1,153 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CREADB21.jcl",
+    "file_path": "carddemo-v2-main/app/app-transaction-type-db2/jcl/CREADB21.jcl",
+    "type": "jcl",
+    "description": "This JCL job (CREADB2) sets up the DB2 database environment for the CardDemo application by freeing existing DB2 plans and packages, creating new DB2 database objects (tables/structures), and loading transaction type and card category data into the DB2 system DAZ1.Key Functionalities:\nFrees existing DB2 plans (CARDDEMO, COTRTLIC) and all packages under COTRTLIC to allow a clean re-creation of the database environment.\nExecutes DB2 DDL statements from the DB2CREAT control member to create the required CardDemo database tables and objects in DB2 system DAZ1.\nLoads transaction type reference data into DB2 by running SQL statements defined in the DB2LTTYP control member.\nLoads card category reference data into DB2 by running SQL statements defined in the DB2LTCAT control member.\nSteps RUNTEP2 and LDTCCAT are conditionally executed only if all prior steps complete successfully (COND=(0,NE) skips execution on any non-zero return code).",
+    "rules": [
+        {
+            "Rule_Id": "R-CREADB21-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo application plan named CARDDEMO exists and is currently bound in DB2 subsystem DAZ1",
+                "When": "The database setup job is initiated to prepare the Card Demo DB2 environment",
+                "Then": "The CARDDEMO application plan must be fully released and freed from DB2 subsystem DAZ1, making it available for rebinding during the subsequent database setup steps"
+            },
+            "Rule_Name": "FREEPLN - IKJEFT01 (DSN FREE) - Release Card Demo Application Plan from DB2",
+            "Rule_Description": "Before any new database setup or object creation begins, the existing Card Demo application plan must be released from the DB2 subsystem DAZ1 to ensure a clean and conflict-free environment for the upcoming database creation process.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CO Transaction License application plan named COTRTLIC exists and is currently bound in DB2 subsystem DAZ1",
+                "When": "The database setup job is initiated to prepare the Card Demo DB2 environment",
+                "Then": "The COTRTLIC application plan must be fully released and freed from DB2 subsystem DAZ1, clearing it for any subsequent rebinding or recreation"
+            },
+            "Rule_Name": "FREEPLN - IKJEFT01 (DSN FREE) - Release CO Transaction License Application Plan from DB2",
+            "Rule_Description": "As part of the Card Demo database environment preparation, the CO Transaction License (COTRTLIC) application plan must be released from DB2 subsystem DAZ1 prior to any new database object creation, ensuring no stale plan references interfere with the setup process.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "One or more packages exist under the COTRTLIC package collection in DB2 subsystem DAZ1",
+                "When": "The database setup job is initiated to prepare the Card Demo DB2 environment",
+                "Then": "Every package within the COTRTLIC collection (COTRTLIC.*) must be fully released and freed from DB2 subsystem DAZ1 \u2014 no package within the collection is selectively retained, and the entire collection is cleared without exception"
+            },
+            "Rule_Name": "FREEPLN - IKJEFT01 (DSN FREE) - Release All CO Transaction License Packages from DB2",
+            "Rule_Description": "All packages belonging to the CO Transaction License (COTRTLIC) package collection must be completely released from DB2 subsystem DAZ1 before new database objects are created. No individual package within the COTRTLIC collection is retained \u2014 the release applies universally to every package in the collection.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo application DB2 setup process has been initiated, the DB2 subsystem DAZ1 is available, and the SQL DDL script DB2CREAT exists in the shared Card Demo control library (AWS.M2.CARDDEMO.CNTL) in read-only mode",
+                "When": "The DB2 object creation step executes the SQL DDL statements contained in AWS.M2.CARDDEMO.CNTL(DB2CREAT) against DB2 subsystem DAZ1",
+                "Then": "All DB2 database objects defined in the DB2CREAT script (tables, indexes, tablespaces) are created in DB2 subsystem DAZ1, AND even if one or more individual SQL CREATE statements fail (e.g., object already exists), the step continues processing all remaining SQL statements without stopping, AND the overall step is always reported as successful (Return Code = 0) regardless of individual SQL statement outcomes, AND all execution results including successes and failures of individual statements are captured in the job execution log"
+            },
+            "Rule_Name": "CRCRDDB - DSNTIAD - Create Card Demo DB2 Database Objects",
+            "Rule_Description": "This step executes SQL DDL statements from the Card Demo control library to create all required DB2 database objects (tables, indexes, tablespaces) in the DAZ1 subsystem. The step is configured to tolerate individual SQL statement failures and continue processing all remaining statements.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo DB2 object creation step is executing SQL DDL statements from DB2CREAT against DB2 subsystem DAZ1",
+                "When": "One or more individual SQL CREATE statements encounter errors or failures during execution (for example, an object already exists, or a tablespace is unavailable)",
+                "Then": "The failed SQL statement is logged with its error details in the execution log, AND processing continues with the next SQL statement in the DB2CREAT script without stopping, AND all remaining SQL CREATE statements are attempted regardless of prior failures, AND the overall step return code is set to 0 (success) so that downstream data loading steps (type data loading and category data loading) are not blocked by partial creation failures"
+            },
+            "Rule_Name": "CRCRDDB - DSNTIAD - Tolerate Individual SQL Failures During DB2 Object Creation",
+            "Rule_Description": "The DB2 object creation step enforces a fault-tolerant execution policy where individual SQL DDL statement failures do not halt the overall database setup process, ensuring maximum number of database objects are created in a single run.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo DB2 database creation job (CREADB2) is executing the object creation step",
+                "When": "SQL DDL statements from DB2CREAT are submitted for execution",
+                "Then": "All database objects (tables, indexes, tablespaces) are created exclusively within DB2 subsystem DAZ1, AND no database objects are created in any other DB2 subsystem, AND the DB2CREAT source script remains unmodified (read-only, shared access) after the step completes"
+            },
+            "Rule_Name": "CRCRDDB - DSNTIAD - Target DB2 Subsystem Enforcement for Card Demo Database Setup",
+            "Rule_Description": "All Card Demo DB2 database objects must be created exclusively within the designated DB2 subsystem DAZ1, ensuring all application database structures reside in the correct and authorized environment.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo DB2 database setup job has been initiated, and prior steps have executed \u2014 specifically: (1) FREEPLN step that freed the CARDDEMO and COTRTLIC DB2 plans and all COTRTLIC packages, and (2) CRCRDDB step that created all Card Demo DB2 database objects using the DB2CREAT script",
+                "When": "The LDTTYPE checkpoint step is reached during job execution",
+                "Then": "If ALL prior steps (FREEPLN and CRCRDDB) completed with a return code of exactly 0 (full success), then this checkpoint step executes successfully and the job is permitted to proceed to reference data loading steps (type data loading and category data loading); BUT if ANY prior step returned a non-zero return code (indicating a failure or warning in freeing DB2 plans or creating DB2 objects), then this checkpoint step is skipped/bypassed, signaling that the DB2 environment is not in a valid state and downstream reference data loading must not proceed"
+            },
+            "Rule_Name": "LDTTYPE - IEFBR14 - DB2 Setup Success Validation Gate",
+            "Rule_Description": "This step acts as a conditional checkpoint to verify that all prior DB2 setup steps (freeing existing plans/packages and creating new database objects) completed successfully before any reference data loading is permitted. It uses a system no-operation program whose sole purpose is to be conditionally executed or skipped based on prior step outcomes.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo database setup process is in progress, the DB2 database objects have been created in subsystem DAZ1, and the DB2LTTYP SQL script containing type and classification reference data is available in the AWS.M2.CARDDEMO control library",
+                "When": "The RUNTEP2 step executes the DB2LTTYP SQL script against DB2 subsystem DAZ1 using the DSNTEP4 SQL processor",
+                "Then": "All type and classification reference data \u2014 including transaction type codes, account type codes, card type codes, and other lookup classification values \u2014 defined in the DB2LTTYP SQL script are successfully loaded into the corresponding Card Demo DB2 reference tables in subsystem DAZ1"
+            },
+            "Rule_Name": "RUNTEP2 - DSNTEP4 - Load Type Reference Data into Card Demo Database",
+            "Rule_Description": "This step executes SQL statements from the DB2LTTYP control script to load all type and classification reference data into the Card Demo DB2 database tables within subsystem DAZ1. This reference data drives transaction type classifications, account type codes, and other lookup values used across the Card Demo application.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The DB2LTTYP SQL script contains type reference data entries that include mixed-case (both uppercase and lowercase) character values for type codes, descriptions, or classification labels",
+                "When": "The RUNTEP2 step processes and executes the SQL statements from the DB2LTTYP script",
+                "Then": "All mixed-case data values are correctly interpreted and stored in the Card Demo DB2 reference tables without any forced case conversion, ensuring the type reference data retains its exact original casing as defined in the DB2LTTYP source script"
+            },
+            "Rule_Name": "RUNTEP2 - DSNTEP4 - Mixed Case Data Value Preservation During Type Reference Data Loading",
+            "Rule_Description": "The type reference data loading process must correctly handle and preserve mixed-case (both uppercase and lowercase) character values as defined in the DB2LTTYP SQL script, ensuring that reference data codes and descriptions retain their original casing in the Card Demo database.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The DB2LTTYP SQL script is stored as a member within the AWS.M2.CARDDEMO control library and may be required by other concurrent jobs or processes",
+                "When": "The RUNTEP2 step accesses the DB2LTTYP script to execute the type reference data loading SQL statements",
+                "Then": "The DB2LTTYP script is accessed in shared read-only mode, the source script content remains completely unmodified after the loading process completes, and other jobs or processes are not blocked from simultaneously accessing the same DB2LTTYP script"
+            },
+            "Rule_Name": "RUNTEP2 - DSNTEP4 - Shared Read-Only Access to Type Reference Data Source Script",
+            "Rule_Description": "The DB2LTTYP SQL source script must be accessed in shared read-only mode during the type reference data loading process, ensuring the source script is never modified during execution and remains available for concurrent access by other processes or jobs.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo database setup job (CREADB2) is executing and prior steps \u2014 FREEPLN (plan freeing), CRCRDDB (DB2 object creation), and LDTTYPE (success gate) \u2014 have completed with any return code value",
+                "When": "The job execution sequence reaches the RUNTEP2 step",
+                "Then": "The type reference data loading step executes without evaluating or checking the return codes of any prior steps, ensuring that type reference data loading is always attempted even if prior steps encountered issues during the database setup process"
+            },
+            "Rule_Name": "RUNTEP2 - DSNTEP4 - Unconditional Execution of Type Reference Data Loading",
+            "Rule_Description": "The type reference data loading step always executes unconditionally, regardless of the return codes or outcomes of any prior steps in the Card Demo database setup job, ensuring that type reference data loading is always attempted as part of the database setup sequence.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The Card Demo DB2 database setup job (CREADB2) is in progress, and prior steps include: freeing existing DB2 plans and packages (FREEPLN), creating DB2 database objects (CRCRDDB), the success gate checkpoint (LDTTYPE), and loading type reference data (RUNTEP2)",
+                "When": "Any one or more of the prior steps \u2014 FREEPLN, CRCRDDB, LDTTYPE, or RUNTEP2 \u2014 returns a non-zero return code, indicating a failure or error condition in the database setup process",
+                "Then": "The category reference data loading step (LDTCCAT) is entirely bypassed \u2014 no SQL statements from the DB2LTCAT script are executed, no category or classification reference data is loaded into DB2 subsystem DAZ1, and the Card Demo application's category reference tables remain unpopulated, leaving the application in an incomplete state"
+            },
+            "Rule_Name": "LDTCCAT - DSNTEP4 - Conditional Execution Gate for Category Reference Data Loading",
+            "Rule_Description": "Determines whether the category reference data loading step should execute or be bypassed, based on the successful completion of all prior Card Demo DB2 setup steps.",
+            "Rule_Type": "Decision Rule"
+        },
+        {
+            "Rule_Id": "R-CREADB21-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "All prior steps \u2014 FREEPLN, CRCRDDB, LDTTYPE, and RUNTEP2 \u2014 have completed successfully with return code 0, AND the category reference data SQL script is available as a shared read-only dataset at AWS.M2.CARDDEMO.CNTL(DB2LTCAT)",
+                "When": "The category reference data loading step (LDTCCAT) executes and connects to DB2 subsystem DAZ1 to run the SQL statements contained in the DB2LTCAT script",
+                "Then": "All SQL statements within the DB2LTCAT script are executed against DB2 subsystem DAZ1, loading category and classification reference data (such as transaction category codes, merchant category codes, and spending classification codes) into the Card Demo DB2 tables; data values containing both uppercase and lowercase characters are fully supported and preserved as-is during the load process"
+            },
+            "Rule_Name": "LDTCCAT - DSNTEP4 - Load Category and Classification Reference Data into Card Demo DB2 Tables",
+            "Rule_Description": "When all prior Card Demo DB2 setup steps have completed successfully, executes the category reference data SQL script (DB2LTCAT) to populate category and classification lookup tables in DB2 subsystem DAZ1, with full support for mixed-case data values.",
+            "Rule_Type": "Action Rule"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,color:#000,font-weight:bold\n    classDef process fill:#6699ff,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,color:#000,font-weight:bold\n    classDef final fill:#ae74de,color:#000,font-weight:bold\n    classDef success fill:#22c55e,color:#000,font-weight:bold\n    classDef error fill:#ef4444,color:#fff,font-weight:bold\n\n    A([JOB START\nCard Demo DB2 Environment Setup]):::start\n\n    B[_FREEPLN - IKJEFT01\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nRelease Existing DB2 Application Plans & Packages\nfor CARDDEMO & COTRTLIC Applications\non DB2 Subsystem DAZ1\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nUnconditional Step_]:::process\n\n    C[_CRCRDDB - IKJEFT01\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nCreate DB2 Database Objects\nTables \u00b7 Indexes \u00b7 Tablespaces\nfor Card Demo Application\non DB2 Subsystem DAZ1\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nUnconditional Step_]:::process\n\n    D{_All Prior Steps\nCompleted Successfully?\nRC = 0 ?_}:::decision\n\n    E[_LDTTYPE - IEFBR14\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nConditional Placeholder Step\nNo Business Processing Performed\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nRuns Only When All Prior Steps RC = 0_]:::process\n\n    SKIP1[/_\u26a0 LDTTYPE - SKIPPED\nOne or More Prior Steps\nReturned Non-Zero Return Code_/]:::error\n\n    F[_RUNTEP2 - IKJEFT01\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nLoad Type & Reference Data\ninto DB2 Tables\nvia SQL Member DB2LTTYP\non DB2 Subsystem DAZ1\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nUnconditional Step_]:::process\n\n    G{_All Prior Steps\nCompleted Successfully?\nRC = 0 ?_}:::decision\n\n    H[_LDTCCAT - IKJEFT01\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nLoad Category & Classification\nReference Data into DB2 Tables\nvia SQL Member DB2LTCAT\non DB2 Subsystem DAZ1\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nRuns Only When All Prior Steps RC = 0_]:::process\n\n    SKIP2[/_\u26a0 LDTCCAT - SKIPPED\nOne or More Prior Steps\nReturned Non-Zero Return Code_/]:::error\n\n    Z([JOB COMPLETED\nCard Demo DB2 Environment\nSetup Finished]):::success\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|_YES \u2014 All Steps RC = 0\nNormal Flow_| E\n    D -->|_NO \u2014 Any Step RC \u2260 0\nError Detected_| SKIP1\n    E --> F\n    SKIP1 --> F\n    F --> G\n    G -->|_YES \u2014 All Steps RC = 0\nNormal Flow_| H\n    G -->|_NO \u2014 Any Step RC \u2260 0\nError Detected_| SKIP2\n    H --> Z\n    SKIP2 --> Z"
+}

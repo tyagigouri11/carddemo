@@ -1,0 +1,101 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "PRTCATBL.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, **PRTCATBL**, is designed to print and process the Transaction Category Balance File for the CardDemo application. It extracts data from a VSAM KSDS dataset containing transaction category balances, creates a backup copy, and then sorts and formats the records by account ID, transaction type code, and category code. The final output produces a formatted report dataset with transaction category balances, serving as an audit and reporting tool for financial transaction category summaries.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Print Trasaction Category Balance File'",
+          "description": "The accounting information or job description string. This positional parameter provides a label or description for the job, used for identification and accounting purposes on the system."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input class) that determines which initiator will pick up and execute the job. Class A typically represents a general-purpose job class, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL listing, allocation/deallocation messages, and job statistics. Class 0 determines where the system messages are routed for output."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending a completion message to that user's TSO session."
+        },
+        {
+          "name": "JCLLIB ORDER",
+          "value": "'AWS.M2.CARDDEMO.PROC'",
+          "description": "A job-level statement that defines the private procedure library search order. It instructs JES to search the specified partitioned dataset 'AWS.M2.CARDDEMO.PROC' for cataloged procedures (PROCs) referenced in the job, before searching system procedure libraries."
+        }
+      ],
+      "procedures": [
+        "REPROC"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "DELDEF",
+        "purpose": "Deletes the existing transaction category balance report dataset if it exists, using the do-nothing utility IEFBR14 to trigger dataset disposition processing. This ensures a clean slate before the report file is recreated in subsequent steps.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "AWS.M2.CARDDEMO.TCATBALF.REPT (deleted if exists)"
+      },
+      {
+        "step": "PRC001",
+        "purpose": "Unloads the VSAM KSDS transaction category balance file to a sequential backup dataset using the IDCAMS REPRO utility. The output is stored as a new generation in a Generation Data Group (GDG).",
+        "programs": "IDCAMS*",
+        "inputs": "FILEIN: AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS (VSAM KSDS, shared); SYSIN: REPRO command",
+        "outputs": "FILEOUT: AWS.M2.CARDDEMO.TCATBALF.BKUP(+1) (new GDG generation, sequential, LRECL=50, RECFM=FB); SYSPRINT: utility messages to SYSOUT"
+      },
+      {
+        "step": "STEP10R",
+        "purpose": "Sorts the transaction category balance records from the GDG backup by account ID (ascending), transaction type code (ascending), and transaction category code (ascending), then reformats each output record to include the account ID, type code, category code, and balance amount with decimal editing, separated by spaces. The result is written to a new sequential report dataset.",
+        "programs": "SORT*",
+        "inputs": "SORTIN: AWS.M2.CARDDEMO.TCATBALF.BKUP(+1) (GDG generation, sequential); SYMNAMES: field definitions (TRANCAT-ACCT-ID pos 1 len 11 ZD, TRANCAT-TYPE-CD pos 12 len 2 CH, TRANCAT-CD pos 14 len 4 ZD, TRAN-CAT-BAL pos 18 len 11 ZD); SYSIN: SORT and OUTREC control statements",
+        "outputs": "SORTOUT: AWS.M2.CARDDEMO.TCATBALF.REPT (new cataloged sequential dataset, LRECL=40, RECFM=FB, 1 cylinder primary); SYSOUT: sort messages to SYSOUT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "DELDEF",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.REPT",
+        "operations": "DELETE",
+        "description": "IEFBR14 is used to delete the existing report dataset AWS.M2.CARDDEMO.TCATBALF.REPT if it exists, using DISP=(MOD,DELETE)"
+      },
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads the VSAM KSDS file AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS as input for the unload operation"
+      },
+      {
+        "step": "PRC001",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.BKUP(+1)",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO writes the unloaded VSAM records to a new generation of the GDG dataset AWS.M2.CARDDEMO.TCATBALF.BKUP(+1) as a flat sequential file with LRECL=50, RECFM=FB"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.BKUP(+1)",
+        "operations": "READ",
+        "description": "SORT reads the newly created backup GDG dataset AWS.M2.CARDDEMO.TCATBALF.BKUP(+1) as SORTIN input for sorting"
+      },
+      {
+        "step": "STEP10R",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.REPT",
+        "operations": "WRITE",
+        "description": "SORT writes the sorted and reformatted output records to AWS.M2.CARDDEMO.TCATBALF.REPT as SORTOUT, sorted ascending by TRANCAT-ACCT-ID, TRANCAT-TYPE-CD, and TRANCAT-CD, with TRAN-CAT-BAL formatted using edit mask (TTTTTTTTT.TT), LRECL=40, RECFM=FB"
+      }
+    ]
+  }
+}

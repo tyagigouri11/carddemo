@@ -1,0 +1,208 @@
+{
+    "created_on": "2026-11-05",
+    "name": "TRANBKP.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/TRANBKP.jcl",
+    "type": "jcl",
+    "description": "This JCL job (TRANBKP) performs a three-phase backup and refresh cycle for the Credit Card Transaction Master VSAM file: it first copies all transaction records to a versioned backup, then deletes the existing VSAM cluster and its alternate index, and finally recreates a fresh empty VSAM cluster ready for new transactions.Key Functionalities:\nBacks up the Transaction Master VSAM file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) by copying all 350-byte fixed-length transaction records into a new generation of the backup GDG dataset (AWS.M2.CARDDEMO.TRANSACT.BKUP(+1)), preserving a versioned history of transactions.\nDeletes the existing Transaction Master VSAM cluster (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) and its associated Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX), suppressing non-critical errors (return codes up to 8) to ensure a clean removal.\nRecreates the Transaction Master VSAM KSDS cluster from scratch with a 16-byte key starting at position 0, fixed record size of 350 bytes, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders, and share options (2,3), making it ready to accept new transaction data.",
+    "rules": [
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The live Card Transaction VSAM file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) exists and contains Card Transaction records",
+                "When": "The Card Transaction backup process (PRC001) is executed",
+                "Then": "Every Card Transaction record from the live VSAM file is copied in full to the backup file (AWS.M2.CARDDEMO.TRANSACT.BKUP) with no filtering, selection, or exclusion applied \u2014 the backup is a complete and exact copy of all transaction data"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Full Card Transaction Data Backup",
+            "Rule_Description": "All Card Transaction records from the live VSAM file must be completely copied to a backup file without any filtering or selection criteria.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "One or more prior backup generations of Card Transaction data already exist in the backup dataset (AWS.M2.CARDDEMO.TRANSACT.BKUP)",
+                "When": "The Card Transaction backup process (PRC001) is executed",
+                "Then": "A new next-generation backup (+1) is created and permanently registered in the system catalog, while all previously created backup generations are retained and remain accessible \u2014 backup history is never overwritten"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Versioned Backup Generation for Card Transaction Data",
+            "Rule_Description": "Each execution of the backup process must create a new sequential backup generation, preserving all prior backup versions of Card Transaction data.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "A new Card Transaction backup generation is being created during the backup process",
+                "When": "The backup process encounters an error or fails to complete successfully",
+                "Then": "The incomplete backup file is automatically removed from the system and deregistered from the catalog \u2014 no partial or corrupt Card Transaction backup is retained under any failure condition"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Backup Integrity Protection on Failure",
+            "Rule_Description": "If the Card Transaction backup process fails, the incomplete backup must be automatically discarded to prevent corrupt or partial backup data from being retained.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "Card Transaction records are being copied from the live VSAM file to the backup file",
+                "When": "Each Card Transaction record is written to the backup file",
+                "Then": "Every record in the backup file is stored as exactly 350 bytes in fixed-length format (LRECL=350, RECFM=FB), ensuring the backup record structure is identical to the source Card Transaction VSAM file structure"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Card Transaction Backup Record Format Consistency",
+            "Rule_Description": "Card Transaction records written to the backup file must conform to a fixed 350-byte record structure, maintaining consistency with the source VSAM file format.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction backup process (PRC001) is actively reading the live Card Transaction VSAM file",
+                "When": "Other business jobs or processes request read access to the Card Transaction VSAM file (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) at the same time",
+                "Then": "The backup process reads the live transaction file in shared mode (DISP=SHR), allowing all other jobs to simultaneously read Card Transaction data without any interruption or delay to their processing"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Non-Blocking Concurrent Access to Card Transaction Data During Backup",
+            "Rule_Description": "The Card Transaction backup process must not block or interrupt other business processes that need to read Card Transaction data while the backup is running.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction backup file has been allocated with initial storage space of 1 cylinder (primary) and 1 cylinder (secondary expansion)",
+                "When": "The backup process completes and the total data written does not consume all allocated storage",
+                "Then": "All unused storage space beyond what is actually occupied by the backed-up Card Transaction records is automatically released back to the system (RLSE), ensuring no storage is unnecessarily reserved"
+            },
+            "Rule_Name": "PRC001 - IDCAMS REPRO - Automatic Release of Unused Backup Storage",
+            "Rule_Description": "Any storage space allocated for the Card Transaction backup file that is not used after the backup completes must be automatically released back to the system.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM Cluster (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) exists on the system",
+                "When": "The Card Transaction file rebuild process is initiated",
+                "Then": "The entire Card Transaction VSAM Cluster including its DATA component (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA) and INDEX component (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX) must be permanently deleted from the system"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Card Transaction VSAM Cluster",
+            "Rule_Description": "The Card Transaction VSAM Cluster, which stores all active Card Transaction records along with its internal data and index structures, must be fully removed from the system to allow a clean recreation of the file.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been attempted on the Card Transaction VSAM Cluster (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS)",
+                "When": "The delete operation returns a condition code of 8 or below (including the case where the file was already absent or did not exist)",
+                "Then": "The condition code must be reset to 0 (success) and the process must continue to the next step without raising an error, treating the deletion as fully successful"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Tolerate Absent Card Transaction VSAM Cluster During Deletion",
+            "Rule_Description": "The deletion of the Card Transaction VSAM Cluster must be treated as successful even when the file does not exist, ensuring the rebuild process is not blocked by a pre-existing absent file.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) exists on the system",
+                "When": "The Card Transaction file rebuild process proceeds after the VSAM Cluster deletion",
+                "Then": "The Card Transaction Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX) must be permanently deleted from the system as an Alternate Index type object"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Card Transaction Alternate Index",
+            "Rule_Description": "The Alternate Index associated with the Card Transaction VSAM file, which provides a secondary access path to transaction records, must be fully removed from the system alongside the main cluster deletion.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "A delete operation has been attempted on the Card Transaction Alternate Index (AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX)",
+                "When": "The delete operation returns a condition code of 8 or below (including the case where the Alternate Index was already absent or did not exist)",
+                "Then": "The condition code must be reset to 0 (success) and the process must complete successfully without raising an error, treating the Alternate Index deletion as fully successful"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Tolerate Absent Card Transaction Alternate Index During Deletion",
+            "Rule_Description": "The deletion of the Card Transaction Alternate Index must be treated as successful even when the Alternate Index does not exist, ensuring the rebuild process is not blocked by a pre-existing absent index.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file recreation step (STEP10) is about to be triggered",
+                "When": "Any prior job step (backup or deletion) returned a return code greater than 4, indicating a significant error occurred",
+                "Then": "STEP10 is entirely skipped and the Card Transaction VSAM file is NOT recreated, preventing the creation of a file in an unreliable or inconsistent environment; AND when all prior job steps completed with return codes of 4 or less, STEP10 executes and proceeds to recreate the Card Transaction VSAM file"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Conditional Execution of Card Transaction File Recreation",
+            "Rule_Description": "STEP10 is conditionally executed based on the success of all prior job steps. The Card Transaction VSAM file is only recreated if the backup and deletion steps completed without significant errors.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "STEP10 is executing and all prior steps completed with return codes of 4 or less",
+                "When": "The Card Transaction VSAM file definition command is issued",
+                "Then": "A new empty Card Transaction VSAM file named AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS is created on storage volume AWSHJ1 as an indexed, key-sequenced file, containing zero records and ready for data load by subsequent jobs"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction VSAM File Creation",
+            "Rule_Description": "When STEP10 executes successfully, a new empty Card Transaction VSAM file is created on the designated storage volume, ready to receive transaction data from subsequent jobs.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file is being defined",
+                "When": "The key structure of the file is configured",
+                "Then": "The first 16 bytes of every Card Transaction record, starting at position 0 (the very beginning of the record), are designated as the unique Transaction ID (primary key); this key is used to uniquely identify, retrieve, and sequence all Card Transaction records within the file"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Transaction ID Primary Key Definition",
+            "Rule_Description": "Each Card Transaction record is uniquely identified by a 16-character Transaction ID located at the very beginning of the record, enabling fast and direct lookup of individual transactions.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file is being defined with record size constraints",
+                "When": "The record size configuration is applied to the file definition",
+                "Then": "Both the minimum and maximum record size are set to exactly 350 bytes, meaning every Card Transaction record stored in this file must be precisely 350 bytes \u2014 no shorter and no longer \u2014 enforcing a fixed-length record structure for all transactions"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction Record Size Enforcement",
+            "Rule_Description": "All Card Transaction records stored in the VSAM file must conform to a strict fixed length of exactly 350 bytes, enforcing uniform record structure across all transactions.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file is being created on storage volume AWSHJ1",
+                "When": "Storage space is allocated for the file",
+                "Then": "1 cylinder of primary storage is allocated immediately upon file creation; AND if the initial 1 cylinder becomes full due to growing transaction volume, the system automatically allocates additional storage in increments of 5 cylinders at a time to accommodate the increased data"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction File Storage Allocation",
+            "Rule_Description": "The Card Transaction VSAM file is allocated with an initial storage capacity and configured to automatically expand in defined increments when transaction volume grows beyond the initial allocation.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file is defined with the data erasure policy enabled",
+                "When": "The Card Transaction VSAM file is deleted at any point in the future",
+                "Then": "All Card Transaction data stored in the file is physically overwritten and permanently erased from the storage disk; the data cannot be recovered or reconstructed after deletion, ensuring full protection of sensitive card transaction information"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction Sensitive Data Erasure on Deletion",
+            "Rule_Description": "To protect sensitive Card Transaction data, the file is configured so that all data is physically overwritten and permanently erased from disk whenever the file is deleted, preventing any possibility of data recovery.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file is being defined with access sharing rules",
+                "When": "The share options are configured for the file (SHAREOPTIONS 2 3)",
+                "Then": "Multiple jobs running within the same system are permitted to read Card Transaction data simultaneously, while write access is controlled to prevent data corruption (cross-region share option 2); AND multiple systems across the enterprise are permitted to access the Card Transaction file concurrently (cross-system share option 3)"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction File Multi-Job Access Configuration",
+            "Rule_Description": "The Card Transaction VSAM file is configured to support simultaneous access by multiple business jobs and systems, enabling concurrent read operations while managing write access to protect data integrity.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-TRANBKP-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The Card Transaction VSAM file creation command is executing in STEP10",
+                "When": "The file definition is completed",
+                "Then": "Two internal components are created simultaneously: (1) a DATA component named AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.DATA, which physically stores all Card Transaction records; AND (2) an INDEX component named AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS.INDEX, which maintains the Transaction ID key structure enabling fast and direct retrieval of individual transaction records"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Card Transaction File Dual Component Creation",
+            "Rule_Description": "The Card Transaction VSAM file is physically composed of two distinct internal components \u2014 a Data Component and an Index Component \u2014 both of which are created simultaneously as part of a single file definition operation.",
+            "Rule_Type": "Definitional Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000,font-weight:bold\n    classDef process fill:#6699ff,stroke:#333,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,stroke:#333,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,stroke:#333,color:#000,font-weight:bold\n    classDef final fill:#ae74de,stroke:#333,color:#fff,font-weight:bold\n    classDef success fill:#22c55e,stroke:#333,color:#000,font-weight:bold\n    classDef error fill:#ef4444,stroke:#333,color:#fff,font-weight:bold\n\n    A([\ud83d\ude80 JOB START\nCard Transaction VSAM File Re-initialization Process]):::start\n\n    %% \u2500\u2500\u2500 PRC001: BACKUP STEP \u2500\u2500\u2500\n    B[PRC001 - IDCAMS REPRO\nCreate Point-in-Time Backup of All\nCard Transaction Records into GDG Backup]:::process\n\n    DS1[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\n\ud83d\udcc2 Live Card Transaction VSAM File\nSource of All Transaction Records)]:::datasource\n\n    DS2[(AWS.M2.CARDDEMO.TRANSACT.BKUP +1\n\ud83d\udce6 Card Transaction GDG Backup File\nNew Versioned Backup Generation\nFixed 350-Byte Records)]:::datasource\n\n    D1{Backup Completed\nSuccessfully?\nReturn Code = 0}:::decision\n\n    %% \u2500\u2500\u2500 STEP05: DELETE STEP \u2500\u2500\u2500\n    E[STEP05 - IDCAMS DELETE\nSafely Remove Existing Card Transaction\nVSAM Cluster and Alternate Index\nto Prepare for Fresh Re-creation]:::process\n\n    DS3[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\n\ud83d\uddd1\ufe0f Card Transaction VSAM Cluster\nScheduled for Deletion)]:::datasource\n\n    DS4[(AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX\n\ud83d\uddd1\ufe0f Card Transaction Alternate Index\nScheduled for Deletion)]:::datasource\n\n    D2{Delete Return Code \u2264 8?\nFiles May Already Be Absent\nSafe to Proceed Either Way}:::decision\n\n    RC[\u2699\ufe0f Reset Return Code to 0\nDeletion Treated as Successful\nEven if Files Did Not Exist]:::process\n\n    %% \u2500\u2500\u2500 STEP10: CREATE STEP \u2500\u2500\u2500\n    D3{STEP10 Condition Check\nPrior Step Return Code \u2264 4?\nOK to Create New VSAM File?}:::decision\n\n    F[STEP10 - IDCAMS DEFINE CLUSTER\nCreate Brand New Empty Card Transaction\nVSAM Key-Sequenced File with\nData and Index Components]:::process\n\n    DS5[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\n\u2705 Newly Created Card Transaction VSAM File\nEmpty and Ready for Data Load\n350-Byte Fixed Records, Keyed on 16-Byte Transaction ID)]:::datasource\n\n    %% \u2500\u2500\u2500 END NODES \u2500\u2500\u2500\n    G([\u2705 JOB COMPLETED SUCCESSFULLY\nCard Transaction VSAM File Re-initialized\nBackup Preserved, Old Files Removed\nNew Empty VSAM File Ready for Data Load]):::success\n\n    ERR1([\u274c JOB FAILED AT BACKUP STEP\nCard Transaction Backup Could Not Be Created\nOriginal VSAM File Preserved\nNo Further Steps Executed]):::error\n\n    ERR2([\u274c JOB FAILED AT DELETE STEP\nUnexpected Error Deleting VSAM Files\nReturn Code Greater Than 8\nNo Further Steps Executed]):::error\n\n    SKIP([\u26a0\ufe0f STEP10 SKIPPED\nPrior Step Returned Error Code Greater Than 4\nCard Transaction VSAM File Was NOT Re-created\nManual Intervention Required]):::error\n\n    %% \u2500\u2500\u2500 FLOW CONNECTIONS \u2500\u2500\u2500\n    A --> B\n\n    DS1 -.->|\ud83d\udcd6 Read All Card Transaction Records\nFull File Copy - No Filtering| B\n    B -.->|\ud83d\udcbe Write All Records to New\nVersioned Backup Generation| DS2\n\n    B --> D1\n    D1 -->|\u2705 Yes - All Records Backed Up\nNew GDG Generation Cataloged| E\n    D1 -->|\u274c No - Backup Failed\nIncomplete GDG Generation Deleted| ERR1\n\n    DS3 -.->|\ud83d\uddd1\ufe0f Delete Entire VSAM Cluster\nIncludes Data and Index Components| E\n    DS4 -.->|\ud83d\uddd1\ufe0f Delete Alternate Index\nRemoves Secondary Access Path| E\n\n    E --> D2\n    D2 -->|\u2705 Yes - RC \u2264 8| RC\n    D2 -->|\u274c No - RC > 8\nUnexpected System Error| ERR2\n\n    RC --> D3\n\n    D3 -->|\u2705 Yes - RC \u2264 4\nEnvironment Clean and Ready| F\n    D3 -->|\u274c No - RC > 4\nPrior Error Detected| SKIP\n\n    F -.->|\ud83c\udfd7\ufe0f Create New Empty VSAM File\nDefine Cluster, Data and Index Components\nAllocate Storage on Volume AWSHJ1| DS5\n\n    F --> G"
+}

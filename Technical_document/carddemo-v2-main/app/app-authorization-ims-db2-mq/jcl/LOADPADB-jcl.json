@@ -1,0 +1,134 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "LOADPADB.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **LOADPADB**, is designed to load data into an IMS database as part of a Card Demo application. It executes the IMS Batch Message Processing (BMP) program **PAUDBLOD** using the **DFSRRC00** IMS region controller, reading input from two sequential flat files containing root and child records (**PAUTDB.ROOT.FILEO** and **PAUTDB.CHILD.FILEO**) to populate a payment authorization database. The job serves a data loading/initialization business purpose, likely used to seed or refresh the IMS payment authorization database (**PAUTHDB**) with transaction or account data required by the CardDemo application.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "LOADPADB",
+          "description": "The JOB statement marks the beginning of a job and assigns the name LOADPADB to the job, which is used to identify the job in the system."
+        },
+        {
+          "name": "ACCT",
+          "value": "'M2APP'",
+          "description": "The accounting information parameter 'M2APP' is used for job accounting and billing purposes, identifying the account or project associated with this job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Assigns the job to input job class A, which determines the job's scheduling priority and the initiator that will process it."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies that the job's system messages and JCL listing output will be directed to output class H, controlling where the job log is routed."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including allocation/termination messages to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. A value of 0M means the job can use all available memory without restriction, removing memory constraints for the job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that a notification message will be sent to the submitting user (resolved via the &SYSUID symbolic parameter) when the job completes, informing them of the job's completion status."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Sets the maximum CPU time limit for the entire job to 1440 minutes (equivalent to 24 hours), preventing the job from running indefinitely and acting as a safeguard against infinite loops or hung jobs."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP01",
+        "purpose": "Executes the IMS BMP (Batch Message Processing) application program PAUDBLOD under IMS region controller to load payment authorization data into the IMS database DBPAUTP0, processing both root and child segment records using PSB PSBPAUTB which defines access to the PAUTSUM0 and PAUTDTL1 segments.",
+        "programs": "DFSRRC00 (PAUDBLOD)*",
+        "inputs": "INFILE1: AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO (root segment input file), INFILE2: AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO (child segment input file), IMS PSB library: OEM.IMS.IMSP.PSBLIB, IMS DBD library: OEM.IMS.IMSP.DBDLIB, DFSVSAMP: OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB)",
+        "outputs": "SYSPRINT (system print output), SYSUDUMP (system dump output), IMSERR (IMS error messages); IMSLOGR (DUMMY), IEFRDER (DUMMY)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "IMS SDFSRESL load library accessed as STEPLIB for program execution"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL.V151",
+        "operations": "READ",
+        "description": "IMS SDFSRESL V151 load library accessed as STEPLIB for program execution"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "CardDemo application load library accessed as STEPLIB containing PAUDBLOD program"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMA.IMS.IMSP.SDFSRESL",
+        "operations": "READ",
+        "description": "IMS SDFSRESL load library accessed as DFSRESLB for IMS region controller"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.PSBLIB",
+        "operations": "READ",
+        "description": "IMS PSB library accessed to load PSB PSBPAUTB for the BMP region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEM.IMS.IMSP.DBDLIB",
+        "operations": "READ",
+        "description": "IMS DBD library accessed to load DBD definitions for the BMP region"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.ROOT.FILEO",
+        "operations": "READ",
+        "description": "Input file containing root segment data read by PAUDBLOD for loading into IMS database"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.PAUTDB.CHILD.FILEO",
+        "operations": "READ",
+        "description": "Input file containing child segment data read by PAUDBLOD for loading into IMS database"
+      },
+      {
+        "step": "STEP01",
+        "type": "Dataset",
+        "objects": "OEMPP.IMS.V15R01MB.PROCLIB(DFSVSMDB)",
+        "operations": "READ",
+        "description": "IMS VSAM buffer pool parameters member accessed as DFSVSAMP for IMS region configuration"
+      },
+      {
+        "step": "STEP01",
+        "type": "IMS",
+        "objects": "DBPAUTP0, PAUTSUM0, PAUTDTL1",
+        "operations": "WRITE",
+        "description": "IMS BMP program PAUDBLOD uses PSB PSBPAUTB with PCB PAUTBPCB (PROCOPT=AP) to load root segment PAUTSUM0 and child segment PAUTDTL1 into database DBPAUTP0"
+      }
+    ]
+  }
+}

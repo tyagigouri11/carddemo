@@ -1,0 +1,120 @@
+{
+    "created_on": "2026-11-05",
+    "name": "ACCTFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/ACCTFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job reinitializes the Account Data VSAM file (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) by deleting the existing cluster, recreating it with fresh parameters, and reloading it with data from a sequential flat file. The job ensures a clean, up-to-date account data store with fixed-length 300-byte records, an 11-byte key, and specific storage allocations.Key Functionalities:\nDeletes the existing Account Data VSAM KSDS cluster (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) to remove all prior data; any return code of 8 or below is treated as successful to handle cases where the file may not exist.\nRecreates the Account Data VSAM KSDS cluster with defined parameters: 1 primary and 5 secondary cylinder allocations on volume AWSHJ1, an 11-byte key starting at offset 0, fixed record size of 300 bytes, share options (2,3), erase-on-delete enabled, and indexed organization.\nLoads account records from the sequential flat file (AWS.M2.CARDDEMO.ACCTDATA.PS) into the newly created VSAM KSDS cluster (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) using a REPRO copy operation.",
+    "rules": [
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data refresh job (ACCTFILE) has been initiated and STEP05 is executing",
+                "When": "The system attempts to delete the Account Data VSAM file named AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS, including all its components (data and index)",
+                "Then": "The entire Account Data VSAM file cluster \u2014 including its data component and index component \u2014 must be permanently removed from storage to prepare for a fresh file creation in the next step"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Account Data VSAM File",
+            "Rule_Description": "When the Account Data refresh process begins, the existing Account Data VSAM file must be deleted to allow a clean recreation. This rule governs the deletion action itself.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file deletion has been attempted in STEP05",
+                "When": "The deletion result code is less than or equal to 8 \u2014 meaning either the file was successfully deleted (result code = 0) OR the file was not found and a warning was raised (result code = 8)",
+                "Then": "The result code must be overridden and set to 0 (success), so that the job is not interrupted and proceeds normally to recreate and reload the Account Data VSAM file \u2014 regardless of whether the file previously existed or not"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Tolerate Missing Account Data File During Deletion",
+            "Rule_Description": "The deletion step must not fail if the Account Data VSAM file does not exist. Both a successful deletion and a file-not-found warning are treated as acceptable outcomes, allowing the job to continue to the file creation step.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file deletion has been attempted in STEP05",
+                "When": "The deletion result code is greater than 8 \u2014 indicating an unexpected system or data error beyond a file-not-found condition",
+                "Then": "The result code must NOT be reset to 0; the elevated result code must be retained so that the job is flagged as failed, preventing the subsequent Account Data file creation and data load steps from executing on a potentially unstable environment"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Halt Job on Unexpected Account Data File Deletion Error",
+            "Rule_Description": "If an unexpected error occurs during the deletion of the Account Data VSAM file \u2014 beyond a simple missing file warning \u2014 the job must stop to prevent creating or loading a potentially corrupt or incomplete Account Data file.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "No Account Data VSAM file currently exists (it was deleted in the prior step)",
+                "When": "The system creates the Account Data VSAM file",
+                "Then": "A new Key-Sequenced (Indexed) VSAM file named AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS must be created, with a separate Data component named AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS.DATA and an Index component named AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS.INDEX, ensuring Account records are organized and accessible by key"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Account Data VSAM File Identity and Structure",
+            "Rule_Description": "The Account Data VSAM file must be formally defined with a unique name and organized as an indexed (key-sequenced) structure so that Account records can be stored and retrieved efficiently using a unique Account ID key.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file is being created",
+                "When": "The key structure is defined for the Account Data VSAM file",
+                "Then": "The Account ID key must be exactly 11 characters in length and must start at the very first position (position 0) of every Account record, ensuring each Account record is uniquely identifiable by its Account ID"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Account ID as the Unique Record Key",
+            "Rule_Description": "Every Account record stored in the Account Data VSAM file must be uniquely identified by an Account ID key. The key must be defined at a specific position and length within each record to enforce uniqueness and enable direct record lookup.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file is being created",
+                "When": "The record size is defined for the Account Data VSAM file",
+                "Then": "Every Account record must be exactly 300 bytes in length \u2014 both the minimum and maximum record size are set to 300 bytes \u2014 meaning no variable-length Account records are permitted"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed Record Size for Account Data",
+            "Rule_Description": "All Account records stored in the Account Data VSAM file must conform to a fixed, uniform size. No record may be shorter or longer than the defined size, ensuring consistent data structure across all Account records.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file is being created on storage volume AWSHJ1",
+                "When": "The storage allocation is defined for the Account Data VSAM file",
+                "Then": "The file must be initially allocated 1 cylinder of storage space on volume AWSHJ1, and must be permitted to automatically expand up to a maximum of 5 additional cylinders as Account Data volume grows"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Allocate Storage Space for Account Data VSAM File",
+            "Rule_Description": "The Account Data VSAM file must be allocated sufficient storage space to hold Account records, with the ability to expand automatically as the volume of Account data grows over time.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file is being created",
+                "When": "The concurrent access rules (Share Options) are defined for the Account Data VSAM file",
+                "Then": "The file must be configured with Share Options (2 3), meaning: multiple jobs within the same system can read the Account Data file simultaneously (Share Option 2), and across different systems the file can be fully shared (Share Option 3), ensuring no access conflicts for CardDemo application regions reading Account Data concurrently"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Allow Concurrent Access to Account Data VSAM File",
+            "Rule_Description": "The Account Data VSAM file must support simultaneous access by multiple application regions or jobs, enabling multiple CardDemo application instances to read Account Data at the same time without conflict.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data VSAM file is being created",
+                "When": "The data security attribute is defined for the Account Data VSAM file",
+                "Then": "The ERASE attribute must be enabled on the Account Data VSAM file, ensuring that whenever this file is deleted, all Account Data is physically overwritten and permanently erased from disk \u2014 making recovery of sensitive Account information impossible after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Secure Erasure of Account Data on File Deletion",
+            "Rule_Description": "When the Account Data VSAM file is deleted in the future, all Account records must be physically erased from disk storage to prevent unauthorized recovery of sensitive account information, ensuring data security and regulatory compliance.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-ACCTFILE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Account Data master sequential flat file (AWS.M2.CARDDEMO.ACCTDATA.PS) exists and contains Account records, AND the Account Data VSAM indexed file (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) has been freshly created and is empty, AND both files are available in shared access mode allowing concurrent read/write by other processes",
+                "When": "The Account Data load process is triggered to refresh the VSAM file from the master flat file",
+                "Then": "ALL Account records from the master flat file (AWS.M2.CARDDEMO.ACCTDATA.PS) are copied entirely into the Account Data VSAM indexed file (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) without any filtering, transformation, or partial selection, AND every Account record is indexed by its unique Account ID key within the VSAM file, AND the Account Data VSAM file is fully populated and ready for the CardDemo application to perform direct Account lookups and transaction processing"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Full Refresh of Account Data VSAM File from Master Flat File",
+            "Rule_Description": "This step performs a complete load of all Account records from the sequential master flat file into the Account Data VSAM indexed file. Both files are accessible by other processes during this operation. This ensures the Account Data VSAM file is fully populated and ready for key-based account lookups by the CardDemo application.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nAccount Data VSAM File Initialization]):::start\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Account Data VSAM File]:::process\n\n    ACCTVSAM[(AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS\nAccount Data VSAM File)]:::datasource\n\n    D1{Return Code\n\u2264 8?}:::decision\n\n    STEP10[STEP10 - IDCAMS\nCreate New Account Data VSAM File Structure]:::process\n\n    D2{Return Code\n= 0?}:::decision\n\n    STEP15[STEP15 - IDCAMS\nLoad Account Data Records\ninto VSAM File]:::process\n\n    D3{Return Code\n= 0?}:::decision\n\n    SUCCESS([JOB COMPLETED SUCCESSFULLY\nAccount Data VSAM File Fully Populated\nand Ready for Application Use]):::success\n\n    ERR1([JOB FAILED\nUnexpected Error During\nAccount Data VSAM File Deletion]):::error\n    ERR2([JOB FAILED\nUnable to Create\nAccount Data VSAM File Structure]):::error\n    ERR3([JOB FAILED\nUnable to Load Account Data Records\nVSAM File May Be Incomplete]):::error\n\n    A --> STEP05\n    STEP05 -.->|Delete VSAM Cluster| ACCTVSAM\n    STEP05 --> D1\n    D1 -->|YES\nFile Deleted Successfully\nor File Did Not Exist\nReturn Code Forced to 0| STEP10\n    D1 -->|NO\nUnexpected System Error\nDeletion Could Not Complete| ERR1\n\n    STEP10 -.->|Create Empty VSAM Cluster\nwith 11-Char Account ID Key\n300-Byte Fixed Records| ACCTVSAM\n    STEP10 --> D2\n    D2 -->|YES\nEmpty VSAM File Structure\nSuccessfully Created| STEP15\n    D2 -->|NO\nVSAM File Structure\nCould Not Be Created| ERR2\n\n    STEP15 -.->|Load All Account Records\nfrom Sequential Flat File\ninto VSAM Cluster| ACCTVSAM\n    STEP15 --> D3\n    D3 -->|YES\nAll Account Records\nSuccessfully Loaded| SUCCESS\n    D3 -->|NO\nAccount Records Could\nNot Be Loaded| ERR3\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

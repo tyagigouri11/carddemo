@@ -1,0 +1,135 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "XREFFILE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **XREFFILE**, sets up a VSAM Key-Sequenced Data Set (KSDS) for a Card Cross-Reference file used in the CardDemo application. It handles the complete lifecycle of the dataset by first deleting any pre-existing VSAM cluster and alternate index, then defining a fresh KSDS cluster, loading data from a flat file source, and finally building an alternate index on the Account ID field to enable secondary key access. The overall business purpose is to initialize and populate a cross-reference file that links card data to account information, supporting card-to-account lookups within the CardDemo system.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Delete define cross ref file'",
+          "description": "The accounting information or job description string. This is a positional parameter that provides a label or accounting information for the job, used for identification and billing purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to a specific initiator class, determining scheduling priority and resource allocation based on installation-defined class characteristics."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), including JCL listing, allocation/termination messages, and system messages. MSGCLASS=0 routes the job log to a specific output queue defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, so that user receives a notification message when the job finishes, whether it completes successfully or abnormally."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Deletes the existing Card Cross-Reference VSAM KSDS cluster and its alternate index if they already exist, resetting the condition code to 0 if the return code is 8 or less to allow the job to continue even if the objects do not exist.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DELETE commands for AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS CLUSTER and AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX ALTERNATEINDEX)",
+        "outputs": "Deletion of AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (CLUSTER) and AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX (ALTERNATEINDEX); SYSPRINT"
+      },
+      {
+        "step": "STEP10",
+        "purpose": "Defines a new VSAM Key-Sequenced Data Set (KSDS) cluster for the Card Cross-Reference file with specified space, key, record size, and share options on volume AWSHJ1.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE CLUSTER command for AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS with CYLINDERS(1 5), KEYS(16 0), RECORDSIZE(50 50), SHAREOPTIONS(2 3), ERASE, INDEXED on VOLUMES(AWSHJ1))",
+        "outputs": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (CLUSTER), AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.DATA (DATA component), AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.INDEX (INDEX component); SYSPRINT"
+      },
+      {
+        "step": "STEP15",
+        "purpose": "Copies data from the Card Cross-Reference flat file (Physical Sequential) into the newly defined VSAM KSDS cluster using the REPRO command.",
+        "programs": "IDCAMS*",
+        "inputs": "XREFDATA: AWS.M2.CARDDEMO.CARDXREF.PS (flat file, DISP=SHR); SYSIN (REPRO INFILE(XREFDATA) OUTFILE(XREFVSAM))",
+        "outputs": "XREFVSAM: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (populated VSAM KSDS); SYSPRINT"
+      },
+      {
+        "step": "STEP20",
+        "purpose": "Defines an Alternate Index on the Card Cross-Reference VSAM KSDS cluster keyed on the Account ID field, allowing non-unique key access with upgrade enabled on volume AWSHJ1.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE ALTERNATEINDEX command for AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX relating to AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS with KEYS(11,25), NONUNIQUEKEY, UPGRADE, RECORDSIZE(50,50), FREESPACE(10,20), VOLUMES(AWSHJ1), CYLINDERS(5,1))",
+        "outputs": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX (ALTERNATEINDEX), AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.DATA (DATA component), AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.INDEX (INDEX component); SYSPRINT"
+      },
+      {
+        "step": "STEP25",
+        "purpose": "Defines a Path to associate the Alternate Index with the base VSAM KSDS cluster, enabling access to the base cluster through the alternate index.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE PATH command for AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH with PATHENTRY(AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX))",
+        "outputs": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH (PATH object); SYSPRINT"
+      },
+      {
+        "step": "STEP30",
+        "purpose": "Builds the Alternate Index cluster by reading the base VSAM KSDS and populating the Alternate Index dataset, making the alternate key accessible for retrieval.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (BLDINDEX command with INDATASET(AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS))",
+        "outputs": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX (built Alternate Index); SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "DELETE",
+        "description": "Deletes the CARDXREF VSAM KSDS cluster if it already exists. Return code is reset to 0 if MAXCC is 8 or less to suppress errors when dataset does not exist."
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX",
+        "operations": "DELETE",
+        "description": "Deletes the CARDXREF VSAM Alternate Index if it already exists. Return code is reset to 0 if MAXCC is 8 or less to suppress errors when dataset does not exist."
+      },
+      {
+        "step": "STEP10",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.DATA, AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.INDEX",
+        "operations": "DEFINE CLUSTER",
+        "description": "Defines a new VSAM KSDS cluster named AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS on volume AWSHJ1 with 1 primary and 5 secondary cylinders, 16-byte key at offset 0, fixed record size of 50 bytes, share options (2,3), ERASE and INDEXED attributes. Separate DATA and INDEX components are also defined."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.PS",
+        "operations": "READ",
+        "description": "Reads records from the flat file (Physical Sequential) AWS.M2.CARDDEMO.CARDXREF.PS as input to the REPRO operation via DD name XREFDATA."
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "WRITE",
+        "description": "Writes records into the VSAM KSDS cluster AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS as output of the REPRO operation via DD name XREFVSAM, copying data from the flat file."
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX, AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.DATA, AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.INDEX",
+        "operations": "DEFINE ALTERNATEINDEX",
+        "description": "Defines an Alternate Index named AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX related to the base cluster AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS. Key length is 11 bytes at offset 25, NONUNIQUEKEY, UPGRADE enabled, record size 50 bytes, freespace (10,20), on volume AWSHJ1 with 5 primary and 1 secondary cylinders. Separate DATA and INDEX components are defined."
+      },
+      {
+        "step": "STEP25",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH",
+        "operations": "DEFINE PATH",
+        "description": "Defines a PATH named AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH with PATHENTRY pointing to the Alternate Index AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX, relating the Alternate Index to the base cluster for access via the alternate key."
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS, AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX",
+        "operations": "BLDINDEX",
+        "description": "Builds the Alternate Index AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX by reading all records from the base cluster AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS and populating the alternate index entries."
+      }
+    ]
+  }
+}

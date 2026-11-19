@@ -1,0 +1,54 @@
+{
+    "created_on": "2026-11-05",
+    "name": "INTRDRJ1.JCL",
+    "file_path": "carddemo-v2-main/app/jcl/INTRDRJ1.JCL",
+    "type": "jcl",
+    "description": "This JCL job performs two sequential operations: first, it creates a backup copy of a card demo FTP test dataset, and then it submits another JCL member for execution by copying it to the internal reader, enabling automated job submission.Key Functionalities:\nCreates a backup of the card demo FTP test dataset (AWS.M2.CARDEMO.FTP.TEST) by reproducing its contents into a backup dataset (AWS.M2.CARDEMO.FTP.TEST.BKUP) using the IDCAMS REPRO utility.\nReads the JCL member INTRDRJ2 from the card demo JCL library (AWS.M2.CARDDEMO.JCL) and submits it for execution by writing it to the internal reader, enabling automated chained job submission.",
+    "rules": [
+        {
+            "Rule_Id": "R-INTRDRJ1-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CarDemo FTP Test source data file (AWS.M2.CARDEMO.FTP.TEST) is available for access AND the CarDemo FTP Test backup file (AWS.M2.CARDEMO.FTP.TEST.BKUP) already exists and is available for access",
+                "When": "The data backup process is initiated",
+                "Then": "All records from the CarDemo FTP Test source file are copied in their entirety to the CarDemo FTP Test backup file, producing a complete snapshot of the source data at the time of execution"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS - CarDemo FTP Test Data Full Backup",
+            "Rule_Description": "The system must perform a complete backup of the CarDemo FTP Test data file by copying all of its records to a designated backup file, ensuring data is preserved before any downstream processing begins.",
+            "Rule_Type": "Action Rule"
+        },
+        {
+            "Rule_Id": "R-INTRDRJ1-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The backup process is about to be initiated",
+                "When": "The system attempts to open the CarDemo FTP Test backup file (AWS.M2.CARDEMO.FTP.TEST.BKUP) as the output destination",
+                "Then": "The backup process proceeds only if the backup file already exists on the system; if the backup file does not exist, the backup process fails and no data is written"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS - Backup Destination File Pre-existence Requirement",
+            "Rule_Description": "The backup destination file must already exist on the system before the backup process begins. The system will not create a new backup file; it will only write into a pre-existing one.",
+            "Rule_Type": "Validation Rule"
+        },
+        {
+            "Rule_Id": "R-INTRDRJ1-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The backup process is running and reading records from the CarDemo FTP Test source file (AWS.M2.CARDEMO.FTP.TEST)",
+                "When": "Each record from the source file is processed",
+                "Then": "Every record is written to the CarDemo FTP Test backup file (AWS.M2.CARDEMO.FTP.TEST.BKUP) exactly as it appears in the source file, with no filtering criteria, no record selection, and no data transformation applied \u2014 the total record count and content of the backup must match the source exactly"
+            },
+            "Rule_Name": "IDCAMS - IDCAMS - Exact Data Replication Without Transformation",
+            "Rule_Description": "The backup must be an exact, unmodified copy of the source data. No records may be filtered, skipped, or altered during the backup process \u2014 the backup must be a true mirror of the source.",
+            "Rule_Type": "Process Rule"
+        },
+        {
+            "Rule_Id": "R-INTRDRJ1-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CardDemo JCL library (AWS.M2.CARDDEMO.JCL) is available and accessible in shared mode, AND the JCL member INTRDRJ2 exists within that library, AND the system Internal Reader is available to accept job submissions",
+                "When": "STEP01 is executed as part of the INTRDRJ1 job with no filtering or transformation instructions applied to the source JCL content",
+                "Then": "The complete and unmodified content of the INTRDRJ2 JCL member must be read record by record in standard 80-character fixed-length format, AND every record must be written as-is into the system Internal Reader, AND the Internal Reader must interpret the incoming stream as a complete JCL job and automatically submit INTRDRJ2 to the system execution queue without any manual operator intervention"
+            },
+            "Rule_Name": "STEP01 - IEBGENER - Automated Submission of Next CardDemo Job",
+            "Rule_Description": "This step reads the CardDemo JCL job member INTRDRJ2 from the CardDemo JCL library and automatically submits it to the system job execution queue via the Internal Reader, without any modification or filtering of the job content. This enables seamless, operator-free chaining of the next job in the CardDemo processing workflow.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,color:#000\n    classDef process fill:#6699ff,color:#000\n    classDef decision fill:#ffcc00,color:#000\n    classDef datasource fill:#66ff66,color:#000\n    classDef final fill:#ae74de,color:#000\n    classDef success fill:#22c55e,color:#000\n    classDef error fill:#ef4444,color:#000\n\n    START([\ud83d\ude80 Job Start]):::start\n\n    DS_SRC[(AWS.M2.CARDEMO.FTP.TEST\nCarDemo FTP Test Source File)]:::datasource\n    DS_BKP[(AWS.M2.CARDEMO.FTP.TEST.BKUP\nCarDemo FTP Test Backup File)]:::datasource\n    DS_JCL[(AWS.M2.CARDDEMO.JCL - INTRDRJ2\nCardDemo JCL Library Member)]:::datasource\n    DS_INTR[(Internal Reader - INTRDR\nSystem Job Submission Queue)]:::datasource\n\n    STEP_IDCAMS[_IDCAMS - IDCAMS Utility\n\ud83d\udccb Create Full Backup Copy of\nCarDemo FTP Test Data File_]:::process\n\n    STEP01[_STEP01 - IEBGENER Utility\n\ud83d\udce4 Submit CardDemo Automated Job\nvia System Internal Reader_]:::process\n\n    END([\ud83c\udfc1 Job End]):::final\n\n    START --> STEP_IDCAMS\n\n    DS_SRC -.->|\ud83d\udcd6 Read All Records - Full File| STEP_IDCAMS\n    STEP_IDCAMS -.->|\ud83d\udcbe Write Exact Backup Copy| DS_BKP\n\n    STEP_IDCAMS --> STEP01\n\n    DS_JCL -.->|\ud83d\udcd6 Read JCL Job Stream - 80 Byte Records| STEP01\n    STEP01 -.->|\ud83d\udce4 Submit Job for Execution| DS_INTR\n\n    STEP01 --> END"
+}

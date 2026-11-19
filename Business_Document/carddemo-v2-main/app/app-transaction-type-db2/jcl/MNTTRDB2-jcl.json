@@ -1,0 +1,21 @@
+{
+    "created_on": "2026-11-05",
+    "name": "MNTTRDB2.jcl",
+    "file_path": "carddemo-v2-main/app/app-transaction-type-db2/jcl/MNTTRDB2.jcl",
+    "type": "jcl",
+    "description": "This JCL job (MNTTRDB2) executes the COBTUPDT program under DB2 system DAZ1 using the CARDDEMO plan, processing transaction records from an input sequential file to perform maintenance updates against the DB2 database. The job runs as a batch DB2-connected COBOL program designed to update transaction-related data in the CardDemo application.Key Functionalities:\nReads transaction records from the input sequential file (INPFILE / TR-RECORD) to drive the update process\nExecutes the COBTUPDT COBOL program connected to DB2 system DAZ1 under the CARDDEMO application plan to apply transaction maintenance updates\nPerforms database maintenance operations against DB2 tables within the CardDemo application using the loaded COBOL program and its associated DBRM library",
+    "rules": [
+        {
+            "Rule_Id": "R-MNTTRDB2-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO database on DB2 system DAZ1 is available and accessible, the INPFILE containing Transaction Records (TR-RECORD) is present and ready for shared read access, and the CARDDEMO database plan is bound and available for execution",
+                "When": "The COBTUPDT program is executed under the CARDDEMO database plan against DB2 system DAZ1",
+                "Then": "All Transaction Records present in INPFILE are read sequentially and the corresponding update operations are applied to the CARDDEMO database on DB2 system DAZ1, with all execution messages and processing results captured in the system print output"
+            },
+            "Rule_Name": "STEP1 - COBTUPDT - Transaction Record Database Update",
+            "Rule_Description": "This step invokes the external COBTUPDT COBOL program to read all incoming Transaction Records from the INPFILE input file and apply the corresponding updates to the CARDDEMO database on DB2 system DAZ1. The INPFILE is accessed in shared mode, allowing concurrent read access by other processes. No conditional logic governs this step \u2014 all records are processed unconditionally to completion.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444\n\n    A([Job Start:\nCARDDEMO Transaction Update Job]):::start\n\n    TR[(TR-RECORD\nTransaction Records Sequential File)]:::datasource\n\n    B[STEP1 - COBTUPDT\nRead and Apply Transaction Record Updates\nto CARDDEMO Database via DB2 Plan]:::process\n\n    Z([Job End:\nAll Transaction Records\nProcessed and Applied Successfully]):::final\n\n    A --> B\n    TR -.->|Read Transaction Records Sequentially| B\n    B --> Z"
+}

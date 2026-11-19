@@ -1,0 +1,370 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CICDBCMP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job compiles a CICS COBOL program that integrates with DB2, specifically designed for the CardDemo application. It preprocesses and compiles the COBOL source code while also generating a Database Request Module (DBRM), which is required to bind and execute DB2 SQL statements within the CICS environment. The job serves as a build pipeline step that transforms COBOL source code into an executable load module, enabling the CardDemo application to interact with DB2 databases through CICS transaction processing.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Compile CICS DB2 PGM'",
+          "description": "The accounting information or job description string passed to the system. Identifies the job with a descriptive label used for accounting and job tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to the 'A' execution queue, which determines scheduling priority and resource allocation based on installation-defined class characteristics."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job's system messages (JES job log). MSGCLASS=H routes the job log output to the 'H' output class, which controls how and where the job's messages are printed or held."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) causes all JCL statements including those from procedures to be printed; the second value (1) causes all system messages including those for non-failing steps to be printed."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of virtual storage available to the job. REGION=0M allows the job to use the maximum available region size, effectively removing memory constraints on the job's execution."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a system symbol that resolves to the user ID of the person who submitted the job, so that user receives a completion notification message."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time limit for the entire job in minutes. TIME=1440 sets the limit to 1440 minutes (24 hours), effectively allowing the job to run without a practical CPU time restriction before being cancelled by the system."
+        }
+      ],
+      "procedures": [
+        "BLDCIDB2"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PRECMP",
+        "purpose": "Executes the DB2 Precompiler to process the COBOL source member CICSDB2P, extracting all embedded SQL statements into a Database Request Module (DBRM) and producing a modified source file for subsequent CICS translation and COBOL compilation.",
+        "programs": "DSNHPC*",
+        "inputs": "AWS.M2.CARDDEMO.CBL(CICSDB2P) via SYSIN; AWS.M2.CARDDEMO.DCL via SYSLIB (declarations); AWS.M2.CARDDEMO.CPY via SYSLIB (copybooks)",
+        "outputs": "&&DSNHOUT (temporary precompiled source, passed to next step) via SYSCIN; AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P) via DBRMLIB (DBRM member); SYSPRINT (precompiler listing); SYSTERM (terminal messages); SYSUDUMP (dump output)"
+      },
+      {
+        "step": "TRN",
+        "purpose": "Executes the CICS Translator (DFHECP1$) to process the DB2-precompiled source of CICSDB2P, replacing all CICS command blocks with equivalent COBOL call statements suitable for compilation. This step runs only if PRECMP completed with return code 0.",
+        "programs": "DFHECP1$*",
+        "inputs": "&&DSNHOUT (precompiled source from PRECMP step) via SYSIN",
+        "outputs": "&&SYSCIN (translated COBOL source, passed to COBOL compilation step) via SYSPUNCH; SYSPRINT (translator listing)"
+      },
+      {
+        "step": "COBOL",
+        "purpose": "Executes the IBM Enterprise COBOL Compiler (IGYCRCTL) to compile the CICS-translated and DB2-precompiled source of CICSDB2P into an object module, using options RENT, NODYNAM, and NOSEQ. This step runs only if all prior steps completed with return code 0.",
+        "programs": "IGYCRCTL*",
+        "inputs": "&&SYSCIN (translated source from TRN step) via SYSIN; AWS.M2.CARDDEMO.DCL via SYSLIB (declarations); AWS.M2.CARDDEMO.CPY via SYSLIB (copybooks); OEM.CICSTS.V05R06M0.CICS.SDFHCOB via SYSLIB (CICS COBOL stubs); OEM.CICSTS.V05R06M0.CICS.SDFHMAC via SYSLIB (CICS macros)",
+        "outputs": "&&LOADSET (object module, passed to Link Edit step) via SYSLIN; SYSPRINT (compiler listing); SYSUT1–SYSUT15 and SYSMDECK (compiler work files)"
+      },
+      {
+        "step": "LKED",
+        "purpose": "Executes the IBM Linkage Editor (HEWL) to combine the compiled object module for CICSDB2P with required CICS, DB2, and Language Environment stub modules, producing a single executable load module stored in the load library. This step runs only if all prior steps completed with return code 0.",
+        "programs": "HEWL*",
+        "inputs": "OEM.CICSTS.V05R06M0.CICS.SDFHCOB(DFHEILIC) via SYSLIN (CICS interface stub); &&LOADSET (object module from COBOL step) via SYSLIN; CEE.SCEELKEX and CEE.SCEELKED via SYSLIB (Language Environment libraries); OEM.CICSTS.V05R06M0.CICS.SDFHLOAD and OEM.CICSTS.V05R06M0.CICS.SDFHCOB via SYSLIB (CICS load libraries); OEM.DB2.DAZ1.SDSNLOAD via SYSLIB (DB2 load library); ISP.SISPLOAD via SYSLIB (ISPF load library); GDDM.SADMMOD via SYSLIB (GDDM module library); AWS.M2.CARDDEMO.LOADLIB via SYSLIB; SYSIN DD DUMMY",
+        "outputs": "AWS.M2.CARDDEMO.LOADLIB(CICSDB2P) via SYSLMOD (executable load module); SYSPRINT (linkage editor listing); SYSUT1 (work file)"
+      },
+      {
+        "step": "BINDPK",
+        "purpose": "Executes the TSO Terminal Monitor Program invoking the DB2 DSN command processor to bind the DBRM for CICSDB2P into the CARDDEMO DB2 package collection, replacing any existing package with cursor stability isolation and EBCDIC encoding. This step runs only if all prior steps completed with return code 0.",
+        "programs": "IKJEFT01 (DSN)*",
+        "inputs": "AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P) via DBRMLIB; SYSTSIN (DSN BIND PACKAGE commands: SYSTEM(DAZ1), PACKAGE(CARDDEMO), MEMBER(CICSDB2P), QUALIFIER(CARDDEMO), ACTION(REPLACE), ISOLATION(CS), CURRENTDATA(YES), EXPLAIN(NO), ENCODING(EBCDIC))",
+        "outputs": "DB2 package CARDDEMO.CICSDB2P bound in DB2 subsystem DAZ1; SYSPRINT (DSN output); SYSTSPRT (TSO output); SYSUDUMP (dump output)"
+      },
+      {
+        "step": "BINDPL",
+        "purpose": "Executes the TSO Terminal Monitor Program invoking the DB2 DSN command processor to bind the CARDDEMO DB2 plan, associating it with all packages in the CARDDEMO collection, replacing the existing plan with cursor stability isolation and EBCDIC encoding. This step runs only if BINDPK completed with return code 4 or less.",
+        "programs": "IKJEFT01 (DSN)*",
+        "inputs": "AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P) via DBRMLIB; SYSTSIN (DSN BIND PLAN commands: SYSTEM(DAZ1), PLAN(CARDDEMO), PKLIST(CARDDEMO.*), QUALIFIER(CARDDEMO), ACTION(REPLACE) RETAIN, ISOLATION(CS), CURRENTDATA(YES), ENCODING(EBCDIC))",
+        "outputs": "DB2 plan CARDDEMO bound in DB2 subsystem DAZ1 with package list CARDDEMO.*; SYSPRINT (DSN output); SYSTSPRT (TSO output); DEBUGLST (debug listing); SYSUDUMP (dump output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "OEM.DB2.&SSID..SDSNEXIT",
+        "operations": "READ",
+        "description": "DB2 precompiler step library - read DB2 exit routines"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "OEM.DB2.&SSID..SDSNLOAD",
+        "operations": "READ",
+        "description": "DB2 precompiler step library - read DB2 load modules"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CBL(CICSDB2P)",
+        "operations": "READ",
+        "description": "Read COBOL source member CICSDB2P as input to DB2 precompiler"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "&&DSNHOUT",
+        "operations": "WRITE",
+        "description": "Write precompiler output (modified COBOL source with SQL replaced) to temporary dataset passed to next step"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P)",
+        "operations": "WRITE",
+        "description": "Write DBRM (Database Request Module) extracted from SQL statements in CICSDB2P source"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DCL",
+        "operations": "READ",
+        "description": "Read DCLGEN copybook library (DCLLIB) for SQL DECLARE TABLE statements"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CPY",
+        "operations": "READ",
+        "description": "Read COBOL copybook library (COPYLIB and HLQ.CPY) for COPY statements during precompile"
+      },
+      {
+        "step": "PRECMP",
+        "type": "Dataset",
+        "objects": "SYSUT1, SYSUT2",
+        "operations": "WRITE",
+        "description": "Temporary work datasets on VIO used by DB2 precompiler"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "CICS translator step library - read CICS load modules"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "&&DSNHOUT",
+        "operations": "READ",
+        "description": "Read precompiler output (modified COBOL source) as input to CICS translator, then delete"
+      },
+      {
+        "step": "TRN",
+        "type": "Dataset",
+        "objects": "&&SYSCIN",
+        "operations": "WRITE",
+        "description": "Write CICS translator output (COBOL source with CICS commands replaced by call statements) to temporary dataset passed to next step"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "IGY.SIGYCOMP.V63",
+        "operations": "READ",
+        "description": "COBOL compiler step library - read COBOL compiler load modules"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DCL",
+        "operations": "READ",
+        "description": "Read DCLGEN copybook library (DCLLIB) for COPY statements during COBOL compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CPY",
+        "operations": "READ",
+        "description": "Read COBOL copybook library (COPYLIB and HLQ.CPY) for COPY statements during COBOL compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHCOB",
+        "operations": "READ",
+        "description": "Read CICS COBOL copybook library for COPY statements during COBOL compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHMAC",
+        "operations": "READ",
+        "description": "Read CICS macro library for COPY statements during COBOL compilation"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "&&SYSCIN",
+        "operations": "READ",
+        "description": "Read CICS translator output as input to COBOL compiler, then delete"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "WRITE",
+        "description": "Write compiled object module to temporary dataset passed to linkage editor"
+      },
+      {
+        "step": "COBOL",
+        "type": "Dataset",
+        "objects": "SYSUT1, SYSUT2, SYSUT3, SYSUT4, SYSUT5, SYSUT6, SYSUT7, SYSUT8, SYSUT9, SYSUT10, SYSUT11, SYSUT12, SYSUT13, SYSUT14, SYSUT15, SYSMDECK",
+        "operations": "WRITE",
+        "description": "Temporary work datasets used by COBOL compiler during compilation"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKEX",
+        "operations": "READ",
+        "description": "Language Environment link library - read LE runtime modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKED",
+        "operations": "READ",
+        "description": "Language Environment link library - read LE link edit modules"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHLOAD",
+        "operations": "READ",
+        "description": "CICS load library - read CICS modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHCOB",
+        "operations": "READ",
+        "description": "CICS COBOL library - read CICS COBOL interface modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "OEM.DB2.&SSID..SDSNLOAD",
+        "operations": "READ",
+        "description": "DB2 load library - read DB2 modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "ISP.SISPLOAD",
+        "operations": "READ",
+        "description": "ISPF load library - read ISPF modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "GDDM.SADMMOD",
+        "operations": "READ",
+        "description": "GDDM module library - read GDDM modules for link edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Application load library included in SYSLIB concatenation for resolving external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "OEM.CICSTS.V05R06M0.CICS.SDFHCOB(DFHEILIC)",
+        "operations": "READ",
+        "description": "Read CICS COBOL interface stub module DFHEILIC as primary input to linkage editor"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "READ",
+        "description": "Read compiled object module from COBOL step as input to linkage editor, then delete"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB(CICSDB2P)",
+        "operations": "WRITE",
+        "description": "Write linked executable load module CICSDB2P to application load library"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYSUT1",
+        "operations": "WRITE",
+        "description": "Temporary work dataset on VIO used by linkage editor"
+      },
+      {
+        "step": "BINDPK",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.SDSNEXIT",
+        "operations": "READ",
+        "description": "DB2 exit library for BIND step library"
+      },
+      {
+        "step": "BINDPK",
+        "type": "Dataset",
+        "objects": "OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "DB2 load library for BIND step library"
+      },
+      {
+        "step": "BINDPK",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P)",
+        "operations": "READ",
+        "description": "Read DBRM member CICSDB2P from DBRMLIB as input to DB2 BIND PACKAGE"
+      },
+      {
+        "step": "BINDPK",
+        "type": "DB2",
+        "objects": "CARDDEMO.CICSDB2P (DB2 Package)",
+        "operations": "BIND PACKAGE",
+        "description": "Bind DBRM member CICSDB2P into DB2 package collection CARDDEMO on subsystem DAZ1, with ACTION(REPLACE), ISOLATION(CS), CURRENTDATA(YES), ENCODING(EBCDIC), QUALIFIER(CARDDEMO)"
+      },
+      {
+        "step": "BINDPL",
+        "type": "Dataset",
+        "objects": "OEM.DB2.DAZ1.SDSNEXIT",
+        "operations": "READ",
+        "description": "DB2 exit library for BIND PLAN step library"
+      },
+      {
+        "step": "BINDPL",
+        "type": "Dataset",
+        "objects": "OEMA.DB2.VERSIONA.SDSNLOAD",
+        "operations": "READ",
+        "description": "DB2 load library for BIND PLAN step library"
+      },
+      {
+        "step": "BINDPL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DBRMLIB(CICSDB2P)",
+        "operations": "READ",
+        "description": "Read DBRM member CICSDB2P from DBRMLIB as input to DB2 BIND PLAN"
+      },
+      {
+        "step": "BINDPL",
+        "type": "DB2",
+        "objects": "CARDDEMO (DB2 Plan)",
+        "operations": "BIND PLAN",
+        "description": "Bind DB2 plan CARDDEMO on subsystem DAZ1 with package list CARDDEMO.*, ACTION(REPLACE) RETAIN, ISOLATION(CS), CURRENTDATA(YES), ENCODING(EBCDIC), QUALIFIER(CARDDEMO)"
+      }
+    ]
+  }
+}

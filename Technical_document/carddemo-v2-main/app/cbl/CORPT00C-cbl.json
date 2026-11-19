@@ -1,0 +1,375 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CORPT00C.cbl",
+        "type": "cobol",
+        "transaction_id": "CR00"
+      },
+      "overview": "CORPT00C is part of the CardDemo credit card management application, operating within the online transaction reporting workflow. It serves as the user-facing interface that bridges online CICS users with batch report generation, allowing business users to request transaction reports without direct access to batch job submission systems. The program enables users to generate transaction reports for three time periods — monthly, yearly, or a custom date range — by collecting report parameters through an interactive screen and submitting a pre-built JCL batch job to the internal reader via an extra-partition Transient Data Queue (TDQ named 'JOBS'). This solves the operational need for on-demand report generation from an online terminal without requiring direct JES/batch access.",
+      "key_features": [
+        {
+          "feature": "Report Type Selection",
+          "description": "Allows users to select from three report types: Monthly (current month), Yearly (current year), or Custom date range."
+        },
+        {
+          "feature": "Date Range Validation",
+          "description": "Validates custom start and end date inputs for completeness, numeric correctness, and calendar validity using the CSUTLDTC date validation utility."
+        },
+        {
+          "feature": "Automatic Date Calculation",
+          "description": "Automatically computes the correct start and end dates for Monthly and Yearly report types based on the current system date, eliminating manual date entry."
+        },
+        {
+          "feature": "Batch Job Submission via TDQ",
+          "description": "Dynamically builds and submits a JCL job stream (TRNRPT00) to the CICS internal reader through the 'JOBS' extra-partition TDQ, triggering batch report generation."
+        },
+        {
+          "feature": "User Confirmation Step",
+          "description": "Requires explicit Y/N confirmation from the user before submitting the batch job, preventing accidental report submissions."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 to return to the main menu (COMEN01C) and handles invalid key presses with appropriate error messaging."
+        },
+        {
+          "feature": "Error Messaging",
+          "description": "Provides field-level and screen-level error messages for invalid inputs, empty required fields, and TDQ write failures."
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Uses CICS COMMAREA to maintain program state across multiple screen interactions within the same user session."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "JOBS",
+        "type": "Write",
+        "description": "Extra partition Transient Data Queue (TDQ) - JCL records are written to this queue to submit the transaction report batch job (TRNRPT00) for execution"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and Commarea Check",
+          "description": "Program is invoked via CICS transaction CR00. If EIBCALEN is 0 (no commarea), user is redirected to sign-on screen COSGN00C. Otherwise, the DFHCOMMAREA is moved into CARDDEMO-COMMAREA for session state management.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Initial Screen Display",
+          "description": "On first entry (CDEMO-PGM-REENTER not set), the transaction report request screen CORPT0A is initialized with LOW-VALUES and sent to the terminal with ERASE, setting cursor to the MONTHLY field.",
+          "records": [
+            "CORPT0AO",
+            "MONTHLYL",
+            "CORPT0AI",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive Screen Input",
+          "description": "On re-entry, the BMS map CORPT0A is received from the terminal into CORPT0AI, capturing user selections for report type (Monthly, Yearly, Custom) and date range fields.",
+          "records": [
+            "CORPT0AI",
+            "MONTHLYI",
+            "YEARLYI",
+            "CUSTOMI",
+            "SDTMMI",
+            "SDTDDI",
+            "SDTYYYYI",
+            "EDTMMI",
+            "EDTDDI",
+            "EDTYYYYI",
+            "CONFIRMI"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Evaluation",
+          "description": "The EIBAID value is evaluated. ENTER key triggers report processing. PF3 returns to the main menu (COMEN01C). Any other key results in an invalid key error message displayed on screen.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "CDEMO-TO-PROGRAM",
+            "WS-MESSAGE",
+            "ERRMSGO"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Report Type Selection and Date Calculation",
+          "description": "Based on user selection: Monthly report calculates start date as first day of current month and end date as last day of current month using CURRENT-DATE and DATE-OF-INTEGER/INTEGER-OF-DATE intrinsic functions. Yearly report sets start to Jan 1 and end to Dec 31 of current year. Custom report uses user-entered date fields.",
+          "records": [
+            "MONTHLYI",
+            "YEARLYI",
+            "CUSTOMI",
+            "WS-START-DATE",
+            "WS-END-DATE",
+            "WS-CURDATE-DATA",
+            "WS-CURDATE-YEAR",
+            "WS-CURDATE-MONTH",
+            "WS-CURDATE-DAY",
+            "PARM-START-DATE-1",
+            "PARM-START-DATE-2",
+            "PARM-END-DATE-1",
+            "PARM-END-DATE-2"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Custom Date Validation - Presence Check",
+          "description": "For custom date range, each date component (month, day, year for both start and end dates) is checked for non-blank/non-low-values. Any missing field triggers an error message and re-display of the screen with cursor positioned on the offending field.",
+          "records": [
+            "SDTMMI",
+            "SDTDDI",
+            "SDTYYYYI",
+            "EDTMMI",
+            "EDTDDI",
+            "EDTYYYYI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Custom Date Validation - Numeric and Range Check",
+          "description": "Each date component is converted to numeric using NUMVAL-C, then validated for numeric content and range (month <= 12, day <= 31). Invalid values set the error flag and redisplay the screen.",
+          "records": [
+            "WS-NUM-99",
+            "WS-NUM-9999",
+            "SDTMMI",
+            "SDTDDI",
+            "SDTYYYYI",
+            "EDTMMI",
+            "EDTDDI",
+            "EDTYYYYI",
+            "WS-ERR-FLG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Custom Date Validation - Calendar Validity via CSUTLDTC",
+          "description": "The external date validation routine CSUTLDTC is called twice (once for start date, once for end date) using the YYYY-MM-DD format. If the severity code is not '0000' and message number is not '2513', the date is flagged as invalid.",
+          "records": [
+            "CSUTLDTC-DATE",
+            "CSUTLDTC-DATE-FORMAT",
+            "CSUTLDTC-RESULT",
+            "CSUTLDTC-RESULT-SEV-CD",
+            "CSUTLDTC-RESULT-MSG-NUM",
+            "WS-START-DATE",
+            "WS-END-DATE",
+            "WS-DATE-FORMAT"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Confirmation Check Before Job Submission",
+          "description": "Before writing JCL to the TDQ, the CONFIRM field is checked. If blank, a confirmation prompt is displayed. If 'N', fields are re-initialized and screen is redisplayed. If 'Y', processing continues. Any other value triggers an invalid confirmation error.",
+          "records": [
+            "CONFIRMI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "WS-REPORT-NAME"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "JCL Record Construction",
+          "description": "The JOB-DATA structure contains pre-defined JCL statements for the TRNRPT00 batch job. The start and end date parameters are embedded into FILLER-1 (PARM-START-DATE-1), FILLER-2 (PARM-END-DATE-1), and FILLER-3 (PARM-START-DATE-2, PARM-END-DATE-2) within the JCL. JOB-DATA-2 redefines JOB-DATA-1 as an array of 80-byte JOB-LINES.",
+          "records": [
+            "JOB-DATA",
+            "JOB-LINES",
+            "JCL-RECORD",
+            "PARM-START-DATE-1",
+            "PARM-START-DATE-2",
+            "PARM-END-DATE-1",
+            "PARM-END-DATE-2",
+            "FILLER-1",
+            "FILLER-2",
+            "FILLER-3"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "JCL Submission to Internal Reader via TDQ",
+          "description": "Each 80-byte JCL record from JOB-LINES is written sequentially to the CICS extra-partition TDQ named 'JOBS' using EXEC CICS WRITEQ TD. The loop terminates when '/*EOF' or blank/low-value records are encountered, or after 1000 iterations. Write failures set the error flag and display an error message.",
+          "records": [
+            "JCL-RECORD",
+            "JOB-LINES",
+            "WS-IDX",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "END-LOOP-YES"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Success Confirmation Display",
+          "description": "If no errors occurred during job submission, all input fields are re-initialized, a green success message is composed indicating the report type submitted, and the screen is redisplayed.",
+          "records": [
+            "WS-REPORT-NAME",
+            "WS-MESSAGE",
+            "ERRMSGC",
+            "CORPT0AO",
+            "MONTHLYL"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Return to CICS with Commarea",
+          "description": "Program returns control to CICS specifying transaction ID CR00 and passing the updated CARDDEMO-COMMAREA to maintain session state for the next invocation.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN Commarea Presence",
+          "description": "The program requires a non-zero EIBCALEN to proceed with normal processing. A zero value forces an immediate redirect to the sign-on program COSGN00C, preventing any report submission without an active session."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER State Flag",
+          "description": "The re-entry flag in CARDDEMO-COMMAREA (from COCOM01Y) controls whether the program sends the initial blank screen or processes user input. This flag must be correctly set on first entry and toggled on re-entry to avoid re-initializing the screen on every invocation."
+        },
+        {
+          "dependency": "WS-ERR-FLG Sequential Validation Gate",
+          "description": "The error flag WS-ERR-FLG is used as a gate throughout the custom date validation and job submission flow. Once set to 'Y', subsequent processing steps (SUBMIT-JOB-TO-INTRDR, TDQ write) are skipped. The flag is never reset between validation checks within a single PROCESS-ENTER-KEY execution, meaning the first validation failure halts all further processing."
+        },
+        {
+          "dependency": "CONFIRMI Field Dependency on Date Parameters",
+          "description": "The CONFIRMI confirmation field is only meaningful after valid date parameters have been established. The SUBMIT-JOB-TO-INTRDR paragraph checks CONFIRMI before writing to the TDQ, but this paragraph is only reached if date validation passes, creating a sequential dependency between date validation state and confirmation processing."
+        },
+        {
+          "dependency": "JCL Parameter Embedding Before Loop",
+          "description": "PARM-START-DATE-1, PARM-START-DATE-2, PARM-END-DATE-1, and PARM-END-DATE-2 must be populated with valid date values before the JOB-LINES loop begins. These fields are embedded within the JOB-DATA structure and are read as part of JOB-LINES during TDQ writes. Late or missing population results in blank date parameters in the submitted JCL."
+        },
+        {
+          "dependency": "CSUTLDTC Call Result Interpretation",
+          "description": "Date validation via CSUTLDTC depends on the severity code '0000' for success. The special case where message number '2513' is tolerated (not treated as an error) introduces a dependency on the specific behavior of the CSUTLDTC utility, meaning changes to that utility's return codes could silently affect validation logic."
+        },
+        {
+          "dependency": "TDQ JOBS Queue Availability",
+          "description": "The entire batch job submission depends on the CICS extra-partition TDQ named 'JOBS' being defined, available, and writable. Any TDQ write failure (non-NORMAL RESP code) halts the submission mid-stream, potentially leaving a partial JCL stream in the queue, which could cause the batch job to fail or behave unexpectedly."
+        },
+        {
+          "dependency": "JOB-DATA-1 and JOB-DATA-2 REDEFINES Alignment",
+          "description": "JOB-DATA-2 redefines JOB-DATA-1 as an array of 1000 80-byte lines. The correctness of JCL submission depends on the total byte length of JOB-DATA-1 being exactly 80000 bytes (1000 x 80). Any mismatch in FILLER definitions would misalign JCL records during the loop."
+        },
+        {
+          "dependency": "Monthly Date Calculation Boundary Condition",
+          "description": "The monthly end-date calculation increments WS-CURDATE-MONTH by 1 (with year rollover handling) then uses DATE-OF-INTEGER(INTEGER-OF-DATE(date) - 1) to get the last day of the current month. This calculation depends on WS-CURDATE-N being correctly structured as a numeric date (YYYYMMDD) compatible with the INTEGER-OF-DATE intrinsic function."
+        },
+        {
+          "dependency": "Screen Map CORPT00 / CORPT0A Field Name Consistency",
+          "description": "All field references (MONTHLYI, YEARLYI, CUSTOMI, SDTMMI, SDTDDI, SDTYYYYI, EDTMMI, EDTDDI, EDTYYYYI, CONFIRMI and their length counterparts) depend on the BMS map definitions in copybook CORPT00.cpy. Any change to field names or lengths in the map requires corresponding changes throughout the program."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "CICS Terminal Management",
+          "type": "Online transaction processing - terminal I/O",
+          "purpose": "Sends and receives BMS map CORPT0A (mapset CORPT00) to/from the user terminal for report request input and status message display. Uses EXEC CICS SEND MAP with ERASE/CURSOR options and EXEC CICS RECEIVE MAP."
+        },
+        {
+          "system": "CICS Extra-Partition Transient Data Queue (TDQ) - JOBS",
+          "type": "CICS Transient Data Queue (extra-partition)",
+          "purpose": "Receives 80-byte JCL records written sequentially via EXEC CICS WRITEQ TD to queue 'JOBS'. This queue is connected to the z/OS internal reader, which picks up the JCL stream and submits the TRNRPT00 batch job (executing procedure TRANREPT from library AWS.M2.CARDDEMO.PROC) for asynchronous batch execution."
+        },
+        {
+          "system": "CICS Program Control - XCTL",
+          "type": "CICS inter-program control transfer",
+          "purpose": "Transfers control to other CardDemo programs (COSGN00C for sign-on, COMEN01C for main menu) using EXEC CICS XCTL with COMMAREA, enabling navigation within the CardDemo application without returning to the calling program."
+        },
+        {
+          "system": "CICS Task Management - RETURN",
+          "type": "CICS pseudo-conversational return",
+          "purpose": "Returns control to CICS after each screen interaction using EXEC CICS RETURN with TRANSID(CR00) and COMMAREA, implementing the pseudo-conversational programming model and preserving session state between user interactions."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        },
+        {
+          "name": "CSUTLDTC.cbl",
+          "purpose": "This program is a utility component within the CardDemo financial application, serving as a reusable date validation service that can be called by other programs in the system. It operates as a shared infrastructure module in the date processing workflow, providing centralized date validation capabilities. The program validates whether a given date string conforms to a specified format by invoking the IBM Language Environment (LE) API CEEDAYS, which converts a date into a Lillian date (a standardized integer representation). It solves the problem of consistent, reliable date validation across the application by wrapping the CEEDAYS API call and translating its feedback codes into human-readable result messages that calling programs can interpret."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors - Report Type Selection",
+        "description": "Validates that a report type (Monthly, Yearly, or Custom) is selected before processing. If none selected, sets WS-ERR-FLG to 'Y', moves error message to WS-MESSAGE, positions cursor to MONTHLYL field, and re-displays the screen via SEND-TRNRPT-SCREEN."
+      },
+      {
+        "category": "Input Validation Errors - Custom Date Field Presence",
+        "description": "For custom date range, validates each date component (month, day, year for both start and end dates) is not empty/spaces/low-values. Each missing field triggers an individual error message, sets ERR-FLG-ON, positions cursor to the offending field, and re-sends the screen immediately via PERFORM SEND-TRNRPT-SCREEN."
+      },
+      {
+        "category": "Input Validation Errors - Custom Date Field Format",
+        "description": "Validates numeric format and range of each date component using NUMVAL-C and range checks (month > 12, day > 31). Non-numeric or out-of-range values set ERR-FLG-ON, populate a specific error message, position cursor to the offending field, and re-display the screen."
+      },
+      {
+        "category": "Input Validation Errors - Custom Date Semantic Validity",
+        "description": "Calls external program CSUTLDTC to validate the logical correctness of start and end dates. If CSUTLDTC-RESULT-SEV-CD is not '0000' and message number is not '2513' (a tolerated condition), sets ERR-FLG-ON, moves a date-invalid message to WS-MESSAGE, positions cursor to the month field, and re-displays the screen."
+      },
+      {
+        "category": "Input Validation Errors - Confirmation Field",
+        "description": "Validates the CONFIRMI field before job submission. Empty/spaces triggers a confirmation prompt message with ERR-FLG-ON. Values other than Y/y/N/n produce an invalid-value error message with cursor on CONFIRML. A value of N/n initializes all fields and re-displays the screen without submitting the job."
+      },
+      {
+        "category": "Invalid Key / Navigation Errors",
+        "description": "In MAIN-PARA, any AID key other than ENTER or PF3 sets WS-ERR-FLG to 'Y', moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, positions cursor to MONTHLYL, and re-sends the screen. PF3 navigates to COMEN01C via RETURN-TO-PREV-SCREEN."
+      },
+      {
+        "category": "TDQ Write Operation Errors",
+        "description": "In WIRTE-JOBSUB-TDQ, after EXEC CICS WRITEQ TD, WS-RESP-CD is evaluated. A non-NORMAL response logs RESP and REAS codes via DISPLAY, sets ERR-FLG-ON, moves 'Unable to Write TDQ (JOBS)...' to WS-MESSAGE, positions cursor to MONTHLYL, and calls SEND-TRNRPT-SCREEN to halt further processing and inform the user."
+      },
+      {
+        "category": "Session / Communication Area Errors",
+        "description": "If EIBCALEN is 0 (no commarea present), the program redirects to COSGN00C via RETURN-TO-PREV-SCREEN, treating it as an unauthorized or uninitialized session rather than displaying an explicit error message."
+      },
+      {
+        "category": "Error Flag Propagation and Guard Pattern",
+        "description": "A central WS-ERR-FLG ('Y'/'N') with 88-level conditions ERR-FLG-ON/ERR-FLG-OFF acts as a global error gate. Subsequent processing steps check 'IF NOT ERR-FLG-ON' before proceeding, preventing cascading operations after an error. On success, the flag remains off and a green confirmation message is displayed."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "CORPT00",
+        "map_name": "CORPT0A",
+        "business_function": "Transaction Report Generation screen for the CardDemo application. Allows users to submit batch transaction reports by selecting a report type (Monthly, Yearly, or Custom date range) and submitting a JCL job via an extra partition TDQ (JOBS). The screen supports three report modes: Monthly (auto-populates current month date range), Yearly (auto-populates current year date range), and Custom (allows user-specified start and end dates in MM/DD/YYYY format). A confirmation prompt (Y/N) is required before the job is submitted to the internal reader."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>CORPT0A - Transaction Reports</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#fff;width:80ch;padding:10px;border:1px solid #444;font-size:15px;line-height:1.5;} .row{white-space:pre;height:1.5em;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff5555;} .turquoise{color:#00ffff;} .neutral{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:15px;outline:none;} .input-1{width:1ch;} .input-2{width:2ch;} .input-4{width:4ch;} .input-8{width:8ch;} .input-78{width:78ch;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CR00</span><span>                </span><span class='yellow bright'>CardDemo                        </span><span>        </span><span class='blue'>Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>CORPT00C</span><span>            </span><span class='yellow bright'>Transaction Reports              </span><span>        </span><span class='blue'>Time: </span><span class='blue'>23:12:33</span></div><div class='row'>&nbsp;</div><div class='row'><span>                             </span><span class='neutral bright'>Transaction Reports</span><span>                             </span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>         </span><input class='input-field input-1 green underline' type='text' maxlength='1' value=' '><span>      </span><span class='turquoise bright'>Monthly (Current Month) </span></div><div class='row'>&nbsp;</div><div class='row'><span>         </span><input class='input-field input-1 green underline' type='text' maxlength='1' value=' '><span>      </span><span class='turquoise bright'>Yearly (Current Year)   </span></div><div class='row'>&nbsp;</div><div class='row'><span>         </span><input class='input-field input-1 green underline' type='text' maxlength='1' value=' '><span>      </span><span class='turquoise bright'>Custom (Date Range)     </span></div><div class='row'>&nbsp;</div><div class='row'><span>              </span><span class='turquoise'>Start Date : </span><input class='input-field input-2 green underline' type='text' maxlength='2' value='  '><span class='blue'>/</span><input class='input-field input-2 green underline' type='text' maxlength='2' value='  '><span class='blue'>/</span><input class='input-field input-4 green underline' type='text' maxlength='4' value='    '><span>  </span><span class='blue'>(MM/DD/YYYY)</span></div><div class='row'><span>              </span><span class='turquoise'>  End Date : </span><input class='input-field input-2 green underline' type='text' maxlength='2' value='  '><span class='blue'>/</span><input class='input-field input-2 green underline' type='text' maxlength='2' value='  '><span class='blue'>/</span><input class='input-field input-4 green underline' type='text' maxlength='4' value='    '><span>  </span><span class='blue'>(MM/DD/YYYY)</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>     </span><span class='turquoise'>The Report will be submitted for printing. Please confirm: </span><input class='input-field input-1 green underline' type='text' maxlength='1' value=' '><span>  </span><span class='neutral'>(Y/N)</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><input class='input-field input-78 red bright' type='text' maxlength='78' value=''></div><div class='row'><span class='yellow'>ENTER=Continue  F3=Back</span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the selected report type. Validates input fields, sets date parameters, and submits the JCL batch job to the JOBS TDQ (internal reader) for printing. Requires confirmation (Y/N) before submission."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen (COMEN01C - Main Menu)"
+        }
+      ]
+    }
+  }
+}

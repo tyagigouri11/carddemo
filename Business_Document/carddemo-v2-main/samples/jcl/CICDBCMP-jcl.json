@@ -1,0 +1,9 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CICDBCMP.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/CICDBCMP.jcl",
+    "type": "jcl",
+    "description": "This JCL job compiles a CICS DB2 program named CICSDB2P within the CardDemo application environment. It invokes a utility procedure (BLDCIDB2) to compile the COBOL source code, generate a Database Request Module (DBRM), and build a load module, binding it to the CARDDEMO plan on the DAZ1 DB2 subsystem.Key Functionalities:\nCompiles the CICS DB2 COBOL program (CICSDB2P) from the source library AWS.M2.CARDDEMO.CBL using the BLDCIDB2 build procedure\nGenerates a Database Request Module (DBRM) and stores it in the AWS.M2.CARDDEMO.DBRMLIB library for DB2 plan binding\nLinks and stores the compiled load module into the AWS.M2.CARDDEMO.LOADLIB partitioned dataset for execution\nBinds the compiled program to the CARDDEMO DB2 plan on subsystem DAZ1, enabling the program to execute DB2 SQL statements\nReferences copybook members from AWS.M2.CARDDEMO.CPY and DB2 declarations from AWS.M2.CARDDEMO.DCL during compilation",
+    "rules": [],
+    "flow_diagram_code": "flowchart TD\n    A([JCL Job Start]):::start\n    Z([JCL Job End]):::final\n\n    A --> Z\n\n    classDef start fill:#ff6666,stroke:#333,stroke-width:2px,color:#000\n    classDef process fill:#6699ff,stroke:#333,stroke-width:2px,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,stroke-width:2px,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,stroke-width:2px,color:#000\n    classDef final fill:#ae74de,stroke:#333,stroke-width:2px,color:#000\n    classDef success fill:#22c55e,stroke:#333,stroke-width:2px,color:#000\n    classDef error fill:#ef4444,stroke:#333,stroke-width:2px,color:#000"
+}

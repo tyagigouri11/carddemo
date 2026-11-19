@@ -1,0 +1,1225 @@
+{
+    "name": "CBACT03C.cbl",
+    "program_name": "CBACT03C.cbl",
+    "generated_at": "2026-11-05T08:10:24Z",
+    "overview": {
+        "total_key_functionalities": 8,
+        "total_rules": 47,
+        "main_flow_diagram": "flowchart TD\n    A([Program Start]):::start\n    P1[1: Program Initialization\nDisplay 'START OF EXECUTION OF PROGRAM CBACT03C']:::process\n    P2[2: Open Account Cross-Reference File\nPrepare file for sequential reading]:::process\n    XREFFILE1[(XREFFILE\nVSAM KSDS - Account Cross-Reference)]:::datasource\n    D1{File Opened\nSuccessfully?}:::decision\n    E1[Error: Cannot Open File\nDisplay Error & Terminate Program]:::error\n    P6[6: Iterative Record Processing\nBegin sequential read loop]:::process\n    D2{End of File\nReached?}:::decision\n    P3[3: Read Next Cross-Reference Record\nRetrieve Card Number - 16 chars\nand Cross-Reference Data - 34 chars]:::process\n    XREFFILE2[(XREFFILE\nVSAM KSDS - Account Cross-Reference)]:::datasource\n    D3{Record Read\nSuccessfully?}:::decision\n    P5[5: End-of-File Detection\nSignal program to stop reading]:::process\n    E2[Error: Cannot Read File\nDisplay Error & Terminate Program]:::error\n    P4[4: Display Cross-Reference Record\nPrint Card Number and\nAssociated Account Cross-Reference Data]:::process\n    P7[7: Close Account Cross-Reference File\nClose file after all records processed]:::process\n    XREFFILE3[(XREFFILE\nVSAM KSDS - Account Cross-Reference)]:::datasource\n    D4{File Closed\nSuccessfully?}:::decision\n    E3[Error: Cannot Close File\nDisplay Error & Terminate Program]:::error\n    P8[8: Program Completion\nDisplay 'END OF EXECUTION OF PROGRAM CBACT03C']:::process\n    Z([Program End]):::final\n\n    A --> P1\n    P1 --> P2\n    P2 --> XREFFILE1\n    XREFFILE1 -.->|Open File| D1\n    D1 -->|No| E1\n    D1 -->|Yes| P6\n    P6 --> D2\n    D2 -->|No - Continue Reading| P3\n    XREFFILE2 -.->|Sequential Read| P3\n    P3 --> D3\n    D3 -->|End of File Detected| P5\n    D3 -->|Error Reading File| E2\n    D3 -->|Record Retrieved Successfully| P4\n    P4 --> D2\n    P5 --> D2\n    D2 -->|Yes - All Records Processed| P7\n    P7 --> XREFFILE3\n    XREFFILE3 -.->|Close File| D4\n    D4 -->|No| E3\n    D4 -->|Yes| P8\n    P8 --> Z\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-CBACT03C-cbl-00001",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Initialization Announcement",
+                "rule_description": "The program must announce its start before performing any processing, providing a clear audit trail marker in the output log.",
+                "sub_graph_node_text": "1: Program Initialization\nDisplay 'START OF EXECUTION OF PROGRAM CBACT03C'",
+                "acceptance_criteria": {
+                    "Given": "The Card Cross-Reference File Reader program (CBACT03C) is invoked",
+                    "When": "The program begins execution",
+                    "Then": "The program must display the message 'START OF EXECUTION OF PROGRAM CBACT03C' as the very first action before any file operations or record processing begins"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "Open Account Cross-Reference File for Sequential Reading",
+                "rule_description": "The Account Cross-Reference file (XREFFILE) must be successfully opened in input mode before any record retrieval can begin. This is a mandatory prerequisite step for all subsequent record processing.",
+                "sub_graph_node_text": "2: Open Account Cross-Reference File\nPrepare file for sequential reading",
+                "acceptance_criteria": {
+                    "Given": "The program has displayed its start message and is ready to begin file processing",
+                    "When": "The program attempts to open the Account Cross-Reference file (XREFFILE) for sequential reading",
+                    "Then": "The file must be opened successfully in input mode, setting the processing status to successful (result = 0), so that sequential record reading can proceed"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00003",
+                "rule_type": "Decision Rules",
+                "rule_name": "File Open Failure Terminates Program",
+                "rule_description": "If the Account Cross-Reference file cannot be opened, the program must immediately report the failure and halt all processing. No records can be processed without a successfully opened file.",
+                "sub_graph_node_text": "Error: Cannot Open File\nDisplay Error & Terminate Program",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to open the Account Cross-Reference file (XREFFILE)",
+                    "When": "The file open operation does not complete successfully (file status is not '00'), setting the result to 12",
+                    "Then": "The program must display the error message 'ERROR OPENING XREFFILE', display the file status details, and immediately terminate abnormally \u2014 no record processing is attempted"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00004",
+                "rule_type": "Process Rules",
+                "rule_name": "Sequential Record Processing Loop Initiation",
+                "rule_description": "After the Account Cross-Reference file is successfully opened, the program enters a continuous sequential read loop to process every record in the file from beginning to end.",
+                "sub_graph_node_text": "6: Iterative Record Processing\nBegin sequential read loop",
+                "acceptance_criteria": {
+                    "Given": "The Account Cross-Reference file (XREFFILE) has been successfully opened for reading",
+                    "When": "The program begins iterative record processing",
+                    "Then": "The program must enter a sequential read loop that continues processing records as long as the end-of-file condition has not been signalled (END-OF-FILE flag is not 'Y'), ensuring every record in the file is processed"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00005",
+                "rule_type": "Decision Rules",
+                "rule_name": "End-of-File Check Controls Loop Continuation",
+                "rule_description": "At the start of each loop iteration, the program checks whether the end of the Account Cross-Reference file has been reached. This check determines whether to continue reading records or to proceed to file closure.",
+                "sub_graph_node_text": "End of File\nReached?",
+                "acceptance_criteria": {
+                    "Given": "The program is in the sequential record processing loop",
+                    "When": "The loop condition is evaluated at the beginning of each iteration",
+                    "Then": "If the end-of-file flag is 'Y' (all records processed), the loop must exit and proceed to close the file; if the end-of-file flag is 'N' (records remain), the program must proceed to read the next record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00006",
+                "rule_type": "Process Rules",
+                "rule_name": "Read Next Cross-Reference Record Sequentially",
+                "rule_description": "When the end of file has not been reached, the program reads the next available record from the Account Cross-Reference file. Each record contains a 16-character Card Number and 34 characters of associated Cross-Reference data.",
+                "sub_graph_node_text": "3: Read Next Cross-Reference Record\nRetrieve Card Number - 16 chars\nand Cross-Reference Data - 34 chars",
+                "acceptance_criteria": {
+                    "Given": "The program is in the sequential read loop and the end-of-file flag is 'N'",
+                    "When": "The program reads the next record from the Account Cross-Reference file (XREFFILE) into the CARD-XREF-RECORD structure",
+                    "Then": "The record containing the 16-character Card Number and 34-character Cross-Reference data is retrieved and made available for display; the read result is evaluated to determine the next action (success, end-of-file, or error)"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00007",
+                "rule_type": "Decision Rules",
+                "rule_name": "Successful Record Read Triggers Display",
+                "rule_description": "When a Cross-Reference record is successfully retrieved from the file, it must be immediately displayed, and the processing loop must continue to retrieve the next record.",
+                "sub_graph_node_text": "Record Retrieved Successfully",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                    "When": "The record is read successfully (file status is '00'), setting the result to 0 (AOK)",
+                    "Then": "The program must display the retrieved CARD-XREF-RECORD (containing Card Number and Cross-Reference data) and return to the loop to check for the next record"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00008",
+                "rule_type": "Decision Rules",
+                "rule_name": "End-of-File Detection Signals Loop Termination",
+                "rule_description": "When the last record in the Account Cross-Reference file has already been read and no more records are available, the program must signal that all records have been processed and stop the read loop.",
+                "sub_graph_node_text": "5: End-of-File Detection\nSignal program to stop reading",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                    "When": "The read operation detects that there are no more records to read (file status is '10'), setting the result to 16 (EOF)",
+                    "Then": "The end-of-file flag must be set to 'Y', which will cause the processing loop to exit on its next condition check, and no further read attempts are made"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00009",
+                "rule_type": "Decision Rules",
+                "rule_name": "Record Read Failure Terminates Program",
+                "rule_description": "If an unexpected error occurs while reading a record from the Account Cross-Reference file, the program must immediately report the failure and halt all processing.",
+                "sub_graph_node_text": "Error: Cannot Read File\nDisplay Error & Terminate Program",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                    "When": "The read operation fails with an unexpected error (file status is neither '00' for success nor '10' for end-of-file), setting the result to 12",
+                    "Then": "The program must display the error message 'ERROR READING XREFFILE', display the file status details, and immediately terminate abnormally \u2014 no further records are processed"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00010",
+                "rule_type": "Process Rules",
+                "rule_name": "Display Retrieved Cross-Reference Record",
+                "rule_description": "Each successfully retrieved Cross-Reference record must be displayed to the output, showing the Card Number and its associated Account Cross-Reference data.",
+                "sub_graph_node_text": "4: Display Cross-Reference Record\nPrint Card Number and\nAssociated Account Cross-Reference Data",
+                "acceptance_criteria": {
+                    "Given": "A Cross-Reference record has been successfully read from the Account Cross-Reference file and the end-of-file flag remains 'N'",
+                    "When": "The program processes the successfully retrieved record in the main processing loop",
+                    "Then": "The complete CARD-XREF-RECORD \u2014 containing the 16-character Card Number and 34-character Cross-Reference data \u2014 must be displayed to the output, after which the loop returns to check the end-of-file condition for the next iteration"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00011",
+                "rule_type": "Process Rules",
+                "rule_name": "Close Account Cross-Reference File After Processing",
+                "rule_description": "Once all records in the Account Cross-Reference file have been processed and the end-of-file condition is confirmed, the file must be properly closed before the program completes.",
+                "sub_graph_node_text": "7: Close Account Cross-Reference File\nClose file after all records processed",
+                "acceptance_criteria": {
+                    "Given": "The sequential record processing loop has exited because the end-of-file flag is 'Y', indicating all records have been processed",
+                    "When": "The program attempts to close the Account Cross-Reference file (XREFFILE)",
+                    "Then": "The file must be closed successfully (result set to 0), confirming that all file resources are properly released before program completion"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00012",
+                "rule_type": "Decision Rules",
+                "rule_name": "File Close Failure Terminates Program",
+                "rule_description": "If the Account Cross-Reference file cannot be properly closed after all records are processed, the program must report the failure and halt abnormally.",
+                "sub_graph_node_text": "Error: Cannot Close File\nDisplay Error & Terminate Program",
+                "acceptance_criteria": {
+                    "Given": "The program has attempted to close the Account Cross-Reference file (XREFFILE) after completing all record processing",
+                    "When": "The file close operation does not complete successfully (file status is not '00'), setting the result to 12",
+                    "Then": "The program must display the error message 'ERROR CLOSING XREFFILE', display the file status details, and immediately terminate abnormally"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBACT03C-cbl-00013",
+                "rule_type": "Process Rules",
+                "rule_name": "Program Completion Announcement",
+                "rule_description": "Upon successful completion of all record processing and file closure, the program must announce its successful end, providing a clear audit trail marker in the output log.",
+                "sub_graph_node_text": "8: Program Completion\nDisplay 'END OF EXECUTION OF PROGRAM CBACT03C'",
+                "acceptance_criteria": {
+                    "Given": "All Cross-Reference records have been read and displayed, and the Account Cross-Reference file has been successfully closed",
+                    "When": "The program reaches its final step",
+                    "Then": "The program must display the message 'END OF EXECUTION OF PROGRAM CBACT03C' as the last action before terminating normally"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "program-initialization",
+            "title": "Program Initialization",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Program Start]) \n    B[Display Message:\\n'START OF EXECUTION OF\\nPROGRAM CBACT03C']\n    C([Proceed to Open\\nAccount Cross-Reference File])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00014",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Program Start Notification",
+                    "rule_description": "When the Account Cross-Reference file reading and printing process begins, the system must announce its start to confirm the process has been initiated.",
+                    "sub_graph_node_text": "Display Message: 'START OF EXECUTION OF PROGRAM CBACT03C'",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file reading and printing program CBACT03C is triggered for execution",
+                        "When": "The program begins its execution",
+                        "Then": "The system displays the message 'START OF EXECUTION OF PROGRAM CBACT03C' to confirm that the Account Cross-Reference file reading and printing process has started"
+                    },
+                    "key_functionality_id": "program-initialization"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Initialization"
+        },
+        {
+            "id": "open-account-cross",
+            "title": "Open Account Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Open Account\\nCross-Reference File])\n    B[Request to Open\\nAccount Cross-Reference File\\nfor Sequential Reading]\n    XREFFILE[(XREFFILE\\nVSAM KSDS\\nAccount Cross-Reference)]\n    C{File Opened\\nSuccessfully?}\n    D[File Ready for\\nSequential Record Reading]\n    E[Display Error Message:\\nCannot Open Account\\nCross-Reference File]\n    F([Terminate Program\\nwith Error])\n    G([Return to\\nMain Process])\n\n    A --> B\n    B --> XREFFILE\n    XREFFILE -.->|Open Result| C\n    C -->|Yes - File Available| D\n    C -->|No - File Unavailable| E\n    E --> F\n    D --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00015",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Open Account Cross-Reference File for Sequential Reading",
+                    "rule_description": "The Account Cross-Reference file must be opened in read-only sequential mode before any record processing can begin. This is the mandatory first step to access card-to-account cross-reference data.",
+                    "sub_graph_node_text": "Request to Open Account Cross-Reference File for Sequential Reading",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file (XREFFILE) exists and contains card-to-account cross-reference records",
+                        "When": "The program initiates the process to open the Account Cross-Reference file for sequential reading",
+                        "Then": "The Account Cross-Reference file is opened in input (read-only) mode, making it available for sequential record-by-record reading"
+                    },
+                    "key_functionality_id": "open-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00016",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Successful Opening of Account Cross-Reference File",
+                    "rule_description": "After requesting to open the Account Cross-Reference file, the program must verify whether the file was made available successfully before proceeding with any record reading operations.",
+                    "sub_graph_node_text": "File Opened Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "A request has been made to open the Account Cross-Reference file for sequential reading",
+                        "When": "The file system returns the result of the open operation",
+                        "Then": "If the file was opened successfully, the file is marked as ready for sequential record reading and processing continues; if the file was not opened successfully, the program proceeds to error handling and termination"
+                    },
+                    "key_functionality_id": "open-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00017",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Proceed to Sequential Record Reading When File is Available",
+                    "rule_description": "When the Account Cross-Reference file has been successfully opened, the program confirms the file is ready and returns control to the main process to begin sequential reading of cross-reference records.",
+                    "sub_graph_node_text": "File Ready for Sequential Record Reading",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file has been successfully opened for input",
+                        "When": "The file open operation is confirmed as successful",
+                        "Then": "The file is marked as ready for sequential record reading and control is returned to the main process to begin reading card-to-account cross-reference records"
+                    },
+                    "key_functionality_id": "open-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00018",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Error Message When Account Cross-Reference File Cannot Be Opened",
+                    "rule_description": "When the Account Cross-Reference file cannot be opened, the program must notify the user with a descriptive error message identifying the file that failed to open, so the issue can be investigated and resolved.",
+                    "sub_graph_node_text": "Display Error Message: Cannot Open Account Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "A request was made to open the Account Cross-Reference file for sequential reading",
+                        "When": "The file open operation fails and the file is not available",
+                        "Then": "An error message 'ERROR OPENING XREFFILE' is displayed, and the file status details are displayed to identify the nature of the failure"
+                    },
+                    "key_functionality_id": "open-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00019",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Terminate Program When Account Cross-Reference File Cannot Be Opened",
+                    "rule_description": "When the Account Cross-Reference file cannot be opened, the program cannot continue processing and must terminate abnormally. This ensures no partial or incorrect processing occurs without access to the required cross-reference data.",
+                    "sub_graph_node_text": "Terminate Program with Error",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file failed to open and an error message has been displayed",
+                        "When": "The file unavailability is confirmed as an unrecoverable condition",
+                        "Then": "The program is terminated abnormally, halting all further processing to prevent any incomplete or erroneous cross-reference data operations"
+                    },
+                    "key_functionality_id": "open-account-cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Open Account Cross"
+        },
+        {
+            "id": "read-next-cross",
+            "title": "Read Next Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Read Next Cross-Reference Record])\n    B[Read Next Record from\\nAccount Cross-Reference File\\ninto CARD-XREF-RECORD]\n    XREFFILE[(XREFFILE\\nVSAM KSDS\\nAccount Cross-Reference)]\n    C{Was Record\\nRead Successfully?}\n    D[Record Retrieved:\\nCard Number - 16 Characters\\nCross-Reference Data - 34 Characters]\n    E{Is This\\nEnd of File?}\n    F[Signal End of File:\\nSet END-OF-FILE = 'Y']\n    G[Error: Failed to Read\\nAccount Cross-Reference Record\\nTerminate Program]\n    H([End: Return to Processing Loop])\n\n    A --> B\n    B <-.->|Sequential Read| XREFFILE\n    B --> C\n    C -->|Yes - Record Found| D\n    D --> H\n    C -->|No - Read Issue| E\n    E -->|Yes - No More Records| F\n    F --> H\n    E -->|No - Unexpected Error| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00020",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Read of Next Cross-Reference Record",
+                    "rule_description": "The system must sequentially retrieve the next available record from the Account Cross-Reference file into the cross-reference record buffer for processing.",
+                    "sub_graph_node_text": "Read Next Record from\nAccount Cross-Reference File\ninto CARD-XREF-RECORD",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file has been successfully opened and is positioned at the next unread record",
+                        "When": "The system requests the next record from the Account Cross-Reference file using sequential access",
+                        "Then": "The system reads the next record from the Account Cross-Reference file and loads it into the cross-reference record buffer (CARD-XREF-RECORD) for further processing"
+                    },
+                    "key_functionality_id": "read-next-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00021",
+                    "rule_type": "Validation Rules",
+                    "rule_name": "Successful Cross-Reference Record Retrieval",
+                    "rule_description": "When a cross-reference record is successfully read, the system confirms retrieval and makes the record data available, consisting of a 16-character card number and 34 characters of associated cross-reference data.",
+                    "sub_graph_node_text": "Record Retrieved:\nCard Number - 16 Characters\nCross-Reference Data - 34 Characters",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                        "When": "The read operation completes successfully and a record is found",
+                        "Then": "The system confirms successful retrieval by setting the result indicator to success (0), and the cross-reference record buffer (CARD-XREF-RECORD) is populated with the card number (16 characters) and associated cross-reference data (34 characters), and the record is displayed"
+                    },
+                    "key_functionality_id": "read-next-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00022",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Detection on Cross-Reference File",
+                    "rule_description": "When no more records remain in the Account Cross-Reference file, the system must detect the end-of-file condition and signal the processing loop to stop reading.",
+                    "sub_graph_node_text": "Signal End of File:\nSet END-OF-FILE = 'Y'",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                        "When": "The read operation returns an end-of-file condition indicating there are no more records to process",
+                        "Then": "The system sets the result indicator to end-of-file (16), recognizes the end-of-file condition, sets the END-OF-FILE flag to 'Y', and returns control to the processing loop which will then terminate further record reads"
+                    },
+                    "key_functionality_id": "read-next-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00023",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Unexpected Error During Cross-Reference Record Read",
+                    "rule_description": "When an unexpected error occurs while reading from the Account Cross-Reference file (neither a successful read nor an end-of-file), the system must report the failure and immediately terminate processing to prevent data integrity issues.",
+                    "sub_graph_node_text": "Error: Failed to Read\nAccount Cross-Reference Record\nTerminate Program",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                        "When": "The read operation returns an unexpected error condition that is neither a successful read nor an end-of-file",
+                        "Then": "The system sets the result indicator to error (12), displays the message 'ERROR READING XREFFILE', captures and displays the file status details, and terminates the program abnormally to prevent further processing"
+                    },
+                    "key_functionality_id": "read-next-cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Read Next Cross"
+        },
+        {
+            "id": "display-cross",
+            "title": "Display Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Display Cross-Reference Record])\n    D1{Was Record\\nRetrieved\\nSuccessfully?}\n    P1[Prepare Cross-Reference Record\\nfor Display\\nCard Number - 16 Characters\\nAccount Cross-Reference Data - 34 Characters]\n    P2[Display Complete\\nCross-Reference Record\\nCard Number + Account Cross-Reference Data]\n    P3[Skip Display\\nEnd of File or Error Condition]\n    Z([Return to Record Processing Loop])\n\n    A --> D1\n    D1 -->|Yes - Record Retrieved Successfully| P1\n    D1 -->|No - End of File or Read Error| P3\n    P1 --> P2\n    P2 --> Z\n    P3 --> Z",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00024",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Verify Record Retrieval Status Before Display",
+                    "rule_description": "Before displaying a Cross-Reference record, the system must confirm that the record was retrieved successfully from the Cross-Reference file. Only records with a confirmed successful retrieval status proceed to display; end-of-file or error conditions are routed away from display.",
+                    "sub_graph_node_text": "Was Record Retrieved Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to read the next record from the Card Cross-Reference file",
+                        "When": "The retrieval attempt completes and a retrieval status is available",
+                        "Then": "If the retrieval was successful (record found and read without error), the record is marked as ready for display; if the retrieval resulted in end-of-file or an error condition, the record is not marked for display and the display step is bypassed"
+                    },
+                    "key_functionality_id": "display-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00025",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Display Cross-Reference Record Upon Successful Retrieval",
+                    "rule_description": "When a Cross-Reference record is successfully retrieved from the Cross-Reference file, the complete record \u2014 comprising the 16-character Card Number and the 34-character Account Cross-Reference Data \u2014 is immediately displayed as a single combined output.",
+                    "sub_graph_node_text": "Display Complete Cross-Reference Record Card Number + Account Cross-Reference Data",
+                    "acceptance_criteria": {
+                        "Given": "A Cross-Reference record has been successfully retrieved from the Card Cross-Reference file with no errors and end-of-file has not been reached",
+                        "When": "The system confirms the record retrieval was successful",
+                        "Then": "The complete Cross-Reference record is displayed, containing the Card Number (16 characters) concatenated with the Account Cross-Reference Data (34 characters), totalling 50 characters of cross-reference information"
+                    },
+                    "key_functionality_id": "display-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00026",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Prepare Cross-Reference Record Data for Display",
+                    "rule_description": "Before displaying, the successfully retrieved Cross-Reference record is structured as a combined data unit consisting of a 16-character Card Number field and a 34-character Account Cross-Reference Data field, forming the complete record to be presented.",
+                    "sub_graph_node_text": "Prepare Cross-Reference Record for Display Card Number - 16 Characters Account Cross-Reference Data - 34 Characters",
+                    "acceptance_criteria": {
+                        "Given": "A record has been successfully read from the Card Cross-Reference file into the Cross-Reference record area",
+                        "When": "The system prepares the record for output",
+                        "Then": "The record is composed of exactly two data elements: the Card Number occupying 16 characters and the Account Cross-Reference Data occupying 34 characters, and the full 50-character record is made ready for display"
+                    },
+                    "key_functionality_id": "display-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00027",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Skip Record Display at End of File",
+                    "rule_description": "When the Cross-Reference file has no more records to read (end-of-file condition), the display step is skipped entirely and the end-of-file indicator is set, causing the record processing loop to terminate without attempting to display any further records.",
+                    "sub_graph_node_text": "Skip Display End of File or Error Condition",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to read the next record from the Card Cross-Reference file and the end-of-file condition has been reached",
+                        "When": "The end-of-file status is detected after a read attempt",
+                        "Then": "The end-of-file indicator is set to 'Yes', no record is displayed, and the record processing loop exits without performing any display action"
+                    },
+                    "key_functionality_id": "display-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00028",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Skip Record Display on Read Error and Halt Processing",
+                    "rule_description": "When an unexpected error occurs while reading a record from the Cross-Reference file (neither a successful read nor an end-of-file), the display step is skipped, an error message is shown, and the program halts immediately to prevent processing of corrupt or incomplete data.",
+                    "sub_graph_node_text": "Skip Display End of File or Error Condition",
+                    "acceptance_criteria": {
+                        "Given": "The system has attempted to read the next record from the Card Cross-Reference file and the result is neither a successful read nor an end-of-file condition",
+                        "When": "An unexpected error condition is detected during the record read attempt",
+                        "Then": "No record is displayed, an error message 'ERROR READING XREFFILE' is shown to indicate the Cross-Reference file read failure, and the program terminates immediately without processing any further records"
+                    },
+                    "key_functionality_id": "display-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00029",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Confirm End-of-File Not Reached Before Second Display in Processing Loop",
+                    "rule_description": "Within the main record processing loop, after a read attempt, the system performs a secondary check to confirm that end-of-file has not been reached before displaying the record a second time, ensuring no spurious display occurs at the boundary of the file.",
+                    "sub_graph_node_text": "Was Record Retrieved Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "The system has just completed a read attempt within the main record processing loop and the read paragraph has already been executed",
+                        "When": "The main loop evaluates whether to display the record",
+                        "Then": "If the end-of-file indicator is still 'No' after the read attempt, the Cross-Reference record is displayed in the main loop; if the end-of-file indicator has been set to 'Yes' by the read attempt, the display in the main loop is skipped and the loop exits on the next iteration check"
+                    },
+                    "key_functionality_id": "display-cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Display Cross"
+        },
+        {
+            "id": "end",
+            "title": "End",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Read Record Attempt Complete])\n    B{Was Last Record\\nAlready Read?}\n    C{Check File\\nRead Status}\n    D[Signal End of File:\\nSet END-OF-FILE Flag to Yes]\n    E([Return to Loop:\\nStop Reading Records])\n    F([Continue to\\nDisplay Record])\n\n    A --> B\n    B -->|Yes - END-OF-FILE = Y| E\n    B -->|No - END-OF-FILE = N| C\n    C -->|File Status = 10\\nNo More Records Available| D\n    C -->|File Status = 00\\nRecord Successfully Retrieved| F\n    D --> E",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00030",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Prevent Reading Beyond End of Cross-Reference File",
+                    "rule_description": "Before attempting to read the next record from the Account Cross-Reference file, the program checks whether the end-of-file condition has already been signaled. If it has, no further read attempts are made and the program exits the processing loop.",
+                    "sub_graph_node_text": "Was Last Record Already Read?",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file processing loop is active and a previous read attempt has already signaled that all records have been exhausted (END-OF-FILE flag is set to Yes)",
+                        "When": "The program evaluates whether to attempt reading the next record from the Account Cross-Reference file",
+                        "Then": "The program must NOT attempt another read and must immediately exit the processing loop, stopping all further record retrieval from the Account Cross-Reference file"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00031",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect Exhaustion of All Records in Cross-Reference File",
+                    "rule_description": "When a read attempt on the Account Cross-Reference file returns a status indicating that no more records are available (end-of-file condition), the program must signal that all records have been processed so that the reading loop can be terminated.",
+                    "sub_graph_node_text": "File Status = 10 No More Records Available",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file is open and being read sequentially, and the END-OF-FILE flag is currently set to No",
+                        "When": "A read attempt on the Account Cross-Reference file returns a file status indicating no more records are available (end-of-file reached)",
+                        "Then": "The program must set the END-OF-FILE flag to Yes, signaling that all records in the Account Cross-Reference file have been processed, and must return control to the processing loop to trigger loop termination"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00032",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Signal End-of-File to Stop Cross-Reference File Processing",
+                    "rule_description": "Upon confirming that no more records exist in the Account Cross-Reference file, the program updates the END-OF-FILE indicator to Yes. This state change is the mechanism that communicates to the main processing loop that record retrieval is complete and iteration should cease.",
+                    "sub_graph_node_text": "Signal End of File: Set END-OF-FILE Flag to Yes",
+                    "acceptance_criteria": {
+                        "Given": "A read attempt on the Account Cross-Reference file has confirmed that no further records are available",
+                        "When": "The program processes the end-of-file condition returned from the Account Cross-Reference file read operation",
+                        "Then": "The END-OF-FILE flag must be set to Yes, and control must return to the main processing loop where the Yes value will cause the loop to terminate and no further records will be read"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00033",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Confirm Successful Record Retrieval and Continue to Display",
+                    "rule_description": "When a record is successfully retrieved from the Account Cross-Reference file, the program confirms the successful read and proceeds to display the record. The END-OF-FILE flag remains set to No, allowing the processing loop to continue retrieving subsequent records.",
+                    "sub_graph_node_text": "File Status = 00 Record Successfully Retrieved",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file is open and being read sequentially, and the END-OF-FILE flag is currently set to No",
+                        "When": "A read attempt on the Account Cross-Reference file returns a status confirming that a record was successfully retrieved",
+                        "Then": "The program must confirm the read as successful, keep the END-OF-FILE flag set to No, and proceed to display the retrieved Cross-Reference record \u2014 allowing the processing loop to continue to the next iteration for subsequent records"
+                    },
+                    "key_functionality_id": "end"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00034",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Return to Processing Loop After End-of-File is Signaled",
+                    "rule_description": "Once the END-OF-FILE flag has been set to Yes \u2014 either because it was already Yes before the read attempt or because the current read confirmed no more records exist \u2014 the program returns control to the main loop. The loop evaluates the Yes flag and terminates, stopping all further reads of the Account Cross-Reference file.",
+                    "sub_graph_node_text": "Return to Loop: Stop Reading Records",
+                    "acceptance_criteria": {
+                        "Given": "The END-OF-FILE flag has been set to Yes, either prior to the read attempt or as a result of the current read returning no more records",
+                        "When": "Control is returned to the main processing loop for evaluation",
+                        "Then": "The main processing loop must detect the END-OF-FILE flag as Yes and must exit the loop, ensuring no further read attempts are made against the Account Cross-Reference file"
+                    },
+                    "key_functionality_id": "end"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "End"
+        },
+        {
+            "id": "iterative-record-processing",
+            "title": "Iterative Record Processing",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Begin Iterative Record Processing])\n    D1{Has End of File\\nbeen Reached?}\n    P1[Read Next Cross-Reference Record\\nfrom Account Cross-Reference File]\n    D2{Was Record\\nRead Successfully?}\n    P2[Display Cross-Reference Record\\nCard Number and Associated\\nAccount Cross-Reference Data]\n    P3[Mark End of File\\nSignal = Yes]\n    E1[Display Read Error\\nTerminate Program]\n    Z([End of Iterative Processing\\nAll Records Processed])\n\n    A --> D1\n    D1 -->|No - Continue Processing| P1\n    P1 --> D2\n    D2 -->|Record Retrieved Successfully| P2\n    P2 --> D1\n    D2 -->|End of File Detected| P3\n    P3 --> D1\n    D2 -->|Read Error Occurred| E1\n    D1 -->|Yes - End of File Reached| Z",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00035",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Continue Processing When End of File Not Yet Reached",
+                    "rule_description": "Determines whether the iterative record processing loop should continue by checking if the end-of-file signal has been set. Processing continues only when the end-of-file has not yet been reached.",
+                    "sub_graph_node_text": "Has End of File been Reached?",
+                    "acceptance_criteria": {
+                        "Given": "The iterative processing of the Account Cross-Reference File is active and the End-of-File Signal is currently set to 'No' (not yet reached)",
+                        "When": "The system evaluates the End-of-File Signal at the start of each iteration",
+                        "Then": "The system proceeds to read the next Cross-Reference Record from the Account Cross-Reference File"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00036",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Terminate Loop When End of File Has Been Reached",
+                    "rule_description": "Determines that iterative record processing must stop when the end-of-file signal has been set to 'Yes', signalling that all records in the Account Cross-Reference File have been processed.",
+                    "sub_graph_node_text": "Has End of File been Reached?",
+                    "acceptance_criteria": {
+                        "Given": "The iterative processing of the Account Cross-Reference File is active and the End-of-File Signal is currently set to 'Yes'",
+                        "When": "The system evaluates the End-of-File Signal at the start of an iteration",
+                        "Then": "The system exits the processing loop and moves to the End of Iterative Processing, indicating all Cross-Reference Records have been processed"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00037",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Read Next Cross-Reference Record from Account Cross-Reference File",
+                    "rule_description": "Retrieves the next sequential Cross-Reference Record from the Account Cross-Reference File into the Card Cross-Reference Record area for processing.",
+                    "sub_graph_node_text": "Read Next Cross-Reference Record from Account Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference File is open for reading and the End-of-File Signal is 'No'",
+                        "When": "The system attempts to read the next record from the Account Cross-Reference File",
+                        "Then": "The next Cross-Reference Record is retrieved and loaded into the Card Cross-Reference Record area, and the system evaluates whether the read was successful, end-of-file was detected, or a read error occurred"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00038",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Display Cross-Reference Record on Successful Read",
+                    "rule_description": "When a Cross-Reference Record is successfully retrieved from the Account Cross-Reference File, the full record containing the Card Number and its associated Account Cross-Reference data is displayed as output.",
+                    "sub_graph_node_text": "Display Cross-Reference Record Card Number and Associated Account Cross-Reference Data",
+                    "acceptance_criteria": {
+                        "Given": "A read operation on the Account Cross-Reference File has been performed and the record was retrieved successfully",
+                        "When": "The system confirms the record was read without error and the End-of-File Signal remains 'No'",
+                        "Then": "The system displays the complete Cross-Reference Record, including the Card Number and all associated Account Cross-Reference data, and returns to check the End-of-File Signal for the next iteration"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00039",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Mark End of File When Last Record Has Been Read",
+                    "rule_description": "When the Account Cross-Reference File signals that there are no more records to read, the End-of-File Signal is set to 'Yes' to indicate that all Cross-Reference Records have been processed and the loop should terminate.",
+                    "sub_graph_node_text": "Mark End of File Signal = Yes",
+                    "acceptance_criteria": {
+                        "Given": "A read operation on the Account Cross-Reference File has been performed",
+                        "When": "The file signals that the end of the file has been reached and there are no more Cross-Reference Records to retrieve",
+                        "Then": "The system sets the End-of-File Signal to 'Yes' and returns to the loop check, which will then terminate iterative processing"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00040",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Terminate Program on Cross-Reference File Read Error",
+                    "rule_description": "When an unexpected error occurs while reading from the Account Cross-Reference File (neither a successful read nor an end-of-file condition), the system displays an error message and immediately terminates the program to prevent processing of incomplete or corrupt data.",
+                    "sub_graph_node_text": "Display Read Error Terminate Program",
+                    "acceptance_criteria": {
+                        "Given": "A read operation on the Account Cross-Reference File has been performed and the result is neither a successful record retrieval nor an end-of-file signal",
+                        "When": "An unexpected read error condition is detected on the Account Cross-Reference File",
+                        "Then": "The system displays the message 'ERROR READING XREFFILE' along with the file status details, and immediately terminates the program abnormally \u2014 no further Cross-Reference Records are processed"
+                    },
+                    "key_functionality_id": "iterative-record-processing"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Iterative Record Processing"
+        },
+        {
+            "id": "close-account-cross",
+            "title": "Close Account Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Close Account\\nCross-Reference File])\n    B[Attempt to Close\\nAccount Cross-Reference File]\n    XREFFILE[(XREFFILE\\nVSAM KSDS\\nAccount Cross-Reference)]\n    C{File Closed\\nSuccessfully?}\n    D[File Closure\\nConfirmed - No Errors]\n    E[Display Error Message:\\n'ERROR CLOSING XREFFILE']\n    F[Display Detailed\\nFile Status Information]\n    G[Terminate Program\\nAbnormally]\n    H([End: File Closed\\nSuccessfully])\n\n    A --> B\n    B --> XREFFILE\n    XREFFILE -.->|Close Operation| C\n    C -->|Yes - Status OK| D\n    C -->|No - Closure Failed| E\n    E --> F\n    F --> G\n    D --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00041",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Account Cross-Reference File After Processing",
+                    "rule_description": "The Account Cross-Reference file must be closed after all records have been fully processed. The close operation is only initiated once the end of the file has been reached and the read loop has completed.",
+                    "sub_graph_node_text": "Attempt to Close Account Cross-Reference File",
+                    "acceptance_criteria": {
+                        "Given": "All records in the Account Cross-Reference file have been read and processed, and the end-of-file condition has been reached",
+                        "When": "The program attempts to close the Account Cross-Reference file",
+                        "Then": "A close operation is issued against the Account Cross-Reference file (XREFFILE)"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00042",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Confirm Successful Closure of Account Cross-Reference File",
+                    "rule_description": "When the Account Cross-Reference file is closed without any errors, the closure is confirmed as successful and normal program completion proceeds.",
+                    "sub_graph_node_text": "File Closure Confirmed - No Errors",
+                    "acceptance_criteria": {
+                        "Given": "A close operation has been issued against the Account Cross-Reference file",
+                        "When": "The file system confirms the file was closed successfully with no errors (file status equals success)",
+                        "Then": "The file closure is confirmed with no errors, the result is set to zero (no error condition), and the program proceeds to normal completion"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Detect Failure to Close Account Cross-Reference File",
+                    "rule_description": "When the Account Cross-Reference file cannot be closed properly, the failure must be detected and flagged so that appropriate error handling can be triggered.",
+                    "sub_graph_node_text": "File Closed Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "A close operation has been issued against the Account Cross-Reference file",
+                        "When": "The file system reports that the file was NOT closed successfully (file status is not a success code)",
+                        "Then": "The closure failure is detected, an error result code (12) is set to indicate the failure condition, and error handling is triggered"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00044",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Error Message When Account Cross-Reference File Cannot Be Closed",
+                    "rule_description": "When the Account Cross-Reference file closure fails, a descriptive error message must be displayed to notify that the file could not be closed properly.",
+                    "sub_graph_node_text": "Display Error Message: 'ERROR CLOSING XREFFILE'",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file close operation has failed (error result code is set and the application is not in an all-OK state)",
+                        "When": "The program evaluates the result of the close operation and determines it was unsuccessful",
+                        "Then": "The error message 'ERROR CLOSING XREFFILE' is displayed to the output"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00045",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Display Detailed File Status Information on Closure Failure",
+                    "rule_description": "Following the display of the closure error message, detailed file status information must be displayed to provide additional context about the nature of the closure failure.",
+                    "sub_graph_node_text": "Display Detailed File Status Information",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file close operation has failed and the error message 'ERROR CLOSING XREFFILE' has been displayed",
+                        "When": "The program processes the file status details for display",
+                        "Then": "The file status is captured and detailed status information is displayed in the format 'FILE STATUS IS: NNNN' followed by the four-character status code, providing specific information about the closure failure"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                },
+                {
+                    "rule_id": "R-CBACT03C-cbl-00046",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Terminate Program Abnormally on File Closure Failure",
+                    "rule_description": "If the Account Cross-Reference file cannot be closed properly, the program must be terminated abnormally to prevent data integrity issues and signal the failure to the operations team.",
+                    "sub_graph_node_text": "Terminate Program Abnormally",
+                    "acceptance_criteria": {
+                        "Given": "The Account Cross-Reference file close operation has failed, the error message has been displayed, and detailed file status information has been shown",
+                        "When": "The program invokes the abnormal termination routine",
+                        "Then": "The program is terminated abnormally by calling the system abend routine (CEE3ABD) with abend code 999, halting all further processing immediately"
+                    },
+                    "key_functionality_id": "close-account-cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Close Account Cross"
+        },
+        {
+            "id": "program-completion",
+            "title": "Program Completion",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Enter: Program Completion])\n    B[Display Message:\\n'END OF EXECUTION OF\\nPROGRAM CBACT03C']\n    C([Program Successfully Completed\\nControl Returned])\n\n    A --> B\n    B --> C",
+            "rules": [
+                {
+                    "rule_id": "R-CBACT03C-cbl-00047",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Program Completion Notification",
+                    "rule_description": "Upon successful completion of all Account Cross-Reference file reading and display operations, the program must notify the user that the process has ended successfully.",
+                    "sub_graph_node_text": "Display Message: 'END OF EXECUTION OF PROGRAM CBACT03C'",
+                    "acceptance_criteria": {
+                        "Given": "The program has successfully completed reading and displaying all records from the Account Cross-Reference file, and the file has been closed without errors",
+                        "When": "All records have been processed and the end-of-file condition has been reached",
+                        "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT03C' to confirm successful completion of the Account Cross-Reference file reading and printing process, and control is returned to the calling environment"
+                    },
+                    "key_functionality_id": "program-completion"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Program Completion"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00001",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference File Reader program (CBACT03C) is invoked",
+                "When": "The program begins execution",
+                "Then": "The program must display the message 'START OF EXECUTION OF PROGRAM CBACT03C' as the very first action before any file operations or record processing begins"
+            },
+            "Rule_Name": "Program Initialization Announcement",
+            "Rule_Description": "The program must announce its start before performing any processing, providing a clear audit trail marker in the output log."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has displayed its start message and is ready to begin file processing",
+                "When": "The program attempts to open the Account Cross-Reference file (XREFFILE) for sequential reading",
+                "Then": "The file must be opened successfully in input mode, setting the processing status to successful (result = 0), so that sequential record reading can proceed"
+            },
+            "Rule_Name": "Open Account Cross-Reference File for Sequential Reading",
+            "Rule_Description": "The Account Cross-Reference file (XREFFILE) must be successfully opened in input mode before any record retrieval can begin. This is a mandatory prerequisite step for all subsequent record processing."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00003",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to open the Account Cross-Reference file (XREFFILE)",
+                "When": "The file open operation does not complete successfully (file status is not '00'), setting the result to 12",
+                "Then": "The program must display the error message 'ERROR OPENING XREFFILE', display the file status details, and immediately terminate abnormally \u2014 no record processing is attempted"
+            },
+            "Rule_Name": "File Open Failure Terminates Program",
+            "Rule_Description": "If the Account Cross-Reference file cannot be opened, the program must immediately report the failure and halt all processing. No records can be processed without a successfully opened file."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00004",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file (XREFFILE) has been successfully opened for reading",
+                "When": "The program begins iterative record processing",
+                "Then": "The program must enter a sequential read loop that continues processing records as long as the end-of-file condition has not been signalled (END-OF-FILE flag is not 'Y'), ensuring every record in the file is processed"
+            },
+            "Rule_Name": "Sequential Record Processing Loop Initiation",
+            "Rule_Description": "After the Account Cross-Reference file is successfully opened, the program enters a continuous sequential read loop to process every record in the file from beginning to end."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00005",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is in the sequential record processing loop",
+                "When": "The loop condition is evaluated at the beginning of each iteration",
+                "Then": "If the end-of-file flag is 'Y' (all records processed), the loop must exit and proceed to close the file; if the end-of-file flag is 'N' (records remain), the program must proceed to read the next record"
+            },
+            "Rule_Name": "End-of-File Check Controls Loop Continuation",
+            "Rule_Description": "At the start of each loop iteration, the program checks whether the end of the Account Cross-Reference file has been reached. This check determines whether to continue reading records or to proceed to file closure."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00006",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program is in the sequential read loop and the end-of-file flag is 'N'",
+                "When": "The program reads the next record from the Account Cross-Reference file (XREFFILE) into the CARD-XREF-RECORD structure",
+                "Then": "The record containing the 16-character Card Number and 34-character Cross-Reference data is retrieved and made available for display; the read result is evaluated to determine the next action (success, end-of-file, or error)"
+            },
+            "Rule_Name": "Read Next Cross-Reference Record Sequentially",
+            "Rule_Description": "When the end of file has not been reached, the program reads the next available record from the Account Cross-Reference file. Each record contains a 16-character Card Number and 34 characters of associated Cross-Reference data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00007",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                "When": "The record is read successfully (file status is '00'), setting the result to 0 (AOK)",
+                "Then": "The program must display the retrieved CARD-XREF-RECORD (containing Card Number and Cross-Reference data) and return to the loop to check for the next record"
+            },
+            "Rule_Name": "Successful Record Read Triggers Display",
+            "Rule_Description": "When a Cross-Reference record is successfully retrieved from the file, it must be immediately displayed, and the processing loop must continue to retrieve the next record."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00008",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                "When": "The read operation detects that there are no more records to read (file status is '10'), setting the result to 16 (EOF)",
+                "Then": "The end-of-file flag must be set to 'Y', which will cause the processing loop to exit on its next condition check, and no further read attempts are made"
+            },
+            "Rule_Name": "End-of-File Detection Signals Loop Termination",
+            "Rule_Description": "When the last record in the Account Cross-Reference file has already been read and no more records are available, the program must signal that all records have been processed and stop the read loop."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00009",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to read a record from the Account Cross-Reference file",
+                "When": "The read operation fails with an unexpected error (file status is neither '00' for success nor '10' for end-of-file), setting the result to 12",
+                "Then": "The program must display the error message 'ERROR READING XREFFILE', display the file status details, and immediately terminate abnormally \u2014 no further records are processed"
+            },
+            "Rule_Name": "Record Read Failure Terminates Program",
+            "Rule_Description": "If an unexpected error occurs while reading a record from the Account Cross-Reference file, the program must immediately report the failure and halt all processing."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00010",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Cross-Reference record has been successfully read from the Account Cross-Reference file and the end-of-file flag remains 'N'",
+                "When": "The program processes the successfully retrieved record in the main processing loop",
+                "Then": "The complete CARD-XREF-RECORD \u2014 containing the 16-character Card Number and 34-character Cross-Reference data \u2014 must be displayed to the output, after which the loop returns to check the end-of-file condition for the next iteration"
+            },
+            "Rule_Name": "Display Retrieved Cross-Reference Record",
+            "Rule_Description": "Each successfully retrieved Cross-Reference record must be displayed to the output, showing the Card Number and its associated Account Cross-Reference data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00011",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The sequential record processing loop has exited because the end-of-file flag is 'Y', indicating all records have been processed",
+                "When": "The program attempts to close the Account Cross-Reference file (XREFFILE)",
+                "Then": "The file must be closed successfully (result set to 0), confirming that all file resources are properly released before program completion"
+            },
+            "Rule_Name": "Close Account Cross-Reference File After Processing",
+            "Rule_Description": "Once all records in the Account Cross-Reference file have been processed and the end-of-file condition is confirmed, the file must be properly closed before the program completes."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00012",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has attempted to close the Account Cross-Reference file (XREFFILE) after completing all record processing",
+                "When": "The file close operation does not complete successfully (file status is not '00'), setting the result to 12",
+                "Then": "The program must display the error message 'ERROR CLOSING XREFFILE', display the file status details, and immediately terminate abnormally"
+            },
+            "Rule_Name": "File Close Failure Terminates Program",
+            "Rule_Description": "If the Account Cross-Reference file cannot be properly closed after all records are processed, the program must report the failure and halt abnormally."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00013",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All Cross-Reference records have been read and displayed, and the Account Cross-Reference file has been successfully closed",
+                "When": "The program reaches its final step",
+                "Then": "The program must display the message 'END OF EXECUTION OF PROGRAM CBACT03C' as the last action before terminating normally"
+            },
+            "Rule_Name": "Program Completion Announcement",
+            "Rule_Description": "Upon successful completion of all record processing and file closure, the program must announce its successful end, providing a clear audit trail marker in the output log."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00014",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file reading and printing program CBACT03C is triggered for execution",
+                "When": "The program begins its execution",
+                "Then": "The system displays the message 'START OF EXECUTION OF PROGRAM CBACT03C' to confirm that the Account Cross-Reference file reading and printing process has started"
+            },
+            "Rule_Name": "Program Start Notification",
+            "Rule_Description": "When the Account Cross-Reference file reading and printing process begins, the system must announce its start to confirm the process has been initiated."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00015",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file (XREFFILE) exists and contains card-to-account cross-reference records",
+                "When": "The program initiates the process to open the Account Cross-Reference file for sequential reading",
+                "Then": "The Account Cross-Reference file is opened in input (read-only) mode, making it available for sequential record-by-record reading"
+            },
+            "Rule_Name": "Open Account Cross-Reference File for Sequential Reading",
+            "Rule_Description": "The Account Cross-Reference file must be opened in read-only sequential mode before any record processing can begin. This is the mandatory first step to access card-to-account cross-reference data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00016",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A request has been made to open the Account Cross-Reference file for sequential reading",
+                "When": "The file system returns the result of the open operation",
+                "Then": "If the file was opened successfully, the file is marked as ready for sequential record reading and processing continues; if the file was not opened successfully, the program proceeds to error handling and termination"
+            },
+            "Rule_Name": "Validate Successful Opening of Account Cross-Reference File",
+            "Rule_Description": "After requesting to open the Account Cross-Reference file, the program must verify whether the file was made available successfully before proceeding with any record reading operations."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00017",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file has been successfully opened for input",
+                "When": "The file open operation is confirmed as successful",
+                "Then": "The file is marked as ready for sequential record reading and control is returned to the main process to begin reading card-to-account cross-reference records"
+            },
+            "Rule_Name": "Proceed to Sequential Record Reading When File is Available",
+            "Rule_Description": "When the Account Cross-Reference file has been successfully opened, the program confirms the file is ready and returns control to the main process to begin sequential reading of cross-reference records."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00018",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A request was made to open the Account Cross-Reference file for sequential reading",
+                "When": "The file open operation fails and the file is not available",
+                "Then": "An error message 'ERROR OPENING XREFFILE' is displayed, and the file status details are displayed to identify the nature of the failure"
+            },
+            "Rule_Name": "Display Error Message When Account Cross-Reference File Cannot Be Opened",
+            "Rule_Description": "When the Account Cross-Reference file cannot be opened, the program must notify the user with a descriptive error message identifying the file that failed to open, so the issue can be investigated and resolved."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00019",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file failed to open and an error message has been displayed",
+                "When": "The file unavailability is confirmed as an unrecoverable condition",
+                "Then": "The program is terminated abnormally, halting all further processing to prevent any incomplete or erroneous cross-reference data operations"
+            },
+            "Rule_Name": "Terminate Program When Account Cross-Reference File Cannot Be Opened",
+            "Rule_Description": "When the Account Cross-Reference file cannot be opened, the program cannot continue processing and must terminate abnormally. This ensures no partial or incorrect processing occurs without access to the required cross-reference data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00020",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file has been successfully opened and is positioned at the next unread record",
+                "When": "The system requests the next record from the Account Cross-Reference file using sequential access",
+                "Then": "The system reads the next record from the Account Cross-Reference file and loads it into the cross-reference record buffer (CARD-XREF-RECORD) for further processing"
+            },
+            "Rule_Name": "Sequential Read of Next Cross-Reference Record",
+            "Rule_Description": "The system must sequentially retrieve the next available record from the Account Cross-Reference file into the cross-reference record buffer for processing."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00021",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                "When": "The read operation completes successfully and a record is found",
+                "Then": "The system confirms successful retrieval by setting the result indicator to success (0), and the cross-reference record buffer (CARD-XREF-RECORD) is populated with the card number (16 characters) and associated cross-reference data (34 characters), and the record is displayed"
+            },
+            "Rule_Name": "Successful Cross-Reference Record Retrieval",
+            "Rule_Description": "When a cross-reference record is successfully read, the system confirms retrieval and makes the record data available, consisting of a 16-character card number and 34 characters of associated cross-reference data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00022",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                "When": "The read operation returns an end-of-file condition indicating there are no more records to process",
+                "Then": "The system sets the result indicator to end-of-file (16), recognizes the end-of-file condition, sets the END-OF-FILE flag to 'Y', and returns control to the processing loop which will then terminate further record reads"
+            },
+            "Rule_Name": "End-of-File Detection on Cross-Reference File",
+            "Rule_Description": "When no more records remain in the Account Cross-Reference file, the system must detect the end-of-file condition and signal the processing loop to stop reading."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00023",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Account Cross-Reference file",
+                "When": "The read operation returns an unexpected error condition that is neither a successful read nor an end-of-file",
+                "Then": "The system sets the result indicator to error (12), displays the message 'ERROR READING XREFFILE', captures and displays the file status details, and terminates the program abnormally to prevent further processing"
+            },
+            "Rule_Name": "Unexpected Error During Cross-Reference Record Read",
+            "Rule_Description": "When an unexpected error occurs while reading from the Account Cross-Reference file (neither a successful read nor an end-of-file), the system must report the failure and immediately terminate processing to prevent data integrity issues."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00024",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to read the next record from the Card Cross-Reference file",
+                "When": "The retrieval attempt completes and a retrieval status is available",
+                "Then": "If the retrieval was successful (record found and read without error), the record is marked as ready for display; if the retrieval resulted in end-of-file or an error condition, the record is not marked for display and the display step is bypassed"
+            },
+            "Rule_Name": "Verify Record Retrieval Status Before Display",
+            "Rule_Description": "Before displaying a Cross-Reference record, the system must confirm that the record was retrieved successfully from the Cross-Reference file. Only records with a confirmed successful retrieval status proceed to display; end-of-file or error conditions are routed away from display."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00025",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Cross-Reference record has been successfully retrieved from the Card Cross-Reference file with no errors and end-of-file has not been reached",
+                "When": "The system confirms the record retrieval was successful",
+                "Then": "The complete Cross-Reference record is displayed, containing the Card Number (16 characters) concatenated with the Account Cross-Reference Data (34 characters), totalling 50 characters of cross-reference information"
+            },
+            "Rule_Name": "Display Cross-Reference Record Upon Successful Retrieval",
+            "Rule_Description": "When a Cross-Reference record is successfully retrieved from the Cross-Reference file, the complete record \u2014 comprising the 16-character Card Number and the 34-character Account Cross-Reference Data \u2014 is immediately displayed as a single combined output."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00026",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A record has been successfully read from the Card Cross-Reference file into the Cross-Reference record area",
+                "When": "The system prepares the record for output",
+                "Then": "The record is composed of exactly two data elements: the Card Number occupying 16 characters and the Account Cross-Reference Data occupying 34 characters, and the full 50-character record is made ready for display"
+            },
+            "Rule_Name": "Prepare Cross-Reference Record Data for Display",
+            "Rule_Description": "Before displaying, the successfully retrieved Cross-Reference record is structured as a combined data unit consisting of a 16-character Card Number field and a 34-character Account Cross-Reference Data field, forming the complete record to be presented."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00027",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to read the next record from the Card Cross-Reference file and the end-of-file condition has been reached",
+                "When": "The end-of-file status is detected after a read attempt",
+                "Then": "The end-of-file indicator is set to 'Yes', no record is displayed, and the record processing loop exits without performing any display action"
+            },
+            "Rule_Name": "Skip Record Display at End of File",
+            "Rule_Description": "When the Cross-Reference file has no more records to read (end-of-file condition), the display step is skipped entirely and the end-of-file indicator is set, causing the record processing loop to terminate without attempting to display any further records."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00028",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has attempted to read the next record from the Card Cross-Reference file and the result is neither a successful read nor an end-of-file condition",
+                "When": "An unexpected error condition is detected during the record read attempt",
+                "Then": "No record is displayed, an error message 'ERROR READING XREFFILE' is shown to indicate the Cross-Reference file read failure, and the program terminates immediately without processing any further records"
+            },
+            "Rule_Name": "Skip Record Display on Read Error and Halt Processing",
+            "Rule_Description": "When an unexpected error occurs while reading a record from the Cross-Reference file (neither a successful read nor an end-of-file), the display step is skipped, an error message is shown, and the program halts immediately to prevent processing of corrupt or incomplete data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00029",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The system has just completed a read attempt within the main record processing loop and the read paragraph has already been executed",
+                "When": "The main loop evaluates whether to display the record",
+                "Then": "If the end-of-file indicator is still 'No' after the read attempt, the Cross-Reference record is displayed in the main loop; if the end-of-file indicator has been set to 'Yes' by the read attempt, the display in the main loop is skipped and the loop exits on the next iteration check"
+            },
+            "Rule_Name": "Confirm End-of-File Not Reached Before Second Display in Processing Loop",
+            "Rule_Description": "Within the main record processing loop, after a read attempt, the system performs a secondary check to confirm that end-of-file has not been reached before displaying the record a second time, ensuring no spurious display occurs at the boundary of the file."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00030",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file processing loop is active and a previous read attempt has already signaled that all records have been exhausted (END-OF-FILE flag is set to Yes)",
+                "When": "The program evaluates whether to attempt reading the next record from the Account Cross-Reference file",
+                "Then": "The program must NOT attempt another read and must immediately exit the processing loop, stopping all further record retrieval from the Account Cross-Reference file"
+            },
+            "Rule_Name": "Prevent Reading Beyond End of Cross-Reference File",
+            "Rule_Description": "Before attempting to read the next record from the Account Cross-Reference file, the program checks whether the end-of-file condition has already been signaled. If it has, no further read attempts are made and the program exits the processing loop."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00031",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file is open and being read sequentially, and the END-OF-FILE flag is currently set to No",
+                "When": "A read attempt on the Account Cross-Reference file returns a file status indicating no more records are available (end-of-file reached)",
+                "Then": "The program must set the END-OF-FILE flag to Yes, signaling that all records in the Account Cross-Reference file have been processed, and must return control to the processing loop to trigger loop termination"
+            },
+            "Rule_Name": "Detect Exhaustion of All Records in Cross-Reference File",
+            "Rule_Description": "When a read attempt on the Account Cross-Reference file returns a status indicating that no more records are available (end-of-file condition), the program must signal that all records have been processed so that the reading loop can be terminated."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00032",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read attempt on the Account Cross-Reference file has confirmed that no further records are available",
+                "When": "The program processes the end-of-file condition returned from the Account Cross-Reference file read operation",
+                "Then": "The END-OF-FILE flag must be set to Yes, and control must return to the main processing loop where the Yes value will cause the loop to terminate and no further records will be read"
+            },
+            "Rule_Name": "Signal End-of-File to Stop Cross-Reference File Processing",
+            "Rule_Description": "Upon confirming that no more records exist in the Account Cross-Reference file, the program updates the END-OF-FILE indicator to Yes. This state change is the mechanism that communicates to the main processing loop that record retrieval is complete and iteration should cease."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00033",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file is open and being read sequentially, and the END-OF-FILE flag is currently set to No",
+                "When": "A read attempt on the Account Cross-Reference file returns a status confirming that a record was successfully retrieved",
+                "Then": "The program must confirm the read as successful, keep the END-OF-FILE flag set to No, and proceed to display the retrieved Cross-Reference record \u2014 allowing the processing loop to continue to the next iteration for subsequent records"
+            },
+            "Rule_Name": "Confirm Successful Record Retrieval and Continue to Display",
+            "Rule_Description": "When a record is successfully retrieved from the Account Cross-Reference file, the program confirms the successful read and proceeds to display the record. The END-OF-FILE flag remains set to No, allowing the processing loop to continue retrieving subsequent records."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00034",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The END-OF-FILE flag has been set to Yes, either prior to the read attempt or as a result of the current read returning no more records",
+                "When": "Control is returned to the main processing loop for evaluation",
+                "Then": "The main processing loop must detect the END-OF-FILE flag as Yes and must exit the loop, ensuring no further read attempts are made against the Account Cross-Reference file"
+            },
+            "Rule_Name": "Return to Processing Loop After End-of-File is Signaled",
+            "Rule_Description": "Once the END-OF-FILE flag has been set to Yes \u2014 either because it was already Yes before the read attempt or because the current read confirmed no more records exist \u2014 the program returns control to the main loop. The loop evaluates the Yes flag and terminates, stopping all further reads of the Account Cross-Reference file."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00035",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The iterative processing of the Account Cross-Reference File is active and the End-of-File Signal is currently set to 'No' (not yet reached)",
+                "When": "The system evaluates the End-of-File Signal at the start of each iteration",
+                "Then": "The system proceeds to read the next Cross-Reference Record from the Account Cross-Reference File"
+            },
+            "Rule_Name": "Continue Processing When End of File Not Yet Reached",
+            "Rule_Description": "Determines whether the iterative record processing loop should continue by checking if the end-of-file signal has been set. Processing continues only when the end-of-file has not yet been reached."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00036",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The iterative processing of the Account Cross-Reference File is active and the End-of-File Signal is currently set to 'Yes'",
+                "When": "The system evaluates the End-of-File Signal at the start of an iteration",
+                "Then": "The system exits the processing loop and moves to the End of Iterative Processing, indicating all Cross-Reference Records have been processed"
+            },
+            "Rule_Name": "Terminate Loop When End of File Has Been Reached",
+            "Rule_Description": "Determines that iterative record processing must stop when the end-of-file signal has been set to 'Yes', signalling that all records in the Account Cross-Reference File have been processed."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00037",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference File is open for reading and the End-of-File Signal is 'No'",
+                "When": "The system attempts to read the next record from the Account Cross-Reference File",
+                "Then": "The next Cross-Reference Record is retrieved and loaded into the Card Cross-Reference Record area, and the system evaluates whether the read was successful, end-of-file was detected, or a read error occurred"
+            },
+            "Rule_Name": "Read Next Cross-Reference Record from Account Cross-Reference File",
+            "Rule_Description": "Retrieves the next sequential Cross-Reference Record from the Account Cross-Reference File into the Card Cross-Reference Record area for processing."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00038",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation on the Account Cross-Reference File has been performed and the record was retrieved successfully",
+                "When": "The system confirms the record was read without error and the End-of-File Signal remains 'No'",
+                "Then": "The system displays the complete Cross-Reference Record, including the Card Number and all associated Account Cross-Reference data, and returns to check the End-of-File Signal for the next iteration"
+            },
+            "Rule_Name": "Display Cross-Reference Record on Successful Read",
+            "Rule_Description": "When a Cross-Reference Record is successfully retrieved from the Account Cross-Reference File, the full record containing the Card Number and its associated Account Cross-Reference data is displayed as output."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00039",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation on the Account Cross-Reference File has been performed",
+                "When": "The file signals that the end of the file has been reached and there are no more Cross-Reference Records to retrieve",
+                "Then": "The system sets the End-of-File Signal to 'Yes' and returns to the loop check, which will then terminate iterative processing"
+            },
+            "Rule_Name": "Mark End of File When Last Record Has Been Read",
+            "Rule_Description": "When the Account Cross-Reference File signals that there are no more records to read, the End-of-File Signal is set to 'Yes' to indicate that all Cross-Reference Records have been processed and the loop should terminate."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00040",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A read operation on the Account Cross-Reference File has been performed and the result is neither a successful record retrieval nor an end-of-file signal",
+                "When": "An unexpected read error condition is detected on the Account Cross-Reference File",
+                "Then": "The system displays the message 'ERROR READING XREFFILE' along with the file status details, and immediately terminates the program abnormally \u2014 no further Cross-Reference Records are processed"
+            },
+            "Rule_Name": "Terminate Program on Cross-Reference File Read Error",
+            "Rule_Description": "When an unexpected error occurs while reading from the Account Cross-Reference File (neither a successful read nor an end-of-file condition), the system displays an error message and immediately terminates the program to prevent processing of incomplete or corrupt data."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00041",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "All records in the Account Cross-Reference file have been read and processed, and the end-of-file condition has been reached",
+                "When": "The program attempts to close the Account Cross-Reference file",
+                "Then": "A close operation is issued against the Account Cross-Reference file (XREFFILE)"
+            },
+            "Rule_Name": "Close Account Cross-Reference File After Processing",
+            "Rule_Description": "The Account Cross-Reference file must be closed after all records have been fully processed. The close operation is only initiated once the end of the file has been reached and the read loop has completed."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00042",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A close operation has been issued against the Account Cross-Reference file",
+                "When": "The file system confirms the file was closed successfully with no errors (file status equals success)",
+                "Then": "The file closure is confirmed with no errors, the result is set to zero (no error condition), and the program proceeds to normal completion"
+            },
+            "Rule_Name": "Confirm Successful Closure of Account Cross-Reference File",
+            "Rule_Description": "When the Account Cross-Reference file is closed without any errors, the closure is confirmed as successful and normal program completion proceeds."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A close operation has been issued against the Account Cross-Reference file",
+                "When": "The file system reports that the file was NOT closed successfully (file status is not a success code)",
+                "Then": "The closure failure is detected, an error result code (12) is set to indicate the failure condition, and error handling is triggered"
+            },
+            "Rule_Name": "Detect Failure to Close Account Cross-Reference File",
+            "Rule_Description": "When the Account Cross-Reference file cannot be closed properly, the failure must be detected and flagged so that appropriate error handling can be triggered."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00044",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file close operation has failed (error result code is set and the application is not in an all-OK state)",
+                "When": "The program evaluates the result of the close operation and determines it was unsuccessful",
+                "Then": "The error message 'ERROR CLOSING XREFFILE' is displayed to the output"
+            },
+            "Rule_Name": "Display Error Message When Account Cross-Reference File Cannot Be Closed",
+            "Rule_Description": "When the Account Cross-Reference file closure fails, a descriptive error message must be displayed to notify that the file could not be closed properly."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00045",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file close operation has failed and the error message 'ERROR CLOSING XREFFILE' has been displayed",
+                "When": "The program processes the file status details for display",
+                "Then": "The file status is captured and detailed status information is displayed in the format 'FILE STATUS IS: NNNN' followed by the four-character status code, providing specific information about the closure failure"
+            },
+            "Rule_Name": "Display Detailed File Status Information on Closure Failure",
+            "Rule_Description": "Following the display of the closure error message, detailed file status information must be displayed to provide additional context about the nature of the closure failure."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00046",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account Cross-Reference file close operation has failed, the error message has been displayed, and detailed file status information has been shown",
+                "When": "The program invokes the abnormal termination routine",
+                "Then": "The program is terminated abnormally by calling the system abend routine (CEE3ABD) with abend code 999, halting all further processing immediately"
+            },
+            "Rule_Name": "Terminate Program Abnormally on File Closure Failure",
+            "Rule_Description": "If the Account Cross-Reference file cannot be closed properly, the program must be terminated abnormally to prevent data integrity issues and signal the failure to the operations team."
+        },
+        {
+            "Rule_Id": "R-CBACT03C-cbl-00047",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program has successfully completed reading and displaying all records from the Account Cross-Reference file, and the file has been closed without errors",
+                "When": "All records have been processed and the end-of-file condition has been reached",
+                "Then": "The program displays the message 'END OF EXECUTION OF PROGRAM CBACT03C' to confirm successful completion of the Account Cross-Reference file reading and printing process, and control is returned to the calling environment"
+            },
+            "Rule_Name": "Program Completion Notification",
+            "Rule_Description": "Upon successful completion of all Account Cross-Reference file reading and display operations, the program must notify the user that the process has ended successfully."
+        }
+    ],
+    "description": "CBACT03C is a batch COBOL program within the CardDemo application that reads and prints all records from an account cross-reference data file sequentially. It opens the indexed VSAM file, iterates through every record displaying each card cross-reference record to the output, and closes the file upon completion. This is a Main/Driver program with no external program calls other than an abend utility.\n\n<br>\n\n- **Execution Environment**: Batch\n- **Database Access**: VSAM (Indexed)\n- **MQ Calls**: No\n- **Module Type**: Main/Driver module\n\n<br>\n\n### Key Functionalities:\n\n1: Program Initialization - Display a message indicating the start of the Account Cross-Reference file reading and printing process\n\n2: Open Account Cross-Reference File - Open the Account Cross-Reference data file to prepare it for sequential reading; terminate the program with an error if the file cannot be opened\n\n3: Read Next Cross-Reference Record - Sequentially read the next record from the Account Cross-Reference file, retrieving the card number (16 characters) and associated cross-reference data (34 characters)\n\n4: Display Cross-Reference Record - Print/display each successfully retrieved cross-reference record containing the card number and its associated account cross-reference data\n\n5: End-of-File Detection - Detect when all records in the Account Cross-Reference file have been processed and signal the program to stop reading\n\n6: Iterative Record Processing - Continuously read and display all cross-reference records sequentially until the end of the file is reached\n\n7: Close Account Cross-Reference File - Close the Account Cross-Reference data file after all records have been processed; terminate the program with an error if the file cannot be closed properly\n\n8: Program Completion - Display a message indicating the successful end of the Account Cross-Reference file reading and printing process\n\n"
+}

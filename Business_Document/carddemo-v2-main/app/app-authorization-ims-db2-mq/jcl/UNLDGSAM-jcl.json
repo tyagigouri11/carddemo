@@ -1,0 +1,65 @@
+{
+    "created_on": "2026-11-05",
+    "name": "UNLDGSAM.JCL",
+    "file_path": "carddemo-v2-main/app/app-authorization-ims-db2-mq/jcl/UNLDGSAM.JCL",
+    "type": "jcl",
+    "description": "This JCL job (UNLDGSAM) executes an IMS DL/I batch program (DBUNLDGS) using the IMS region controller (DFSRRC00) to unload data from an IMS Payment Authorization database (PAUTHDB) into two GSAM (Generalized Sequential Access Method) output files \u2014 one for root segments and one for child segments \u2014 as part of the CardDemo application's data migration or extract process.Key Functionalities:\nExecutes the IMS DL/I batch unload program (DBUNLDGS) using PSB DLIGSAMP to read from the IMS Payment Authorization database (PAUTHDB)\nUnloads IMS root segment records from the Payment Authorization database into a sequential GSAM output file (AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM), retaining the file after the job completes\nUnloads IMS child segment records from the Payment Authorization database into a separate sequential GSAM output file (AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM), retaining the file after the job completes\nReads the IMS Payment Authorization primary database (OEM.IMS.IMSP.PAUTHDB) and its index (OEM.IMS.IMSP.PAUTHDBX) as source data for the unload operation\nUtilizes IMS PSB and DBD libraries to define the program's database access structure and segment layouts during execution",
+    "rules": [
+        {
+            "Rule_Id": "R-UNLDGSAM-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The IMS Payment Authorization Database (PAUTHDB) contains payment authorization records organized in a hierarchical structure with root/parent records and child/dependent records, AND the PSB DLIGSAMP is available to define the authorized access scope for the unload program DBUNLDGS",
+                "When": "The DBUNLDGS program is executed in IMS DL/I batch mode to perform a full unload of the entire Payment Authorization Database with no filtering or selection criteria applied",
+                "Then": "All root/parent Payment Authorization records are written exclusively to the ROOT GSAM output file (PASFILOP \u2014 AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM), AND all child/dependent Payment Authorization records are written exclusively to the CHILD GSAM output file (PADFILOP \u2014 AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM), ensuring every record in the database is extracted and the parent-child relationship is preserved across the two output files"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00 - Payment Authorization Database Full Extraction with Hierarchical Record Separation",
+            "Rule_Description": "The IMS batch program DBUNLDGS performs a complete unload of all records from the Payment Authorization Database and separates them into two output files \u2014 one for root/parent records and one for child/dependent records \u2014 preserving the hierarchical business relationship across flat files.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDGSAM-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The Payment Authorization Database unload job (UNLDGSAM) is initiated and STEP01 is about to execute",
+                "When": "The job attempts to open the ROOT GSAM file (PASFILOP \u2014 AWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM) and the CHILD GSAM file (PADFILOP \u2014 AWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM) for writing",
+                "Then": "Both files must already exist in the system prior to job execution; if the ROOT GSAM file does not exist, the job fails immediately before any data extraction begins; if the CHILD GSAM file does not exist, the job fails immediately before any data extraction begins; no new files are created by this job"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00 - Output File Pre-existence Validation for Payment Authorization Unload",
+            "Rule_Description": "Both output files designated to receive the extracted Payment Authorization records must already exist in the system before the unload job begins. The job does not create these files \u2014 it only writes into pre-existing ones.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDGSAM-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Payment Authorization Database unload is executing and actively writing extracted records to the ROOT GSAM file (PASFILOP) and the CHILD GSAM file (PADFILOP)",
+                "When": "The job completes \u2014 either successfully with all records fully extracted, OR abnormally due to an error or failure at any point during processing",
+                "Then": "On successful completion \u2014 both output files are retained in the system containing the complete set of extracted Payment Authorization records; On abnormal termination \u2014 both output files are still retained in the system but may contain only a partial set of records extracted up to the point of failure; downstream processes consuming these files must independently verify data completeness before use, as the job does not purge or reset partial output on failure"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00 - Payment Authorization Output File Retention Policy",
+            "Rule_Description": "Both Payment Authorization output files \u2014 ROOT GSAM and CHILD GSAM \u2014 are retained in the system regardless of whether the unload job completes successfully or terminates with a failure, which may result in partial data being preserved in the event of a failure.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDGSAM-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Payment Authorization Database unload job is actively running and reading records from the Payment Authorization Database (DDPAUTP0 \u2014 PAUTHDB) and its index (DDPAUTX0 \u2014 PAUTHDBX)",
+                "When": "Other business applications or batch jobs need to access the Payment Authorization Database at the same time as the unload is in progress",
+                "Then": "The unload operation accesses the database in shared mode and does not acquire exclusive locks; other authorized users and processes can simultaneously read from the Payment Authorization Database without interruption; the unload does not block, delay, or prevent concurrent access to the Payment Authorization Database or its index"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00 - Concurrent Shared Access to Payment Authorization Database During Unload",
+            "Rule_Description": "The Payment Authorization Database and its index are accessed in shared mode during the unload operation, ensuring that other business applications and batch jobs can continue to access the same database simultaneously without being blocked.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-UNLDGSAM-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The DBUNLDGS program is initializing its connection to the IMS Payment Authorization Database through the IMS DL/I interface, AND the PSB library (PSBLIB) and Database Definition library (DBDLIB) are available",
+                "When": "The program establishes its database session and begins reading records from the Payment Authorization Database",
+                "Then": "Access is authorized and scoped exclusively by PSB DLIGSAMP; only the database segments (record types) defined and permitted within DLIGSAMP are accessible to the unload program; the program reads segments only in the sequence and manner authorized by DLIGSAMP; any segment not defined in DLIGSAMP is inaccessible to the program"
+            },
+            "Rule_Name": "STEP01 - DFSRRC00 - PSB-Based Authorization for Payment Authorization Database Access",
+            "Rule_Description": "Access to the Payment Authorization Database during the unload is governed and restricted by PSB DLIGSAMP, which defines the specific record types (segments) the unload program is authorized to read and the sequence in which they are accessed.",
+            "Rule_Type": "Authorization Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000\n\n    A([JOB START\nPayment Authorization Database Unload]):::start\n\n    PAUTHDB[(IMS Payment Authorization Database\nOEM.IMS.IMSP.PAUTHDB)]:::datasource\n    PAUTHDBX[(IMS Payment Authorization Database Index\nOEM.IMS.IMSP.PAUTHDBX)]:::datasource\n    ROOTGSAM[(Payment Authorization Root Records File\nAWS.M2.CARDDEMO.PAUTDB.ROOT.GSAM)]:::datasource\n    CHILDGSAM[(Payment Authorization Child Records File\nAWS.M2.CARDDEMO.PAUTDB.CHILD.GSAM)]:::datasource\n\n    STEP01[STEP01 - DFSRRC00 - DBUNLDGS\nUnload All Payment Authorization Records\nParent and Child Segments from IMS Database\ninto Sequential Output Files]:::process\n\n    RC1{STEP01\nUnload Successful?\nReturn Code = 0}:::decision\n\n    SUCCESS([JOB COMPLETED SUCCESSFULLY\nPayment Authorization Records\nSuccessfully Unloaded to Output Files]):::success\n    FAIL([JOB FAILED\nPayment Authorization Database\nUnload Encountered Errors]):::error\n\n    A --> STEP01\n\n    PAUTHDB -.->|Read Payment Authorization\nParent and Child Records| STEP01\n    PAUTHDBX -.->|Read Database Index\nfor Sequential Access| STEP01\n\n    STEP01 -.->|Write Root / Parent\nPayment Authorization Records| ROOTGSAM\n    STEP01 -.->|Write Child / Dependent\nPayment Authorization Records| CHILDGSAM\n\n    STEP01 --> RC1\n    RC1 -->|Yes - All Records Unloaded| SUCCESS\n    RC1 -->|No - Unload Error Detected| FAIL"
+}

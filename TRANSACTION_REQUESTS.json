@@ -1,0 +1,309 @@
+{
+  "description": "Phase 3 - All Transaction Test Requests",
+  "baseUrl": "http://localhost:8081/swagger-ui.html",
+  "endpoint": "POST /api/transactions",
+  
+  "purchase_transactions": [
+    {
+      "request_id": "REQ_1",
+      "name": "PURCHASE - Walmart",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "amount": 150,
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M123",
+        "merchantName": "Walmart"
+      }
+    },
+    {
+      "request_id": "REQ_2",
+      "name": "PURCHASE - Target",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "amount": 89.99,
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M124",
+        "merchantName": "Target"
+      }
+    },
+    {
+      "request_id": "REQ_3",
+      "name": "PURCHASE - Amazon",
+      "data": {
+        "accountId": 2,
+        "cardNumber": "5500005555555559",
+        "amount": 249.99,
+        "date": "2026-10-16",
+        "postDate": "2026-10-16",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M125",
+        "merchantName": "Amazon"
+      }
+    },
+    {
+      "request_id": "REQ_4",
+      "name": "PURCHASE - Best Buy",
+      "data": {
+        "accountId": 2,
+        "cardNumber": "5500005555555559",
+        "amount": 599.99,
+        "date": "2026-10-16",
+        "postDate": "2026-10-16",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M126",
+        "merchantName": "Best Buy"
+      }
+    },
+    {
+      "request_id": "REQ_5",
+      "name": "PURCHASE - Shell Gas Station",
+      "data": {
+        "accountId": 3,
+        "cardNumber": "378282246310005",
+        "amount": 65.50,
+        "date": "2026-10-17",
+        "postDate": "2026-10-17",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M127",
+        "merchantName": "Shell Gas Station"
+      }
+    }
+  ],
+  
+  "payment_transactions": [
+    {
+      "request_id": "REQ_6",
+      "name": "PAYMENT - Online Payment Portal",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "amount": 1000.00,
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "PAYMENT",
+        "status": "PENDING",
+        "merchantId": "PAY001",
+        "merchantName": "Online Payment Portal"
+      },
+      "note": "SAVE THIS ID FOR SETTLEMENT TEST"
+    },
+    {
+      "request_id": "REQ_7",
+      "name": "PAYMENT - Bank Wire Transfer",
+      "data": {
+        "accountId": 2,
+        "cardNumber": "5500005555555559",
+        "amount": 500.00,
+        "date": "2026-10-16",
+        "postDate": "2026-10-16",
+        "type": "PAYMENT",
+        "status": "PENDING",
+        "merchantId": "PAY002",
+        "merchantName": "Bank Wire Transfer"
+      }
+    },
+    {
+      "request_id": "REQ_8",
+      "name": "PAYMENT - Automatic Bill Payment",
+      "data": {
+        "accountId": 3,
+        "cardNumber": "378282246310005",
+        "amount": 250.00,
+        "date": "2026-10-17",
+        "postDate": "2026-10-17",
+        "type": "PAYMENT",
+        "status": "PENDING",
+        "merchantId": "PAY003",
+        "merchantName": "Automatic Bill Payment"
+      }
+    },
+    {
+      "request_id": "REQ_9",
+      "name": "PAYMENT - Mobile App Payment",
+      "data": {
+        "accountId": 4,
+        "cardNumber": "6011111111111117",
+        "amount": 350.50,
+        "date": "2026-10-18",
+        "postDate": "2026-10-18",
+        "type": "PAYMENT",
+        "status": "PENDING",
+        "merchantId": "PAY004",
+        "merchantName": "Mobile App Payment"
+      }
+    },
+    {
+      "request_id": "REQ_10",
+      "name": "PAYMENT - Minimum Payment",
+      "data": {
+        "accountId": 5,
+        "cardNumber": "3530111333300000",
+        "amount": 100.00,
+        "date": "2026-10-19",
+        "postDate": "2026-10-19",
+        "type": "PAYMENT",
+        "status": "PENDING",
+        "merchantId": "PAY005",
+        "merchantName": "Minimum Payment"
+      }
+    }
+  ],
+  
+  "cash_advance_transactions": [
+    {
+      "request_id": "REQ_11",
+      "name": "CASH_ADVANCE - Chase ATM Withdrawal",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "amount": 200.00,
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "CASH_ADVANCE",
+        "status": "PENDING",
+        "merchantId": "ATM001",
+        "merchantName": "Chase ATM Withdrawal"
+      }
+    },
+    {
+      "request_id": "REQ_12",
+      "name": "CASH_ADVANCE - Bank of America Counter",
+      "data": {
+        "accountId": 2,
+        "cardNumber": "5500005555555559",
+        "amount": 500.00,
+        "date": "2026-10-16",
+        "postDate": "2026-10-16",
+        "type": "CASH_ADVANCE",
+        "status": "PENDING",
+        "merchantId": "ATM002",
+        "merchantName": "Bank of America Counter"
+      }
+    },
+    {
+      "request_id": "REQ_13",
+      "name": "CASH_ADVANCE - International ATM - London",
+      "data": {
+        "accountId": 3,
+        "cardNumber": "378282246310005",
+        "amount": 1500.00,
+        "date": "2026-10-17",
+        "postDate": "2026-10-17",
+        "type": "CASH_ADVANCE",
+        "status": "PENDING",
+        "merchantId": "ATM003",
+        "merchantName": "International ATM - London"
+      }
+    },
+    {
+      "request_id": "REQ_14",
+      "name": "CASH_ADVANCE - Las Vegas Casino",
+      "data": {
+        "accountId": 4,
+        "cardNumber": "6011111111111117",
+        "amount": 1000.00,
+        "date": "2026-10-18",
+        "postDate": "2026-10-18",
+        "type": "CASH_ADVANCE",
+        "status": "PENDING",
+        "merchantId": "ATM004",
+        "merchantName": "Las Vegas Casino"
+      }
+    },
+    {
+      "request_id": "REQ_15",
+      "name": "CASH_ADVANCE - Foreign ATM - Tokyo",
+      "data": {
+        "accountId": 5,
+        "cardNumber": "3530111333300000",
+        "amount": 300.00,
+        "date": "2026-10-19",
+        "postDate": "2026-10-19",
+        "type": "CASH_ADVANCE",
+        "status": "PENDING",
+        "merchantId": "ATM005",
+        "merchantName": "Foreign ATM - Tokyo"
+      }
+    }
+  ],
+  
+  "validation_tests": [
+    {
+      "request_id": "REQ_16",
+      "name": "NEGATIVE AMOUNT - Should Fail (400)",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "amount": -50.00,
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M999",
+        "merchantName": "Invalid Test"
+      },
+      "expected_status": 400,
+      "expected_error": "Amount must be positive"
+    },
+    {
+      "request_id": "REQ_17",
+      "name": "MISSING AMOUNT - Should Fail (400)",
+      "data": {
+        "accountId": 1,
+        "cardNumber": "4111111111111111",
+        "date": "2026-10-15",
+        "postDate": "2026-10-15",
+        "type": "PURCHASE",
+        "status": "PENDING",
+        "merchantId": "M999",
+        "merchantName": "Invalid Test"
+      },
+      "expected_status": 400,
+      "expected_error": "Amount is required"
+    }
+  ],
+  
+  "settlement_tests": [
+    {
+      "request_id": "REQ_18",
+      "endpoint": "POST /api/transactions/settle",
+      "name": "SETTLE VALID TRANSACTION",
+      "data": {
+        "transactionId": "USE_ID_FROM_REQ_6"
+      },
+      "expected_status": 200,
+      "note": "After getting ID from REQ_6, use it here"
+    },
+    {
+      "request_id": "REQ_19",
+      "endpoint": "POST /api/transactions/settle",
+      "name": "DOUBLE SETTLEMENT - Should Fail (422)",
+      "data": {
+        "transactionId": "USE_SAME_ID_FROM_REQ_18"
+      },
+      "expected_status": 422,
+      "expected_error": "Transaction already settled"
+    },
+    {
+      "request_id": "REQ_20",
+      "endpoint": "POST /api/transactions/settle",
+      "name": "SETTLE NON-EXISTENT - Should Fail (404)",
+      "data": {
+        "transactionId": "TXN_INVALID_99999"
+      },
+      "expected_status": 404,
+      "expected_error": "Transaction not found"
+    }
+  ]
+}

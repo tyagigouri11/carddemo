@@ -1,0 +1,2025 @@
+{
+    "name": "CBSTM03B.cbl",
+    "program_name": "CBSTM03B.cbl",
+    "generated_at": "2026-11-05T08:08:24Z",
+    "overview": {
+        "total_key_functionalities": 16,
+        "total_rules": 77,
+        "main_flow_diagram": "flowchart TD\n    A([Program Start]):::start\n    B{1: File Operation Routing\nWhich file to operate on?}:::decision\n\n    %% Transaction File Branch\n    C1{Transaction\nOperation Type?}:::decision\n    T_OPEN[2: Transaction File Open\nOpen TRNX-FILE for reading]:::process\n    T_READ[3: Transaction File Sequential Read\nRead next transaction record]:::process\n    T_CLOSE[4: Transaction File Close\nClose TRNX-FILE]:::process\n    TRNX_DS[(TRNX-FILE\nTransaction File)]:::datasource\n\n    %% Cross-Reference File Branch\n    C2{Cross-Reference\nOperation Type?}:::decision\n    X_OPEN[5: Cross-Reference File Open\nOpen XREF-FILE for reading]:::process\n    X_READ[6: Cross-Reference File Sequential Read\nRead next cross-reference record]:::process\n    X_CLOSE[7: Cross-Reference File Close\nClose XREF-FILE]:::process\n    XREF_DS[(XREF-FILE\nCard Cross-Reference File)]:::datasource\n\n    %% Customer File Branch\n    C3{Customer\nOperation Type?}:::decision\n    CU_OPEN[8: Customer File Open\nOpen CUST-FILE for random access]:::process\n    CU_READ[9: Customer Record Lookup by Key\nRetrieve customer record by Customer ID]:::process\n    CU_CLOSE[10: Customer File Close\nClose CUST-FILE]:::process\n    CUST_DS[(CUST-FILE\nCustomer File)]:::datasource\n\n    %% Account File Branch\n    C4{Account\nOperation Type?}:::decision\n    AC_OPEN[11: Account File Open\nOpen ACCT-FILE for random access]:::process\n    AC_READ[12: Account Record Lookup by Key\nRetrieve account record by Account ID]:::process\n    AC_CLOSE[13: Account File Close\nClose ACCT-FILE]:::process\n    ACCT_DS[(ACCT-FILE\nAccount File)]:::datasource\n\n    %% Status Return Nodes\n    SR1[14: Operation Status Return\nReturn TRNX operation result to caller]:::process\n    SR2[14: Operation Status Return\nReturn XREF operation result to caller]:::process\n    SR3[14: Operation Status Return\nReturn CUST operation result to caller]:::process\n    SR4[14: Operation Status Return\nReturn ACCT operation result to caller]:::process\n\n    %% Success/Error for status\n    S1{TRNX Status\nSuccess?}:::decision\n    S2{XREF Status\nSuccess?}:::decision\n    S3{CUST Status\nSuccess?}:::decision\n    S4{ACCT Status\nSuccess?}:::decision\n\n    OK1[Operation Successful]:::success\n    OK2[Operation Successful]:::success\n    OK3[Operation Successful]:::success\n    OK4[Operation Successful]:::success\n    ERR1[Operation Failed]:::error\n    ERR2[Operation Failed]:::error\n    ERR3[Operation Failed]:::error\n    ERR4[Operation Failed]:::error\n\n    Z([Program End]):::final\n\n    %% Main routing\n    A --> B\n    B -->|TRNXFILE| C1\n    B -->|XREFFILE| C2\n    B -->|CUSTFILE| C3\n    B -->|ACCTFILE| C4\n    B -->|Unknown File ID| Z\n\n    %% Transaction flow\n    C1 -->|Open| T_OPEN\n    C1 -->|Read| T_READ\n    C1 -->|Close| T_CLOSE\n    T_OPEN -.->|Open File| TRNX_DS\n    T_READ -.->|Read Record| TRNX_DS\n    T_CLOSE -.->|Close File| TRNX_DS\n    T_OPEN --> SR1\n    T_READ --> SR1\n    T_CLOSE --> SR1\n    SR1 --> S1\n    S1 -->|Yes| OK1\n    S1 -->|No| ERR1\n    OK1 --> Z\n    ERR1 --> Z\n\n    %% Cross-Reference flow\n    C2 -->|Open| X_OPEN\n    C2 -->|Read| X_READ\n    C2 -->|Close| X_CLOSE\n    X_OPEN -.->|Open File| XREF_DS\n    X_READ -.->|Read Record| XREF_DS\n    X_CLOSE -.->|Close File| XREF_DS\n    X_OPEN --> SR2\n    X_READ --> SR2\n    X_CLOSE --> SR2\n    SR2 --> S2\n    S2 -->|Yes| OK2\n    S2 -->|No| ERR2\n    OK2 --> Z\n    ERR2 --> Z\n\n    %% Customer flow\n    C3 -->|Open| CU_OPEN\n    C3 -->|Read by Key| CU_READ\n    C3 -->|Close| CU_CLOSE\n    CU_OPEN -.->|Open File| CUST_DS\n    CU_READ -.->|Lookup by Customer ID| CUST_DS\n    CU_CLOSE -.->|Close File| CUST_DS\n    CU_OPEN --> SR3\n    CU_READ --> SR3\n    CU_CLOSE --> SR3\n    SR3 --> S3\n    S3 -->|Yes| OK3\n    S3 -->|No| ERR3\n    OK3 --> Z\n    ERR3 --> Z\n\n    %% Account flow\n    C4 -->|Open| AC_OPEN\n    C4 -->|Read by Key| AC_READ\n    C4 -->|Close| AC_CLOSE\n    AC_OPEN -.->|Open File| ACCT_DS\n    AC_READ -.->|Lookup by Account ID| ACCT_DS\n    AC_CLOSE -.->|Close File| ACCT_DS\n    AC_OPEN --> SR4\n    AC_READ --> SR4\n    AC_CLOSE --> SR4\n    SR4 --> S4\n    S4 -->|Yes| OK4\n    S4 -->|No| ERR4\n    OK4 --> Z\n    ERR4 --> Z\n\n    classDef start fill:#67A353,color:#fff,stroke:#67A353\n    classDef process fill:#08AAD2,color:#fff,stroke:#08AAD2\n    classDef decision fill:#FFE347,color:#000,stroke:#FFE347\n    classDef datasource fill:#2EA597,color:#fff,stroke:#2EA597\n    classDef final fill:#D13313,color:#fff,stroke:#D13313\n    classDef success fill:#2BB534,color:#fff,stroke:#2BB534\n    classDef error fill:#D13313,color:#fff,stroke:#D13313",
+        "rules": [
+            {
+                "rule_id": "R-CBSTM03B-cbl-00001",
+                "rule_type": "Decision Rules",
+                "rule_name": "File Operation Routing",
+                "rule_description": "Routes the file operation request to the correct file handler based on the file identifier provided by the caller. If an unrecognized file identifier is provided, the program exits without performing any operation.",
+                "sub_graph_node_text": "1: File Operation Routing\nWhich file to operate on?",
+                "acceptance_criteria": {
+                    "Given": "The program receives a file identifier (LK-M03B-DD) from the calling program",
+                    "When": "The file identifier is evaluated against known file names: TRNXFILE, XREFFILE, CUSTFILE, or ACCTFILE",
+                    "Then": "If the file identifier is TRNXFILE, route to Transaction File processing; if XREFFILE, route to Cross-Reference File processing; if CUSTFILE, route to Customer File processing; if ACCTFILE, route to Account File processing; if the file identifier does not match any known file name, exit the program immediately without performing any file operation"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00002",
+                "rule_type": "Process Rules",
+                "rule_name": "Transaction File Open",
+                "rule_description": "Opens the Transaction File to allow sequential reading of transaction records.",
+                "sub_graph_node_text": "2: Transaction File Open\nOpen TRNX-FILE for reading",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is TRNXFILE and the requested operation is Open",
+                    "When": "The open operation is requested for the Transaction File",
+                    "Then": "The Transaction File is opened for reading, and the result of the open operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00003",
+                "rule_type": "Process Rules",
+                "rule_name": "Transaction File Sequential Read",
+                "rule_description": "Reads the next available transaction record sequentially from the Transaction File and returns the record data to the caller.",
+                "sub_graph_node_text": "3: Transaction File Sequential Read\nRead next transaction record",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is TRNXFILE, the Transaction File is open, and the requested operation is Read",
+                    "When": "A sequential read operation is performed on the Transaction File",
+                    "Then": "The next transaction record is retrieved in sequence and returned to the calling program as record data; the result of the read operation (including end-of-file condition) is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00004",
+                "rule_type": "Process Rules",
+                "rule_name": "Transaction File Close",
+                "rule_description": "Closes the Transaction File after all required transaction records have been processed.",
+                "sub_graph_node_text": "4: Transaction File Close\nClose TRNX-FILE",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is TRNXFILE and the requested operation is Close",
+                    "When": "The close operation is requested for the Transaction File",
+                    "Then": "The Transaction File is closed and the result of the close operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00005",
+                "rule_type": "Process Rules",
+                "rule_name": "Cross-Reference File Open",
+                "rule_description": "Opens the Cross-Reference File to allow sequential reading of cross-reference records.",
+                "sub_graph_node_text": "5: Cross-Reference File Open\nOpen XREF-FILE for reading",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is XREFFILE and the requested operation is Open",
+                    "When": "The open operation is requested for the Cross-Reference File",
+                    "Then": "The Cross-Reference File is opened for reading and the result of the open operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00006",
+                "rule_type": "Process Rules",
+                "rule_name": "Cross-Reference File Sequential Read",
+                "rule_description": "Reads the next available record sequentially from the Cross-Reference File and returns the record data to the caller.",
+                "sub_graph_node_text": "6: Cross-Reference File Sequential Read\nRead next cross-reference record",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is XREFFILE, the Cross-Reference File is open, and the requested operation is Read",
+                    "When": "A sequential read operation is performed on the Cross-Reference File",
+                    "Then": "The next cross-reference record is retrieved in sequence and returned to the calling program as record data; the result of the read operation (including end-of-file condition) is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00007",
+                "rule_type": "Process Rules",
+                "rule_name": "Cross-Reference File Close",
+                "rule_description": "Closes the Cross-Reference File after all required cross-reference records have been processed.",
+                "sub_graph_node_text": "7: Cross-Reference File Close\nClose XREF-FILE",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is XREFFILE and the requested operation is Close",
+                    "When": "The close operation is requested for the Cross-Reference File",
+                    "Then": "The Cross-Reference File is closed and the result of the close operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00008",
+                "rule_type": "Process Rules",
+                "rule_name": "Customer File Open",
+                "rule_description": "Opens the Customer File to allow direct keyed retrieval of individual customer records.",
+                "sub_graph_node_text": "8: Customer File Open\nOpen CUST-FILE for random access",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is CUSTFILE and the requested operation is Open",
+                    "When": "The open operation is requested for the Customer File",
+                    "Then": "The Customer File is opened for reading and the result of the open operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00009",
+                "rule_type": "Decision Rules",
+                "rule_name": "Customer Record Lookup by Key",
+                "rule_description": "Retrieves a specific customer record directly from the Customer File using a Customer ID key provided by the caller. The key length is variable and specified by the caller.",
+                "sub_graph_node_text": "9: Customer Record Lookup by Key\nRetrieve customer record by Customer ID",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is CUSTFILE, the Customer File is open, the requested operation is Read by Key, and the caller has provided a Customer ID key value along with the key length",
+                    "When": "A keyed read operation is performed using the provided Customer ID (trimmed to the specified key length) as the lookup key",
+                    "Then": "The matching customer record is retrieved directly from the Customer File and returned to the calling program as record data; if no matching customer record is found, the not-found result is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00010",
+                "rule_type": "Process Rules",
+                "rule_name": "Customer File Close",
+                "rule_description": "Closes the Customer File after the required customer record lookup has been completed.",
+                "sub_graph_node_text": "10: Customer File Close\nClose CUST-FILE",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is CUSTFILE and the requested operation is Close",
+                    "When": "The close operation is requested for the Customer File",
+                    "Then": "The Customer File is closed and the result of the close operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00011",
+                "rule_type": "Process Rules",
+                "rule_name": "Account File Open",
+                "rule_description": "Opens the Account File to allow direct keyed retrieval of individual account records.",
+                "sub_graph_node_text": "11: Account File Open\nOpen ACCT-FILE for random access",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is ACCTFILE and the requested operation is Open",
+                    "When": "The open operation is requested for the Account File",
+                    "Then": "The Account File is opened for reading and the result of the open operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00012",
+                "rule_type": "Decision Rules",
+                "rule_name": "Account Record Lookup by Key",
+                "rule_description": "Retrieves a specific account record directly from the Account File using an Account ID key provided by the caller. The key length is variable and specified by the caller.",
+                "sub_graph_node_text": "12: Account Record Lookup by Key\nRetrieve account record by Account ID",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is ACCTFILE, the Account File is open, the requested operation is Read by Key, and the caller has provided an Account ID key value along with the key length",
+                    "When": "A keyed read operation is performed using the provided Account ID (trimmed to the specified key length) as the lookup key",
+                    "Then": "The matching account record is retrieved directly from the Account File and returned to the calling program as record data; if no matching account record is found, the not-found result is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00013",
+                "rule_type": "Process Rules",
+                "rule_name": "Account File Close",
+                "rule_description": "Closes the Account File after the required account record lookup has been completed.",
+                "sub_graph_node_text": "13: Account File Close\nClose ACCT-FILE",
+                "acceptance_criteria": {
+                    "Given": "The file identifier is ACCTFILE and the requested operation is Close",
+                    "When": "The close operation is requested for the Account File",
+                    "Then": "The Account File is closed and the result of the close operation is returned to the calling program"
+                },
+                "key_functionality_id": "overview"
+            },
+            {
+                "rule_id": "R-CBSTM03B-cbl-00014",
+                "rule_type": "Action Rules",
+                "rule_name": "Operation Status Return to Caller",
+                "rule_description": "After every file operation (open, read, or close) on any file, the outcome of that operation is always communicated back to the calling program. This allows the caller to determine whether the operation succeeded, reached end-of-file, or failed to find a record.",
+                "sub_graph_node_text": "14: Operation Status Return\nReturn operation result to caller",
+                "acceptance_criteria": {
+                    "Given": "Any file operation (open, read, or close) has been performed on any of the four files: Transaction, Cross-Reference, Customer, or Account",
+                    "When": "The file operation completes regardless of outcome",
+                    "Then": "The file operation result is captured and returned to the calling program; for Transaction File operations the Transaction File result is returned; for Cross-Reference File operations the Cross-Reference File result is returned; for Customer File operations the Customer File result is returned; for Account File operations the Account File result is returned"
+                },
+                "key_functionality_id": "overview"
+            }
+        ]
+    },
+    "key_functionalities": [
+        {
+            "id": "file-operation-routing",
+            "title": "File Operation Routing",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Calling Program\\nRequests File Operation])\n    B[Receive File Identifier\\nfrom Calling Program]\n    C{Which File\\nIdentifier was\\nReceived?}\n    D[Route to\\nTransaction File\\nHandling Process]\n    E[Route to\\nCross-Reference File\\nHandling Process]\n    F[Route to\\nCustomer File\\nHandling Process]\n    G[Route to\\nAccount File\\nHandling Process]\n    H[/Unknown File Identifier\\nNo Action Taken/]\n    Z([Return to\\nCalling Program])\n\n    A --> B\n    B --> C\n    C -->|TRNXFILE| D\n    C -->|XREFFILE| E\n    C -->|CUSTFILE| F\n    C -->|ACCTFILE| G\n    C -->|Unrecognized\\nIdentifier| H\n    D --> Z\n    E --> Z\n    F --> Z\n    G --> Z\n    H --> Z",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00015",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Route File Operation Request to Appropriate File Handler",
+                    "rule_description": "When a calling program requests a file operation, the service determines which file to operate on by evaluating the file identifier received, and routes the request to the correct file handling process for Transaction, Cross-Reference, Customer, or Account files.",
+                    "sub_graph_node_text": "Which File Identifier was Received?",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request and provided a file identifier (LK-M03B-DD) indicating which file should be operated on",
+                        "When": "The file operation service evaluates the received file identifier against the known file identifiers: TRNXFILE, XREFFILE, CUSTFILE, and ACCTFILE",
+                        "Then": "If the identifier is 'TRNXFILE', the request is routed to the Transaction File handling process; if the identifier is 'XREFFILE', the request is routed to the Cross-Reference File handling process; if the identifier is 'CUSTFILE', the request is routed to the Customer File handling process; if the identifier is 'ACCTFILE', the request is routed to the Account File handling process; if the identifier does not match any known file identifier, no file operation is performed and the service exits immediately returning control to the calling program"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00016",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Handle Unrecognized File Identifier with No Action",
+                    "rule_description": "When the file identifier provided by the calling program does not match any of the recognized file identifiers, the service takes no action and immediately returns control to the calling program without performing any file operation.",
+                    "sub_graph_node_text": "Unknown File Identifier\nNo Action Taken",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request with a file identifier (LK-M03B-DD) that does not match any of the recognized values: TRNXFILE, XREFFILE, CUSTFILE, or ACCTFILE",
+                        "When": "The file operation service evaluates the received file identifier and finds no matching known file identifier",
+                        "Then": "No file operation is performed, no file is opened, read, or closed, and the service immediately exits and returns control to the calling program without updating any output data or status"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00017",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route to Transaction File Handling Process",
+                    "rule_description": "When the file identifier received is TRNXFILE, the service routes the request to the Transaction File handling process to perform the requested operation on the Transaction File.",
+                    "sub_graph_node_text": "Route to\nTransaction File\nHandling Process",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'TRNXFILE'",
+                        "When": "The file operation service evaluates the file identifier and matches it to 'TRNXFILE'",
+                        "Then": "The service routes the request to the Transaction File handling process, which will perform the requested operation (open, sequential read, or close) on the Transaction File and return the operation outcome to the calling program"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00018",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route to Cross-Reference File Handling Process",
+                    "rule_description": "When the file identifier received is XREFFILE, the service routes the request to the Cross-Reference File handling process to perform the requested operation on the Cross-Reference File.",
+                    "sub_graph_node_text": "Route to\nCross-Reference File\nHandling Process",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'XREFFILE'",
+                        "When": "The file operation service evaluates the file identifier and matches it to 'XREFFILE'",
+                        "Then": "The service routes the request to the Cross-Reference File handling process, which will perform the requested operation (open, sequential read, or close) on the Cross-Reference File and return the operation outcome to the calling program"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00019",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route to Customer File Handling Process",
+                    "rule_description": "When the file identifier received is CUSTFILE, the service routes the request to the Customer File handling process to perform the requested operation on the Customer File.",
+                    "sub_graph_node_text": "Route to\nCustomer File\nHandling Process",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'CUSTFILE'",
+                        "When": "The file operation service evaluates the file identifier and matches it to 'CUSTFILE'",
+                        "Then": "The service routes the request to the Customer File handling process, which will perform the requested operation (open, keyed read by Customer ID, or close) on the Customer File and return the operation outcome to the calling program"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00020",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Route to Account File Handling Process",
+                    "rule_description": "When the file identifier received is ACCTFILE, the service routes the request to the Account File handling process to perform the requested operation on the Account File.",
+                    "sub_graph_node_text": "Route to\nAccount File\nHandling Process",
+                    "acceptance_criteria": {
+                        "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'ACCTFILE'",
+                        "When": "The file operation service evaluates the file identifier and matches it to 'ACCTFILE'",
+                        "Then": "The service routes the request to the Account File handling process, which will perform the requested operation (open, keyed read by Account ID, or close) on the Account File and return the operation outcome to the calling program"
+                    },
+                    "key_functionality_id": "file-operation-routing"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "File Operation Routing"
+        },
+        {
+            "id": "transaction-file-open",
+            "title": "Transaction File Open",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Transaction File Open Request Received])\n    B{Is Requested\\nOperation = OPEN?}\n    C[Open Transaction File\\nfor Sequential Reading]\n    D{File Opened\\nSuccessfully?}\n    E[Capture Success Status\\nReady for Transaction Record Retrieval]\n    F[Capture Failure Status\\nTransaction File Unavailable]\n    G[Return Operation Status\\nto Calling Program]\n    H([End: Transaction File Open Complete])\n    I([End: Request Not Applicable])\n\n    A --> B\n    B -->|Yes| C\n    B -->|No - Different Operation| I\n    C --> D\n    D -->|Yes| E\n    D -->|No| F\n    E --> G\n    F --> G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00021",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Transaction File Open Operation Eligibility Check",
+                    "rule_description": "Determines whether the requested file operation is an OPEN request for the Transaction File. Only when the operation type is OPEN should the Transaction File be opened for sequential reading; all other operation types are not applicable to this process step.",
+                    "sub_graph_node_text": "Is Requested Operation = OPEN?",
+                    "acceptance_criteria": {
+                        "Given": "The file I/O service has been invoked with the Transaction File (TRNXFILE) as the target file",
+                        "When": "The requested operation type is evaluated to determine if it is an OPEN request",
+                        "Then": "If the operation type is OPEN, proceed to open the Transaction File for sequential reading; if the operation type is anything other than OPEN, this process step is not applicable and no action is taken"
+                    },
+                    "key_functionality_id": "transaction-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00022",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transaction File Sequential Read Enablement",
+                    "rule_description": "When an OPEN operation is requested for the Transaction File, the file must be opened exclusively in read (input) mode to enable sequential retrieval of transaction records. No modifications to transaction data are permitted during this operation.",
+                    "sub_graph_node_text": "Open Transaction File for Sequential Reading",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File (TRNXFILE) has been identified as the target file and the requested operation is OPEN",
+                        "When": "The OPEN operation is executed on the Transaction File",
+                        "Then": "The Transaction File is opened in read-only (input) mode, making it available for sequential record-by-record retrieval; no write or update access is granted"
+                    },
+                    "key_functionality_id": "transaction-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00023",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transaction File Open Success Status Capture",
+                    "rule_description": "Upon successfully opening the Transaction File, the resulting operation status must be captured and communicated back to the calling program to confirm that the file is available and ready for transaction record retrieval.",
+                    "sub_graph_node_text": "Capture Success Status - Ready for Transaction Record Retrieval",
+                    "acceptance_criteria": {
+                        "Given": "The OPEN operation has been executed on the Transaction File and the file has been opened successfully",
+                        "When": "The Transaction File open operation completes without error",
+                        "Then": "The successful operation status from the Transaction File is captured and returned to the calling program, indicating that the Transaction File is ready for sequential record retrieval"
+                    },
+                    "key_functionality_id": "transaction-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00024",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Transaction File Open Failure Status Capture",
+                    "rule_description": "If the Transaction File cannot be opened, the failure status must be captured and communicated back to the calling program, indicating that the Transaction File is unavailable and transaction record retrieval cannot proceed.",
+                    "sub_graph_node_text": "Capture Failure Status - Transaction File Unavailable",
+                    "acceptance_criteria": {
+                        "Given": "The OPEN operation has been executed on the Transaction File and the file has failed to open",
+                        "When": "The Transaction File open operation completes with an error or non-success condition",
+                        "Then": "The failure operation status from the Transaction File is captured and returned to the calling program, indicating that the Transaction File is unavailable and no transaction records can be retrieved"
+                    },
+                    "key_functionality_id": "transaction-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00025",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Transaction File Operation Status Return to Caller",
+                    "rule_description": "Regardless of whether the Transaction File open operation succeeds or fails, the resulting operation status must always be returned to the calling program. This ensures the caller can determine the outcome and take appropriate next steps.",
+                    "sub_graph_node_text": "Return Operation Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File OPEN operation has been attempted, resulting in either a success or failure status",
+                        "When": "The OPEN operation processing is complete",
+                        "Then": "The Transaction File operation status (whether success or failure) is always transferred and returned to the calling program via the operation return code, enabling the caller to handle the outcome appropriately"
+                    },
+                    "key_functionality_id": "transaction-file-open"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Transaction File Open"
+        },
+        {
+            "id": "transaction-file-sequential-read",
+            "title": "Transaction File Sequential Read",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Transaction File Sequential Read])\n    B{Is Operation\\nRequest = READ?}\n    C[Read Next Transaction Record\\nSequentially from TRNX-FILE]\n    D{Was Record\\nFound?}\n    E[Return Transaction Record Data\\nto Calling Program]\n    F[Return End-of-File Indicator\\nto Calling Program]\n    G[Capture Operation Status\\nSuccess / End-of-File / Failure]\n    H([End: Return to Calling Program])\n    Z([End: No Action Taken])\n\n    A --> B\n    B -->|Yes - READ Operation| C\n    B -->|No - Different Operation| Z\n    C --> D\n    D -->|Yes - Record Retrieved| E\n    D -->|No - No More Records| F\n    E --> G\n    F --> G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00026",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Sequential Read Operation Request for Transaction File",
+                    "rule_description": "Determines whether the requested operation is a sequential READ before attempting to retrieve a transaction record. If the operation is not a READ, no action is taken.",
+                    "sub_graph_node_text": "Is Operation Request = READ?",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File I/O service has been invoked with a file identifier of 'TRNXFILE' and an operation type has been provided by the calling program",
+                        "When": "The operation request is evaluated to determine if it is a sequential READ request (M03B-READ)",
+                        "Then": "If the operation request is a sequential READ, proceed to read the next transaction record from the Transaction File; if the operation request is any other type (Open, Close, or unrecognized), no read action is taken and processing exits without retrieving any transaction data"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00027",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Read Next Transaction Record Sequentially from Transaction File",
+                    "rule_description": "Retrieves the next available transaction record in sequential order from the Transaction File and loads the record data into the shared data area for the calling program to consume.",
+                    "sub_graph_node_text": "Read Next Transaction Record Sequentially from TRNX-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File has been previously opened and the operation request is confirmed as a sequential READ",
+                        "When": "The sequential read operation is executed against the Transaction File",
+                        "Then": "The next transaction record in sequence is retrieved from the Transaction File and its full record data is placed into the shared record data field (LK-M03B-FLDT) available to the calling program"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00028",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Return Transaction Record Data to Calling Program Upon Successful Retrieval",
+                    "rule_description": "When a transaction record is successfully retrieved from the Transaction File, the complete record data is made available to the calling program through the shared data interface.",
+                    "sub_graph_node_text": "Return Transaction Record Data to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A sequential READ operation has been executed against the Transaction File and a transaction record exists at the current file position",
+                        "When": "The read operation completes successfully and a record is found",
+                        "Then": "The full transaction record data is returned to the calling program via the shared record data field (LK-M03B-FLDT), and a successful operation status is returned via the status indicator (LK-M03B-RC)"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00029",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Return End-of-File Indicator When No More Transaction Records Exist",
+                    "rule_description": "When a sequential read reaches the end of the Transaction File and no further records are available, an end-of-file condition is communicated back to the calling program so it can stop requesting further records.",
+                    "sub_graph_node_text": "Return End-of-File Indicator to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A sequential READ operation has been executed against the Transaction File and the current file position is at or beyond the last record in the file",
+                        "When": "The read operation finds no more records available in the Transaction File",
+                        "Then": "An end-of-file status indicator is returned to the calling program via the operation status field (LK-M03B-RC), signaling that all transaction records have been processed and no record data is populated in the shared record data field"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00030",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture and Return Transaction File Operation Status to Calling Program",
+                    "rule_description": "After every sequential read attempt on the Transaction File \u2014 whether successful, end-of-file, or failed \u2014 the resulting operation status is always captured and returned to the calling program to enable appropriate downstream handling.",
+                    "sub_graph_node_text": "Capture Operation Status Success / End-of-File / Failure",
+                    "acceptance_criteria": {
+                        "Given": "A sequential READ operation has been attempted on the Transaction File, resulting in one of the following outcomes: successful record retrieval, end-of-file condition, or a read failure",
+                        "When": "The read operation completes regardless of outcome",
+                        "Then": "The Transaction File operation status (success, end-of-file, or failure) is captured from the file status indicator and returned to the calling program via the return code field (LK-M03B-RC), ensuring the calling program always receives the outcome of the read attempt"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00031",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "No Action Taken When Operation Request Is Not a Sequential Read",
+                    "rule_description": "If the operation requested by the calling program is not a sequential READ (e.g., it is an Open or Close or unrecognized operation), the Transaction File sequential read logic is entirely bypassed and no record retrieval is attempted.",
+                    "sub_graph_node_text": "End: No Action Taken",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File I/O service has been invoked with a file identifier of 'TRNXFILE'",
+                        "When": "The operation request is evaluated and determined to be something other than a sequential READ (M03B-READ is not set)",
+                        "Then": "No transaction record read is attempted, no record data is returned, and processing exits the sequential read section without performing any data retrieval action"
+                    },
+                    "key_functionality_id": "transaction-file-sequential-read"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Transaction File Sequential Read"
+        },
+        {
+            "id": "transaction-file-close",
+            "title": "Transaction File Close",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Start: Transaction File Close Request])\n    B{Is Operation\\nType = CLOSE?}\n    C[Close Transaction File\\nTRNX-FILE]\n    D[Capture Close\\nOperation Status]\n    E[Return Status to\\nCalling Program]\n    F([End: Transaction File\\nClose Complete])\n    G([End: No Action Taken\\nNot a Close Request])\n\n    A --> B\n    B -->|Yes| C\n    C --> D\n    D --> E\n    E --> F\n    B -->|No| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00032",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Close Operation Before Closing Transaction File",
+                    "rule_description": "The system must verify that the requested operation is a CLOSE before attempting to close the Transaction File. If the operation is not a CLOSE request, no action is taken on the Transaction File.",
+                    "sub_graph_node_text": "Is Operation Type = CLOSE?",
+                    "acceptance_criteria": {
+                        "Given": "A request has been received to process the Transaction File (TRNXFILE) and an operation type has been provided by the calling program",
+                        "When": "The operation type is evaluated to determine if it is a CLOSE request",
+                        "Then": "If the operation type is CLOSE, the Transaction File close process is initiated; if the operation type is NOT CLOSE, no action is taken on the Transaction File and the program ends without closing the file"
+                    },
+                    "key_functionality_id": "transaction-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00033",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Transaction File Upon Valid Close Request",
+                    "rule_description": "When a valid CLOSE operation is requested for the Transaction File, the system must close the Transaction File to release it and signal completion of all transaction record processing.",
+                    "sub_graph_node_text": "Close Transaction File TRNX-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File (TRNXFILE) has been previously opened and transaction records have been processed, and the calling program has submitted a CLOSE operation request",
+                        "When": "The operation type is confirmed as CLOSE",
+                        "Then": "The Transaction File is closed, releasing it from active use and marking the end of transaction record processing for this session"
+                    },
+                    "key_functionality_id": "transaction-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00034",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Capture and Return Transaction File Close Operation Outcome",
+                    "rule_description": "After the Transaction File close operation is executed, the outcome of the close operation must be captured and returned to the calling program so the caller can determine whether the file was closed successfully.",
+                    "sub_graph_node_text": "Capture Close Operation Status",
+                    "acceptance_criteria": {
+                        "Given": "The Transaction File close operation has been executed",
+                        "When": "The close operation completes (successfully or otherwise)",
+                        "Then": "The resulting status of the Transaction File close operation is captured and returned to the calling program, enabling the caller to assess the outcome of the close request"
+                    },
+                    "key_functionality_id": "transaction-file-close"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Transaction File Close"
+        },
+        {
+            "id": "cross",
+            "title": "Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Calling Program Requests\\nCross-Reference File Open])\n    B{Is Operation\\nRequest = OPEN?}\n    C[Open Card Cross-Reference File\\nfor Sequential Reading]\n    D{File Opened\\nSuccessfully?}\n    E[Capture Success Status]\n    F[Capture Failure Status]\n    G([Return Operation Status\\nto Calling Program])\n\n    A --> B\n    B -->|Yes - Open Request| C\n    B -->|No - Different Operation| G\n    C --> D\n    D -->|Yes - File Ready\\nfor Sequential Lookups| E\n    D -->|No - File Unavailable| F\n    E --> G\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00035",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Cross-Reference File Open Request Routing",
+                    "rule_description": "Determines whether the requested operation on the Cross-Reference File is an OPEN request, and routes processing accordingly. If the operation is not OPEN, control is returned immediately to the calling program without performing any file action.",
+                    "sub_graph_node_text": "Is Operation Request = OPEN?",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has requested an operation on the Cross-Reference File by passing the file identifier 'XREFFILE'",
+                        "When": "The operation type requested is evaluated",
+                        "Then": "If the operation is OPEN, proceed to open the Cross-Reference File for reading; if the operation is any other type (READ or CLOSE), skip the open logic and return control to the calling program immediately without performing any file action"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00036",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Cross-Reference File Opening for Sequential Reading",
+                    "rule_description": "When an OPEN operation is requested for the Cross-Reference File, the file is opened exclusively for sequential reading to enable card-to-account cross-reference lookups. The file is not opened for update or write operations.",
+                    "sub_graph_node_text": "Open Card Cross-Reference File for Sequential Reading",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has requested an OPEN operation on the Cross-Reference File identified as 'XREFFILE'",
+                        "When": "The OPEN operation is executed on the Cross-Reference File",
+                        "Then": "The Cross-Reference File is opened in read-only (INPUT) mode, making it available for sequential record retrieval; no write or update access is granted"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00037",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Cross-Reference File Open Success or Failure Status Capture",
+                    "rule_description": "After attempting to open the Cross-Reference File, the outcome of the open operation \u2014 whether successful or unsuccessful \u2014 is captured and communicated back to the calling program so it can determine whether the file is available for subsequent cross-reference lookups.",
+                    "sub_graph_node_text": "File Opened Successfully?",
+                    "acceptance_criteria": {
+                        "Given": "An OPEN operation has been attempted on the Cross-Reference File",
+                        "When": "The open operation completes \u2014 either successfully making the file ready for sequential lookups, or unsuccessfully due to the file being unavailable",
+                        "Then": "The resulting operation status (success indicating the file is ready for sequential lookups, or failure indicating the file is unavailable) is captured and returned to the calling program via the operation return code, so the caller can take appropriate action"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00038",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Cross-Reference File Operation Status Return to Caller",
+                    "rule_description": "Upon completion of any Cross-Reference File operation (including OPEN), the status of that operation is always communicated back to the calling program, regardless of whether the operation succeeded or failed.",
+                    "sub_graph_node_text": "Return Operation Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "Any operation (OPEN, READ, or CLOSE) has been attempted or evaluated on the Cross-Reference File",
+                        "When": "The operation processing completes",
+                        "Then": "The Cross-Reference File operation status is always moved to the return code field and passed back to the calling program, enabling the caller to determine the outcome and handle it appropriately"
+                    },
+                    "key_functionality_id": "cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Cross"
+        },
+        {
+            "id": "cross",
+            "title": "Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Cross-Reference Sequential Read\\nRequest Received])\n    B[Read Next Cross-Reference Record\\nSequentially from XREF-FILE]\n    C{Record\\nFound?}\n    D[Load Cross-Reference Record Data\\nCard Number and Associated\\nReference Data into Return Area]\n    E[Set End-of-File Indicator\\nNo More Records Available]\n    F[14: Return Operation Status\\nto Calling Program]\n    G([Return to Calling Program])\n\n    A --> B\n    B --> C\n    C -->|Yes - Record Retrieved| D\n    C -->|No - End of File Reached| E\n    D --> F\n    E --> F\n    F --> G",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00039",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Sequential Read of Next Cross-Reference Record",
+                    "rule_description": "When a sequential read operation is requested on the Cross-Reference file, the system retrieves the next available cross-reference record in file order and loads the card number and associated reference data into the return area for the calling program.",
+                    "sub_graph_node_text": "Read Next Cross-Reference Record\nSequentially from XREF-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Cross-Reference file is open and a sequential read operation has been requested by the calling program",
+                        "When": "The system reads the next cross-reference record sequentially from the Cross-Reference file",
+                        "Then": "The card number and associated reference data from the next cross-reference record are loaded into the return data area available to the calling program"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00040",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Cross-Reference Record Successfully Retrieved",
+                    "rule_description": "When a sequential read of the Cross-Reference file successfully retrieves a record, the card number and associated reference data are made available to the calling program.",
+                    "sub_graph_node_text": "Record\nFound?",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Cross-Reference file",
+                        "When": "A cross-reference record is successfully found and retrieved from the file",
+                        "Then": "The cross-reference record data, including the card number and all associated reference data, is loaded into the return data area for the calling program to consume"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00041",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "End-of-File Reached on Cross-Reference File",
+                    "rule_description": "When a sequential read of the Cross-Reference file finds no more records, an end-of-file condition is signaled to the calling program indicating that all cross-reference records have been processed.",
+                    "sub_graph_node_text": "Set End-of-File Indicator\nNo More Records Available",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Cross-Reference file",
+                        "When": "No further cross-reference records are available because the end of the file has been reached",
+                        "Then": "An end-of-file indicator is set and communicated back to the calling program, signaling that there are no more cross-reference records available for processing"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00042",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Return Cross-Reference Read Operation Status to Calling Program",
+                    "rule_description": "After every sequential read attempt on the Cross-Reference file \u2014 whether a record was found or end-of-file was reached \u2014 the outcome status of the operation is always returned to the calling program so it can determine the next course of action.",
+                    "sub_graph_node_text": "14: Return Operation Status\nto Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A sequential read operation has been performed on the Cross-Reference file, resulting in either a successful record retrieval or an end-of-file condition",
+                        "When": "The read operation completes regardless of whether a record was found or the end of file was reached",
+                        "Then": "The operation outcome status is returned to the calling program, enabling the caller to determine whether to continue processing more records or stop because no more cross-reference records are available"
+                    },
+                    "key_functionality_id": "cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Cross"
+        },
+        {
+            "id": "cross",
+            "title": "Cross",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Cross-Reference File\\nClose Request Received])\n    B{Is Operation\\na CLOSE Request?}\n    C[Close Cross-Reference File\\nXREF-FILE]\n    D[Capture File Close\\nOperation Status]\n    E[Return Status Result\\nto Calling Program]\n    F([Cross-Reference File\\nClose Process Complete])\n    G([No Action Taken\\nExit Process])\n\n    A --> B\n    B -->|Yes - Close Operation| C\n    B -->|No - Not a Close Request| G\n    C --> D\n    D --> E\n    E --> F",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00043",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Validate Close Operation Before Closing Cross-Reference File",
+                    "rule_description": "Before closing the Cross-Reference File, the system must verify that the requested operation is specifically a CLOSE request. If it is not a CLOSE request, no action is taken and the process exits immediately without affecting the file.",
+                    "sub_graph_node_text": "Is Operation a CLOSE Request?",
+                    "acceptance_criteria": {
+                        "Given": "The Cross-Reference File processing service has been invoked with XREFFILE as the target file identifier",
+                        "When": "The requested operation type is evaluated to determine if it is a CLOSE request",
+                        "Then": "If the operation is a CLOSE request, the Cross-Reference File close process proceeds; if the operation is NOT a CLOSE request, no action is taken and the process exits immediately without closing the file"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00044",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Cross-Reference File Upon Valid Close Request",
+                    "rule_description": "When a valid CLOSE request is received for the Cross-Reference File, the system must close the Cross-Reference File to release it after all required cross-reference records have been processed.",
+                    "sub_graph_node_text": "Close Cross-Reference File XREF-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Cross-Reference File is currently open and has been used for cross-reference record lookups or sequential reads",
+                        "When": "A CLOSE operation request is confirmed for the Cross-Reference File",
+                        "Then": "The Cross-Reference File is closed and made unavailable for further read operations in the current processing session"
+                    },
+                    "key_functionality_id": "cross"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00045",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Capture and Return Cross-Reference File Close Operation Outcome",
+                    "rule_description": "After the Cross-Reference File close operation is executed, the outcome of the close operation must be captured and communicated back to the calling program so that the caller can determine whether the file was successfully closed or if an issue occurred.",
+                    "sub_graph_node_text": "Capture File Close Operation Status / Return Status Result to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The Cross-Reference File close operation has been executed",
+                        "When": "The close operation completes \u2014 whether successfully or with an issue",
+                        "Then": "The resulting Cross-Reference File operation status is captured and returned to the calling program as the operation result, allowing the caller to assess the outcome of the close request"
+                    },
+                    "key_functionality_id": "cross"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Cross"
+        },
+        {
+            "id": "customer-file-open",
+            "title": "Customer File Open",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Customer File Process Requested])\n    B{Is Operation\\nType = OPEN?}\n    C[Open Customer File\\nfor Read-Only Access]\n    D{Customer File\\nOpened Successfully?}\n    E[Customer File Ready\\nfor Record Lookups by Customer ID]\n    F[Customer File\\nOpen Failed]\n    G[Capture Operation Status\\nReturn Result to Calling Program]\n    H([End Customer File\\nOpen Process])\n\n    A --> B\n    B -->|Yes - Open Request| C\n    B -->|No - Different Operation| H\n    C --> D\n    D -->|Success| E\n    D -->|Failure| F\n    E --> G\n    F --> G\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00046",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Customer File Open Operation Routing",
+                    "rule_description": "Determines whether the requested operation on the Customer File is an Open request, and routes processing accordingly. If the operation is not an Open request, the Customer File open process is bypassed entirely.",
+                    "sub_graph_node_text": "Is Operation Type = OPEN?",
+                    "acceptance_criteria": {
+                        "Given": "A request has been received to process the Customer File",
+                        "When": "The operation type is evaluated to determine if it is an OPEN request",
+                        "Then": "If the operation type is OPEN, proceed to open the Customer File for read-only access; if the operation type is anything other than OPEN, bypass the open process and end the Customer File open procedure without performing any action"
+                    },
+                    "key_functionality_id": "customer-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00047",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Customer File Opened for Read-Only Access",
+                    "rule_description": "When an Open operation is requested for the Customer File, the file is opened exclusively in read-only (Input) mode to enable subsequent customer record lookups by Customer ID. No modifications to customer data are permitted through this operation.",
+                    "sub_graph_node_text": "Open Customer File for Read-Only Access",
+                    "acceptance_criteria": {
+                        "Given": "A request has been received to process the Customer File and the operation type is OPEN",
+                        "When": "The Customer File open operation is executed",
+                        "Then": "The Customer File must be opened in read-only (Input) mode only, making it available for direct customer record lookups by Customer ID; no write or update access is granted"
+                    },
+                    "key_functionality_id": "customer-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00048",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Customer File Open Success \u2014 File Ready for Lookups",
+                    "rule_description": "Upon successfully opening the Customer File, the file becomes available for customer record retrieval operations using Customer ID as the lookup key.",
+                    "sub_graph_node_text": "Customer File Ready for Record Lookups by Customer ID",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File open operation has been executed",
+                        "When": "The Customer File is opened successfully",
+                        "Then": "The Customer File is ready to accept and process customer record lookup requests using Customer ID as the search key"
+                    },
+                    "key_functionality_id": "customer-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00049",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Customer File Open Failure \u2014 Operation Unsuccessful",
+                    "rule_description": "If the Customer File cannot be opened, the failure condition is captured and the outcome is communicated back to the calling program, preventing any subsequent customer record lookup attempts on an unavailable file.",
+                    "sub_graph_node_text": "Customer File Open Failed",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File open operation has been executed",
+                        "When": "The Customer File fails to open successfully",
+                        "Then": "The Customer File open failure is recorded, the file is not available for customer record lookups, and the failure outcome is returned to the calling program"
+                    },
+                    "key_functionality_id": "customer-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00050",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Customer File Operation Status Returned to Caller",
+                    "rule_description": "After every Customer File open operation \u2014 whether successful or failed \u2014 the outcome status of the operation is always captured and returned to the calling program, enabling the caller to determine the result and take appropriate next steps.",
+                    "sub_graph_node_text": "Capture Operation Status Return Result to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File open operation has been attempted, resulting in either a success or failure outcome",
+                        "When": "The Customer File open process completes",
+                        "Then": "The operation outcome status must always be captured and returned to the calling program regardless of whether the open succeeded or failed, so the caller can handle the result appropriately"
+                    },
+                    "key_functionality_id": "customer-file-open"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Customer File Open"
+        },
+        {
+            "id": "customer-record-lookup-by-key",
+            "title": "Customer Record Lookup by Key",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Customer Record Lookup Requested])\n    B[Receive Customer ID Key\\nfrom Calling Program]\n    C[Set Customer ID as\\nFile Lookup Key]\n    D[(CUST-FILE\\nCustomer File)]\n    E[Retrieve Customer Record\\nfrom Customer File]\n    F{Customer Record\\nFound?}\n    G[Return Customer Record Data\\nto Calling Program]\n    H[Return 'Not Found' Status\\nto Calling Program]\n    I([Return to Calling Program])\n\n    A --> B\n    B --> C\n    C --> E\n    E -.->|Lookup by Customer ID Key| D\n    D -.->|Customer Record| E\n    E --> F\n    F -->|Yes - Record Found| G\n    F -->|No - Record Not Found| H\n    G --> I\n    H --> I",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00051",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Receive Customer ID Key from Calling Program",
+                    "rule_description": "The customer record lookup service accepts a Customer ID key and its length from the calling program to identify which customer record to retrieve.",
+                    "sub_graph_node_text": "Receive Customer ID Key from Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has requested a customer record lookup and has provided a Customer ID key value and the length of that key",
+                        "When": "The customer record lookup operation is initiated with file identifier 'CUSTFILE' and a keyed-read operation type",
+                        "Then": "The Customer ID key value (trimmed to the specified key length) is accepted and prepared for use as the lookup identifier against the Customer File"
+                    },
+                    "key_functionality_id": "customer-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00052",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Set Customer ID as File Lookup Key",
+                    "rule_description": "The Customer ID provided by the calling program is assigned as the active search key for the Customer File, using only the portion of the key up to the specified key length.",
+                    "sub_graph_node_text": "Set Customer ID as File Lookup Key",
+                    "acceptance_criteria": {
+                        "Given": "A Customer ID key value and its length have been received from the calling program",
+                        "When": "The system prepares to look up the customer record in the Customer File",
+                        "Then": "Only the relevant portion of the Customer ID key \u2014 from position 1 up to the specified key length \u2014 is set as the active lookup key for the Customer File"
+                    },
+                    "key_functionality_id": "customer-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00053",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Retrieve Customer Record from Customer File by Key",
+                    "rule_description": "The system performs a direct keyed lookup against the Customer File using the Customer ID to retrieve the matching customer record.",
+                    "sub_graph_node_text": "Retrieve Customer Record from Customer File",
+                    "acceptance_criteria": {
+                        "Given": "The Customer ID has been set as the active lookup key for the Customer File",
+                        "When": "A keyed read operation is executed against the Customer File",
+                        "Then": "The system attempts to directly locate and retrieve the customer record that matches the provided Customer ID from the Customer File"
+                    },
+                    "key_functionality_id": "customer-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00054",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Return Customer Record Data to Calling Program on Successful Lookup",
+                    "rule_description": "When a customer record matching the provided Customer ID is found in the Customer File, the full customer record data is returned to the calling program.",
+                    "sub_graph_node_text": "Customer Record Found?\nReturn Customer Record Data to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A keyed read operation has been executed against the Customer File using the provided Customer ID",
+                        "When": "The Customer File contains a record matching the provided Customer ID",
+                        "Then": "The complete customer record data is returned to the calling program in the designated data field"
+                    },
+                    "key_functionality_id": "customer-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00055",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Return Not Found Status When Customer Record Does Not Exist",
+                    "rule_description": "When no customer record matching the provided Customer ID exists in the Customer File, a 'not found' outcome is communicated back to the calling program.",
+                    "sub_graph_node_text": "Customer Record Found?\nReturn 'Not Found' Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A keyed read operation has been executed against the Customer File using the provided Customer ID",
+                        "When": "No customer record matching the provided Customer ID exists in the Customer File",
+                        "Then": "A 'record not found' status is returned to the calling program, indicating that no customer record was located for the given Customer ID"
+                    },
+                    "key_functionality_id": "customer-record-lookup-by-key"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "set-customer-id-as-file-lookup-key",
+                    "title": "Set Customer ID as File Lookup Key",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    A([Start: Customer Record Lookup Requested])\n    B[Receive Key Field containing Customer ID\\nand Key Length from calling program]\n    C[Extract Customer ID from Key Field\\nusing specified Key Length\\nas the exact number of characters to use]\n    D[Set extracted Customer ID\\nas the File Lookup Key]\n    E([Proceed to Customer Record Lookup])\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E",
+                    "rules": [
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00072",
+                            "rule_type": "Process Rules",
+                            "rule_name": "Extract Customer ID from Key Field Using Specified Key Length",
+                            "rule_description": "When a Customer record lookup is requested, the Customer ID must be precisely extracted from the provided key field by reading only the number of characters specified by the key length, ensuring the correct and exact Customer ID value is isolated for the lookup.",
+                            "sub_graph_node_text": "Extract Customer ID from Key Field using specified Key Length as the exact number of characters to use",
+                            "acceptance_criteria": {
+                                "Given": "A Customer record lookup has been requested, and the calling program has provided a Key Field containing the Customer ID value and a Key Length specifying the exact number of characters that represent the Customer ID",
+                                "When": "The system prepares to perform the Customer record lookup",
+                                "Then": "The system must extract the Customer ID by reading characters from the Key Field starting at the first position and reading exactly the number of characters specified by the Key Length, so that only the relevant portion of the Key Field is used as the Customer ID \u2014 no more and no fewer characters than the specified Key Length"
+                            },
+                            "key_functionality_id": "set-customer-id-as-file-lookup-key"
+                        },
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00073",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Set Extracted Customer ID as the File Lookup Key",
+                            "rule_description": "After the Customer ID has been extracted from the Key Field using the specified Key Length, the extracted value must be assigned as the active File Lookup Key so that the Customer File can locate and retrieve the correct Customer record.",
+                            "sub_graph_node_text": "Set extracted Customer ID as the File Lookup Key",
+                            "acceptance_criteria": {
+                                "Given": "The Customer ID has been successfully extracted from the Key Field using the specified Key Length",
+                                "When": "The system is ready to perform the direct Customer record lookup in the Customer File",
+                                "Then": "The extracted Customer ID value must be set as the File Lookup Key for the Customer File, so that the subsequent record retrieval targets exactly the Customer record matching that Customer ID"
+                            },
+                            "key_functionality_id": "set-customer-id-as-file-lookup-key"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "Customer Record Lookup by Key"
+        },
+        {
+            "id": "customer-file-close",
+            "title": "Customer File Close",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Customer File Close Request Received])\n    B{Is Operation\\nType = CLOSE?}\n    C[Close Customer File\\nCUST-FILE]\n    D[Capture Customer File\\nClose Operation Status]\n    E[Return Status Result\\nto Calling Program]\n    F([Customer File\\nSuccessfully Closed])\n\n    A --> B\n    B -->|Yes| C\n    C --> D\n    D --> E\n    E --> F",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00056",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Verify Close Operation Type Before Closing Customer File",
+                    "rule_description": "The system must verify that the requested operation is a CLOSE before proceeding to close the Customer File, ensuring the correct operation is executed for the Customer File.",
+                    "sub_graph_node_text": "Is Operation Type = CLOSE?",
+                    "acceptance_criteria": {
+                        "Given": "A Customer File Close request has been received with file identifier set to 'CUSTFILE'",
+                        "When": "The operation type indicator (M03B-CLOSE) is evaluated to determine if it is a CLOSE operation",
+                        "Then": "If the operation type is CLOSE, the system proceeds to close the Customer File; if the operation type is not CLOSE, the Customer File close action is skipped and no further processing occurs for this operation"
+                    },
+                    "key_functionality_id": "customer-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00057",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Close Customer File Upon Valid Close Request",
+                    "rule_description": "When a valid CLOSE operation is requested for the Customer File, the system must close the Customer File to release it and make it available for other processes.",
+                    "sub_graph_node_text": "Close Customer File CUST-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File (CUST-FILE) is currently open and the operation type is confirmed as CLOSE",
+                        "When": "The CLOSE operation is executed on the Customer File",
+                        "Then": "The Customer File is closed and released, making it no longer accessible for read operations until it is reopened"
+                    },
+                    "key_functionality_id": "customer-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00058",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Capture and Return Customer File Close Operation Outcome",
+                    "rule_description": "After the Customer File close operation is performed, the system must capture the outcome of the close operation and return it to the calling program so the caller can determine whether the Customer File was successfully closed.",
+                    "sub_graph_node_text": "Capture Customer File Close Operation Status",
+                    "acceptance_criteria": {
+                        "Given": "The Customer File close operation has been executed",
+                        "When": "The Customer File close operation status is captured and returned to the calling program",
+                        "Then": "The Customer File operation status (CUSTFILE-STATUS) is moved into the return code field (LK-M03B-RC) and made available to the calling program, indicating whether the close was successful or encountered an issue"
+                    },
+                    "key_functionality_id": "customer-file-close"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Customer File Close"
+        },
+        {
+            "id": "account-file-open",
+            "title": "Account File Open",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Calling Program Requests\\nAccount File Open])\n    B{Is Operation\\nType = OPEN?}\n    C[Open Account File\\nfor Random Access Reading]\n    D{Account File\\nOpened Successfully?}\n    E[Account File Ready\\nfor Account ID Lookups]\n    F[Capture File Open\\nStatus Result]\n    G[Return Success Status\\nto Calling Program]\n    H[Return Failure Status\\nto Calling Program]\n    I([End Account\\nFile Open Process])\n\n    A --> B\n    B -->|Yes - Open Request| C\n    B -->|No - Different Operation| I\n    C --> D\n    D -->|Success| E\n    D -->|Failed| F\n    E --> F\n    F --> G\n    F --> H\n    G -->|File Open - Ready for\\nAccount Record Lookups| I\n    H -->|File Unavailable -\\nCaller Notified| I",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00059",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Route to Account File Open Operation",
+                    "rule_description": "Determines whether the requested operation for the Account File is an Open request, and routes accordingly to either initiate the file open process or bypass it for a different operation type.",
+                    "sub_graph_node_text": "Is Operation Type = OPEN?",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has submitted a request targeting the Account File (LK-M03B-DD = 'ACCTFILE')",
+                        "When": "The operation type indicator (M03B-OPEN) is evaluated to determine if the request is an Open operation",
+                        "Then": "If the operation type is OPEN, proceed to open the Account File for reading; if the operation type is not OPEN, bypass the open logic and exit the Account File Open process without performing any action"
+                    },
+                    "key_functionality_id": "account-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00060",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Open Account File for Random Access Reading",
+                    "rule_description": "Opens the Account File in read-only mode to enable direct lookup of account records by Account ID. This is a prerequisite before any account record retrieval can be performed.",
+                    "sub_graph_node_text": "Open Account File for Random Access Reading",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has requested an Open operation on the Account File (LK-M03B-DD = 'ACCTFILE') and the operation type is confirmed as OPEN (M03B-OPEN is true)",
+                        "When": "The Account File open request is executed",
+                        "Then": "The Account File is opened for input (read-only, random access) making it available for subsequent account record lookups by Account ID; the file open status result is captured and returned to the calling program"
+                    },
+                    "key_functionality_id": "account-file-open"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00061",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Return Account File Open Status to Calling Program",
+                    "rule_description": "After attempting to open the Account File, the outcome of the open operation \u2014 whether successful or failed \u2014 is always captured and communicated back to the calling program so it can determine whether the Account File is available for account record lookups.",
+                    "sub_graph_node_text": "Return Success Status to Calling Program / Return Failure Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "An open operation has been attempted on the Account File (either successfully opened or failed to open)",
+                        "When": "The Account File open process completes",
+                        "Then": "The Account File operation status (ACCTFILE-STATUS) is moved to the return code field (LK-M03B-RC) and returned to the calling program; if the file opened successfully, the calling program receives a success status indicating the Account File is ready for Account ID lookups; if the file failed to open, the calling program receives a failure status indicating the Account File is unavailable"
+                    },
+                    "key_functionality_id": "account-file-open"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Account File Open"
+        },
+        {
+            "id": "account-record-lookup-by-key",
+            "title": "Account Record Lookup by Key",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Account Record Lookup Requested])\n    B[Receive Account ID Key\\nfrom Calling Program]\n    C[Set Account ID as\\nLookup Key]\n    D[(ACCT-FILE\\nAccount File)]\n    E{Account Record\\nFound?}\n    F[Return Account Record Data\\nto Calling Program]\n    G[Return 'Not Found' Status\\nto Calling Program]\n    H([Return to Calling Program])\n\n    A --> B\n    B --> C\n    C -->|Lookup by Account ID| D\n    D --> E\n    E -->|Yes - Record Found| F\n    E -->|No - Record Not Found| G\n    F --> H\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00062",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Receive Account ID Key from Calling Program",
+                    "rule_description": "The account lookup service receives the Account ID key and its length from the calling program to identify which account record to retrieve.",
+                    "sub_graph_node_text": "Receive Account ID Key from Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The calling program has requested an account record lookup and has provided an Account ID key value and the length of that key",
+                        "When": "The account lookup operation is initiated with the Account ID key and key length supplied by the calling program",
+                        "Then": "The Account ID key value (trimmed to the specified key length) is accepted and made ready to be used as the lookup identifier for the Account File"
+                    },
+                    "key_functionality_id": "account-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00063",
+                    "rule_type": "Definitional Rules",
+                    "rule_name": "Set Account ID as Lookup Key",
+                    "rule_description": "The received Account ID key is applied as the search key on the Account File so that the correct account record can be directly located.",
+                    "sub_graph_node_text": "Set Account ID as Lookup Key",
+                    "acceptance_criteria": {
+                        "Given": "A valid Account ID key and its length have been received from the calling program",
+                        "When": "The system prepares to read from the Account File",
+                        "Then": "Only the portion of the Account ID key matching the specified key length is set as the active lookup key on the Account File, ensuring the search targets the exact account record requested"
+                    },
+                    "key_functionality_id": "account-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00064",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Retrieve Account Record by Account ID Key",
+                    "rule_description": "The system performs a direct keyed lookup on the Account File using the Account ID to retrieve the specific account record requested by the calling program.",
+                    "sub_graph_node_text": "Lookup by Account ID \u2192 ACCT-FILE",
+                    "acceptance_criteria": {
+                        "Given": "The Account File is open for reading and the Account ID has been set as the lookup key",
+                        "When": "A keyed read operation is performed on the Account File using the Account ID",
+                        "Then": "The system attempts to directly locate and retrieve the account record matching the provided Account ID from the Account File"
+                    },
+                    "key_functionality_id": "account-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00065",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Return Account Record Data When Found",
+                    "rule_description": "When the Account File lookup successfully locates the requested account record, the full account record data is returned to the calling program.",
+                    "sub_graph_node_text": "Return Account Record Data to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A keyed read has been performed on the Account File using the provided Account ID",
+                        "When": "The account record matching the Account ID is found in the Account File",
+                        "Then": "The complete account record data is returned to the calling program, and a successful operation status is communicated back to the caller"
+                    },
+                    "key_functionality_id": "account-record-lookup-by-key"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00066",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Return Not Found Status When Account Record Does Not Exist",
+                    "rule_description": "When the Account File lookup cannot locate a record matching the provided Account ID, a 'not found' outcome is communicated back to the calling program.",
+                    "sub_graph_node_text": "Return 'Not Found' Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A keyed read has been performed on the Account File using the provided Account ID",
+                        "When": "No account record matching the provided Account ID exists in the Account File",
+                        "Then": "No account record data is returned, and a 'record not found' status is communicated back to the calling program so the caller can handle the absence of the account appropriately"
+                    },
+                    "key_functionality_id": "account-record-lookup-by-key"
+                }
+            ],
+            "sub_functionalities": [
+                {
+                    "id": "set-account-id-as-lookup-key",
+                    "title": "Set Account ID as Lookup Key",
+                    "level": 2,
+                    "mermaid_diagram": "flowchart TD\n    A([Start: Account Record Lookup Requested])\n    B[Receive Key Field containing Account ID\\nand Key Length from calling program]\n    C[Extract Account ID from Key Field\\nusing specified Key Length\\nfrom position 1 to Key Length]\n    D{Account ID\\nExtracted\\nSuccessfully?}\n    E[Set Extracted Account ID\\nas the File Lookup Key]\n    F([Proceed to Account Record Lookup\\nby Key - Process 12])\n    ERR([Return Error Status\\nto Calling Program])\n\n    A --> B\n    B --> C\n    C --> D\n    D -->|Yes| E\n    D -->|No - Invalid Key Length| ERR\n    E --> F",
+                    "rules": [
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00074",
+                            "rule_type": "Process Rules",
+                            "rule_name": "Receive Account ID Key Field and Key Length from Calling Program",
+                            "rule_description": "When an Account record lookup by key is requested, the program must receive both the Account ID key field value and the key length from the calling program before any key extraction or lookup can proceed.",
+                            "sub_graph_node_text": "Receive Key Field containing Account ID and Key Length from calling program",
+                            "acceptance_criteria": {
+                                "Given": "A calling program has requested an Account record lookup by key and has provided a Key Field containing the Account ID value and a Key Length indicating how many characters of the Key Field represent the valid Account ID",
+                                "When": "The Account File keyed read operation is triggered by the calling program",
+                                "Then": "The program accepts the Key Field (containing the Account ID) and the Key Length from the calling program as the inputs required to identify the specific Account record to be retrieved"
+                            },
+                            "key_functionality_id": "set-account-id-as-lookup-key"
+                        },
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00075",
+                            "rule_type": "Computation Rules",
+                            "rule_name": "Extract Account ID from Key Field Using Specified Key Length",
+                            "rule_description": "The Account ID must be precisely extracted from the provided Key Field by reading characters starting from position 1 up to the length specified by the Key Length value, ensuring only the valid portion of the key is used for the lookup.",
+                            "sub_graph_node_text": "Extract Account ID from Key Field using specified Key Length from position 1 to Key Length",
+                            "acceptance_criteria": {
+                                "Given": "The calling program has provided a Key Field containing the Account ID and a Key Length value specifying the number of valid characters in the Key Field",
+                                "When": "The program prepares the Account ID for the file lookup",
+                                "Then": "The program extracts characters from the Key Field starting at position 1 through the position indicated by the Key Length value, and this extracted substring becomes the Account ID used for the record lookup \u2014 no characters beyond the specified Key Length are included"
+                            },
+                            "key_functionality_id": "set-account-id-as-lookup-key"
+                        },
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00076",
+                            "rule_type": "Action Rules",
+                            "rule_name": "Set Extracted Account ID as the File Lookup Key",
+                            "rule_description": "Once the Account ID has been extracted from the Key Field using the specified Key Length, it must be set as the active lookup key on the Account File so that the correct Account record can be directly retrieved.",
+                            "sub_graph_node_text": "Set Extracted Account ID as the File Lookup Key",
+                            "acceptance_criteria": {
+                                "Given": "The Account ID has been successfully extracted from the Key Field using the specified Key Length",
+                                "When": "The program sets up the Account File for a direct keyed record retrieval",
+                                "Then": "The extracted Account ID is assigned as the lookup key for the Account File, and the program proceeds to retrieve the Account record that matches this Account ID, returning the matched record data to the calling program"
+                            },
+                            "key_functionality_id": "set-account-id-as-lookup-key"
+                        },
+                        {
+                            "rule_id": "R-CBSTM03B-cbl-00077",
+                            "rule_type": "Validation Rules",
+                            "rule_name": "Variable-Length Account ID Key Supports Dynamic Key Lengths",
+                            "rule_description": "The Account ID key extraction mechanism supports variable-length keys, meaning the calling program controls how much of the Key Field constitutes the Account ID by specifying the Key Length. This allows different callers to use different Account ID lengths without changing the lookup service.",
+                            "sub_graph_node_text": "Extract Account ID from Key Field using specified Key Length from position 1 to Key Length",
+                            "acceptance_criteria": {
+                                "Given": "The Account File lookup service is designed to accept Account IDs of varying lengths",
+                                "When": "A calling program provides a Key Field and a Key Length for an Account record lookup",
+                                "Then": "The program uses exactly the number of characters specified by the Key Length \u2014 starting from position 1 of the Key Field \u2014 as the Account ID, ensuring the lookup is performed with the precise key boundary defined by the caller and not a fixed or default key length"
+                            },
+                            "key_functionality_id": "set-account-id-as-lookup-key"
+                        }
+                    ],
+                    "sub_functionalities": []
+                }
+            ],
+            "description": "Account Record Lookup by Key"
+        },
+        {
+            "id": "account-file-close",
+            "title": "Account File Close",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([Account File Close\\nRequest Received])\n    B{Is Operation\\nType = CLOSE?}\n    C[Close the\\nAccount File]\n    D[(ACCT-FILE\\nAccount File)]\n    E[Capture Account File\\nOperation Result Status]\n    F[Return Operation\\nStatus to Calling Program]\n    G([Account File Close\\nProcess Complete])\n\n    A --> B\n    B -->|Yes - Close Requested| C\n    C -.->|Close File| D\n    C --> E\n    E --> F\n    F --> G\n    B -->|No - Different Operation| G",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00067",
+                    "rule_type": "Decision Rules",
+                    "rule_name": "Account File Close Operation Verification",
+                    "rule_description": "Determines whether the requested operation for the Account File is a CLOSE operation before proceeding to close the file. If the operation is not CLOSE, no action is taken and the process completes without closing the file.",
+                    "sub_graph_node_text": "Is Operation Type = CLOSE?",
+                    "acceptance_criteria": {
+                        "Given": "The Account File processing service has been invoked with file identifier 'ACCTFILE' and an operation type has been provided by the calling program",
+                        "When": "The operation type is evaluated to determine if it is a CLOSE request",
+                        "Then": "If the operation type is CLOSE, the Account File close process is initiated; if the operation type is anything other than CLOSE, the Account File close process is skipped and the process completes without any file action"
+                    },
+                    "key_functionality_id": "account-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00068",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Account File Closure Execution",
+                    "rule_description": "Closes the Account File once all required account records have been retrieved, ensuring the file is properly released after use.",
+                    "sub_graph_node_text": "Close the Account File",
+                    "acceptance_criteria": {
+                        "Given": "The Account File has been previously opened and the calling program has completed all required account record retrievals",
+                        "When": "The operation type is confirmed as CLOSE",
+                        "Then": "The Account File is closed and made unavailable for further read operations within this session"
+                    },
+                    "key_functionality_id": "account-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00069",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Account File Close Operation Result Capture",
+                    "rule_description": "After the Account File close operation is executed, the outcome of the operation is captured and made available to the calling program so it can determine whether the file was successfully closed.",
+                    "sub_graph_node_text": "Capture Account File Operation Result Status",
+                    "acceptance_criteria": {
+                        "Given": "The Account File close operation has been executed",
+                        "When": "The close operation completes \u2014 whether successfully or with an issue",
+                        "Then": "The result status of the Account File close operation is captured and stored for return to the calling program"
+                    },
+                    "key_functionality_id": "account-file-close"
+                },
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00070",
+                    "rule_type": "Action Rules",
+                    "rule_name": "Account File Close Status Return to Caller",
+                    "rule_description": "The outcome of the Account File close operation is always communicated back to the calling program, allowing the caller to verify whether the file was successfully closed and take appropriate action if needed.",
+                    "sub_graph_node_text": "Return Operation Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "The Account File close operation has been attempted and the operation result status has been captured",
+                        "When": "The Account File close process is complete",
+                        "Then": "The operation result status is returned to the calling program so the caller can confirm successful closure of the Account File or handle any closure issue accordingly"
+                    },
+                    "key_functionality_id": "account-file-close"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Account File Close"
+        },
+        {
+            "id": "operation-status-return",
+            "title": "Operation Status Return",
+            "level": 1,
+            "mermaid_diagram": "flowchart TD\n    A([File Operation Completed])\n\n    A --> B{Which File\\nWas Operated On?}\n\n    B -->|Transaction File| C1[Capture Transaction File\\nOperation Result]\n    B -->|Cross-Reference File| C2[Capture Cross-Reference File\\nOperation Result]\n    B -->|Customer File| C3[Capture Customer File\\nOperation Result]\n    B -->|Account File| C4[Capture Account File\\nOperation Result]\n\n    C1 --> D[Set Return Status Code\\nfor Calling Program]\n    C2 --> D\n    C3 --> D\n    C4 --> D\n\n    D --> E{Did the File\\nOperation Succeed?}\n\n    E -->|Yes - Status Indicates Success| F[Return Success Status\\nto Calling Program]\n    E -->|No - Status Indicates Failure| G[Return Failure Status\\nto Calling Program]\n\n    F --> H([Return to Calling Program])\n    G --> H",
+            "rules": [
+                {
+                    "rule_id": "R-CBSTM03B-cbl-00071",
+                    "rule_type": "Process Rules",
+                    "rule_name": "Capture and Return File Operation Result to Calling Program",
+                    "rule_description": "After every file operation (open, read, or close) on any supported file, the outcome of that operation is captured from the respective file and communicated back to the calling program. This allows the calling program to determine whether the requested file operation succeeded or failed and take appropriate action.",
+                    "sub_graph_node_text": "Capture Transaction File Operation Result / Capture Cross-Reference File Operation Result / Capture Customer File Operation Result / Capture Account File Operation Result \u2192 Set Return Status Code for Calling Program \u2192 Return Success Status or Return Failure Status to Calling Program",
+                    "acceptance_criteria": {
+                        "Given": "A file operation (open, read, or close) has been requested and executed on one of the supported files: Transaction File, Cross-Reference File, Customer File, or Account File",
+                        "When": "The file operation completes \u2014 regardless of whether it succeeded (e.g., record found, file opened successfully, end-of-file reached) or failed (e.g., record not found, file unavailable)",
+                        "Then": "The operation result status from the specific file that was operated on is captured and set as the return status code passed back to the calling program: if the Transaction File was operated on, the Transaction File operation result is returned; if the Cross-Reference File was operated on, the Cross-Reference File operation result is returned; if the Customer File was operated on, the Customer File operation result is returned; if the Account File was operated on, the Account File operation result is returned \u2014 in all cases the calling program receives the status indicating success or failure of the requested operation"
+                    },
+                    "key_functionality_id": "operation-status-return"
+                }
+            ],
+            "sub_functionalities": [],
+            "description": "Operation Status Return"
+        }
+    ],
+    "all_rules": [
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00001",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The program receives a file identifier (LK-M03B-DD) from the calling program",
+                "When": "The file identifier is evaluated against known file names: TRNXFILE, XREFFILE, CUSTFILE, or ACCTFILE",
+                "Then": "If the file identifier is TRNXFILE, route to Transaction File processing; if XREFFILE, route to Cross-Reference File processing; if CUSTFILE, route to Customer File processing; if ACCTFILE, route to Account File processing; if the file identifier does not match any known file name, exit the program immediately without performing any file operation"
+            },
+            "Rule_Name": "File Operation Routing",
+            "Rule_Description": "Routes the file operation request to the correct file handler based on the file identifier provided by the caller. If an unrecognized file identifier is provided, the program exits without performing any operation."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00002",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is TRNXFILE and the requested operation is Open",
+                "When": "The open operation is requested for the Transaction File",
+                "Then": "The Transaction File is opened for reading, and the result of the open operation is returned to the calling program"
+            },
+            "Rule_Name": "Transaction File Open",
+            "Rule_Description": "Opens the Transaction File to allow sequential reading of transaction records."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00003",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is TRNXFILE, the Transaction File is open, and the requested operation is Read",
+                "When": "A sequential read operation is performed on the Transaction File",
+                "Then": "The next transaction record is retrieved in sequence and returned to the calling program as record data; the result of the read operation (including end-of-file condition) is returned to the calling program"
+            },
+            "Rule_Name": "Transaction File Sequential Read",
+            "Rule_Description": "Reads the next available transaction record sequentially from the Transaction File and returns the record data to the caller."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00004",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is TRNXFILE and the requested operation is Close",
+                "When": "The close operation is requested for the Transaction File",
+                "Then": "The Transaction File is closed and the result of the close operation is returned to the calling program"
+            },
+            "Rule_Name": "Transaction File Close",
+            "Rule_Description": "Closes the Transaction File after all required transaction records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00005",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is XREFFILE and the requested operation is Open",
+                "When": "The open operation is requested for the Cross-Reference File",
+                "Then": "The Cross-Reference File is opened for reading and the result of the open operation is returned to the calling program"
+            },
+            "Rule_Name": "Cross-Reference File Open",
+            "Rule_Description": "Opens the Cross-Reference File to allow sequential reading of cross-reference records."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00006",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is XREFFILE, the Cross-Reference File is open, and the requested operation is Read",
+                "When": "A sequential read operation is performed on the Cross-Reference File",
+                "Then": "The next cross-reference record is retrieved in sequence and returned to the calling program as record data; the result of the read operation (including end-of-file condition) is returned to the calling program"
+            },
+            "Rule_Name": "Cross-Reference File Sequential Read",
+            "Rule_Description": "Reads the next available record sequentially from the Cross-Reference File and returns the record data to the caller."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00007",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is XREFFILE and the requested operation is Close",
+                "When": "The close operation is requested for the Cross-Reference File",
+                "Then": "The Cross-Reference File is closed and the result of the close operation is returned to the calling program"
+            },
+            "Rule_Name": "Cross-Reference File Close",
+            "Rule_Description": "Closes the Cross-Reference File after all required cross-reference records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00008",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is CUSTFILE and the requested operation is Open",
+                "When": "The open operation is requested for the Customer File",
+                "Then": "The Customer File is opened for reading and the result of the open operation is returned to the calling program"
+            },
+            "Rule_Name": "Customer File Open",
+            "Rule_Description": "Opens the Customer File to allow direct keyed retrieval of individual customer records."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00009",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is CUSTFILE, the Customer File is open, the requested operation is Read by Key, and the caller has provided a Customer ID key value along with the key length",
+                "When": "A keyed read operation is performed using the provided Customer ID (trimmed to the specified key length) as the lookup key",
+                "Then": "The matching customer record is retrieved directly from the Customer File and returned to the calling program as record data; if no matching customer record is found, the not-found result is returned to the calling program"
+            },
+            "Rule_Name": "Customer Record Lookup by Key",
+            "Rule_Description": "Retrieves a specific customer record directly from the Customer File using a Customer ID key provided by the caller. The key length is variable and specified by the caller."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00010",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is CUSTFILE and the requested operation is Close",
+                "When": "The close operation is requested for the Customer File",
+                "Then": "The Customer File is closed and the result of the close operation is returned to the calling program"
+            },
+            "Rule_Name": "Customer File Close",
+            "Rule_Description": "Closes the Customer File after the required customer record lookup has been completed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00011",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is ACCTFILE and the requested operation is Open",
+                "When": "The open operation is requested for the Account File",
+                "Then": "The Account File is opened for reading and the result of the open operation is returned to the calling program"
+            },
+            "Rule_Name": "Account File Open",
+            "Rule_Description": "Opens the Account File to allow direct keyed retrieval of individual account records."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00012",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is ACCTFILE, the Account File is open, the requested operation is Read by Key, and the caller has provided an Account ID key value along with the key length",
+                "When": "A keyed read operation is performed using the provided Account ID (trimmed to the specified key length) as the lookup key",
+                "Then": "The matching account record is retrieved directly from the Account File and returned to the calling program as record data; if no matching account record is found, the not-found result is returned to the calling program"
+            },
+            "Rule_Name": "Account Record Lookup by Key",
+            "Rule_Description": "Retrieves a specific account record directly from the Account File using an Account ID key provided by the caller. The key length is variable and specified by the caller."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00013",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file identifier is ACCTFILE and the requested operation is Close",
+                "When": "The close operation is requested for the Account File",
+                "Then": "The Account File is closed and the result of the close operation is returned to the calling program"
+            },
+            "Rule_Name": "Account File Close",
+            "Rule_Description": "Closes the Account File after the required account record lookup has been completed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00014",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "Any file operation (open, read, or close) has been performed on any of the four files: Transaction, Cross-Reference, Customer, or Account",
+                "When": "The file operation completes regardless of outcome",
+                "Then": "The file operation result is captured and returned to the calling program; for Transaction File operations the Transaction File result is returned; for Cross-Reference File operations the Cross-Reference File result is returned; for Customer File operations the Customer File result is returned; for Account File operations the Account File result is returned"
+            },
+            "Rule_Name": "Operation Status Return to Caller",
+            "Rule_Description": "After every file operation (open, read, or close) on any file, the outcome of that operation is always communicated back to the calling program. This allows the caller to determine whether the operation succeeded, reached end-of-file, or failed to find a record."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00015",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request and provided a file identifier (LK-M03B-DD) indicating which file should be operated on",
+                "When": "The file operation service evaluates the received file identifier against the known file identifiers: TRNXFILE, XREFFILE, CUSTFILE, and ACCTFILE",
+                "Then": "If the identifier is 'TRNXFILE', the request is routed to the Transaction File handling process; if the identifier is 'XREFFILE', the request is routed to the Cross-Reference File handling process; if the identifier is 'CUSTFILE', the request is routed to the Customer File handling process; if the identifier is 'ACCTFILE', the request is routed to the Account File handling process; if the identifier does not match any known file identifier, no file operation is performed and the service exits immediately returning control to the calling program"
+            },
+            "Rule_Name": "Route File Operation Request to Appropriate File Handler",
+            "Rule_Description": "When a calling program requests a file operation, the service determines which file to operate on by evaluating the file identifier received, and routes the request to the correct file handling process for Transaction, Cross-Reference, Customer, or Account files."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00016",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request with a file identifier (LK-M03B-DD) that does not match any of the recognized values: TRNXFILE, XREFFILE, CUSTFILE, or ACCTFILE",
+                "When": "The file operation service evaluates the received file identifier and finds no matching known file identifier",
+                "Then": "No file operation is performed, no file is opened, read, or closed, and the service immediately exits and returns control to the calling program without updating any output data or status"
+            },
+            "Rule_Name": "Handle Unrecognized File Identifier with No Action",
+            "Rule_Description": "When the file identifier provided by the calling program does not match any of the recognized file identifiers, the service takes no action and immediately returns control to the calling program without performing any file operation."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00017",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'TRNXFILE'",
+                "When": "The file operation service evaluates the file identifier and matches it to 'TRNXFILE'",
+                "Then": "The service routes the request to the Transaction File handling process, which will perform the requested operation (open, sequential read, or close) on the Transaction File and return the operation outcome to the calling program"
+            },
+            "Rule_Name": "Route to Transaction File Handling Process",
+            "Rule_Description": "When the file identifier received is TRNXFILE, the service routes the request to the Transaction File handling process to perform the requested operation on the Transaction File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00018",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'XREFFILE'",
+                "When": "The file operation service evaluates the file identifier and matches it to 'XREFFILE'",
+                "Then": "The service routes the request to the Cross-Reference File handling process, which will perform the requested operation (open, sequential read, or close) on the Cross-Reference File and return the operation outcome to the calling program"
+            },
+            "Rule_Name": "Route to Cross-Reference File Handling Process",
+            "Rule_Description": "When the file identifier received is XREFFILE, the service routes the request to the Cross-Reference File handling process to perform the requested operation on the Cross-Reference File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00019",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'CUSTFILE'",
+                "When": "The file operation service evaluates the file identifier and matches it to 'CUSTFILE'",
+                "Then": "The service routes the request to the Customer File handling process, which will perform the requested operation (open, keyed read by Customer ID, or close) on the Customer File and return the operation outcome to the calling program"
+            },
+            "Rule_Name": "Route to Customer File Handling Process",
+            "Rule_Description": "When the file identifier received is CUSTFILE, the service routes the request to the Customer File handling process to perform the requested operation on the Customer File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00020",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has submitted a file operation request and the file identifier (LK-M03B-DD) provided is 'ACCTFILE'",
+                "When": "The file operation service evaluates the file identifier and matches it to 'ACCTFILE'",
+                "Then": "The service routes the request to the Account File handling process, which will perform the requested operation (open, keyed read by Account ID, or close) on the Account File and return the operation outcome to the calling program"
+            },
+            "Rule_Name": "Route to Account File Handling Process",
+            "Rule_Description": "When the file identifier received is ACCTFILE, the service routes the request to the Account File handling process to perform the requested operation on the Account File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00021",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The file I/O service has been invoked with the Transaction File (TRNXFILE) as the target file",
+                "When": "The requested operation type is evaluated to determine if it is an OPEN request",
+                "Then": "If the operation type is OPEN, proceed to open the Transaction File for sequential reading; if the operation type is anything other than OPEN, this process step is not applicable and no action is taken"
+            },
+            "Rule_Name": "Transaction File Open Operation Eligibility Check",
+            "Rule_Description": "Determines whether the requested file operation is an OPEN request for the Transaction File. Only when the operation type is OPEN should the Transaction File be opened for sequential reading; all other operation types are not applicable to this process step."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00022",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File (TRNXFILE) has been identified as the target file and the requested operation is OPEN",
+                "When": "The OPEN operation is executed on the Transaction File",
+                "Then": "The Transaction File is opened in read-only (input) mode, making it available for sequential record-by-record retrieval; no write or update access is granted"
+            },
+            "Rule_Name": "Transaction File Sequential Read Enablement",
+            "Rule_Description": "When an OPEN operation is requested for the Transaction File, the file must be opened exclusively in read (input) mode to enable sequential retrieval of transaction records. No modifications to transaction data are permitted during this operation."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00023",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The OPEN operation has been executed on the Transaction File and the file has been opened successfully",
+                "When": "The Transaction File open operation completes without error",
+                "Then": "The successful operation status from the Transaction File is captured and returned to the calling program, indicating that the Transaction File is ready for sequential record retrieval"
+            },
+            "Rule_Name": "Transaction File Open Success Status Capture",
+            "Rule_Description": "Upon successfully opening the Transaction File, the resulting operation status must be captured and communicated back to the calling program to confirm that the file is available and ready for transaction record retrieval."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00024",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The OPEN operation has been executed on the Transaction File and the file has failed to open",
+                "When": "The Transaction File open operation completes with an error or non-success condition",
+                "Then": "The failure operation status from the Transaction File is captured and returned to the calling program, indicating that the Transaction File is unavailable and no transaction records can be retrieved"
+            },
+            "Rule_Name": "Transaction File Open Failure Status Capture",
+            "Rule_Description": "If the Transaction File cannot be opened, the failure status must be captured and communicated back to the calling program, indicating that the Transaction File is unavailable and transaction record retrieval cannot proceed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00025",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File OPEN operation has been attempted, resulting in either a success or failure status",
+                "When": "The OPEN operation processing is complete",
+                "Then": "The Transaction File operation status (whether success or failure) is always transferred and returned to the calling program via the operation return code, enabling the caller to handle the outcome appropriately"
+            },
+            "Rule_Name": "Transaction File Operation Status Return to Caller",
+            "Rule_Description": "Regardless of whether the Transaction File open operation succeeds or fails, the resulting operation status must always be returned to the calling program. This ensures the caller can determine the outcome and take appropriate next steps."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00026",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File I/O service has been invoked with a file identifier of 'TRNXFILE' and an operation type has been provided by the calling program",
+                "When": "The operation request is evaluated to determine if it is a sequential READ request (M03B-READ)",
+                "Then": "If the operation request is a sequential READ, proceed to read the next transaction record from the Transaction File; if the operation request is any other type (Open, Close, or unrecognized), no read action is taken and processing exits without retrieving any transaction data"
+            },
+            "Rule_Name": "Validate Sequential Read Operation Request for Transaction File",
+            "Rule_Description": "Determines whether the requested operation is a sequential READ before attempting to retrieve a transaction record. If the operation is not a READ, no action is taken."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00027",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File has been previously opened and the operation request is confirmed as a sequential READ",
+                "When": "The sequential read operation is executed against the Transaction File",
+                "Then": "The next transaction record in sequence is retrieved from the Transaction File and its full record data is placed into the shared record data field (LK-M03B-FLDT) available to the calling program"
+            },
+            "Rule_Name": "Read Next Transaction Record Sequentially from Transaction File",
+            "Rule_Description": "Retrieves the next available transaction record in sequential order from the Transaction File and loads the record data into the shared data area for the calling program to consume."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00028",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential READ operation has been executed against the Transaction File and a transaction record exists at the current file position",
+                "When": "The read operation completes successfully and a record is found",
+                "Then": "The full transaction record data is returned to the calling program via the shared record data field (LK-M03B-FLDT), and a successful operation status is returned via the status indicator (LK-M03B-RC)"
+            },
+            "Rule_Name": "Return Transaction Record Data to Calling Program Upon Successful Retrieval",
+            "Rule_Description": "When a transaction record is successfully retrieved from the Transaction File, the complete record data is made available to the calling program through the shared data interface."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00029",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential READ operation has been executed against the Transaction File and the current file position is at or beyond the last record in the file",
+                "When": "The read operation finds no more records available in the Transaction File",
+                "Then": "An end-of-file status indicator is returned to the calling program via the operation status field (LK-M03B-RC), signaling that all transaction records have been processed and no record data is populated in the shared record data field"
+            },
+            "Rule_Name": "Return End-of-File Indicator When No More Transaction Records Exist",
+            "Rule_Description": "When a sequential read reaches the end of the Transaction File and no further records are available, an end-of-file condition is communicated back to the calling program so it can stop requesting further records."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00030",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential READ operation has been attempted on the Transaction File, resulting in one of the following outcomes: successful record retrieval, end-of-file condition, or a read failure",
+                "When": "The read operation completes regardless of outcome",
+                "Then": "The Transaction File operation status (success, end-of-file, or failure) is captured from the file status indicator and returned to the calling program via the return code field (LK-M03B-RC), ensuring the calling program always receives the outcome of the read attempt"
+            },
+            "Rule_Name": "Capture and Return Transaction File Operation Status to Calling Program",
+            "Rule_Description": "After every sequential read attempt on the Transaction File \u2014 whether successful, end-of-file, or failed \u2014 the resulting operation status is always captured and returned to the calling program to enable appropriate downstream handling."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00031",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File I/O service has been invoked with a file identifier of 'TRNXFILE'",
+                "When": "The operation request is evaluated and determined to be something other than a sequential READ (M03B-READ is not set)",
+                "Then": "No transaction record read is attempted, no record data is returned, and processing exits the sequential read section without performing any data retrieval action"
+            },
+            "Rule_Name": "No Action Taken When Operation Request Is Not a Sequential Read",
+            "Rule_Description": "If the operation requested by the calling program is not a sequential READ (e.g., it is an Open or Close or unrecognized operation), the Transaction File sequential read logic is entirely bypassed and no record retrieval is attempted."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00032",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A request has been received to process the Transaction File (TRNXFILE) and an operation type has been provided by the calling program",
+                "When": "The operation type is evaluated to determine if it is a CLOSE request",
+                "Then": "If the operation type is CLOSE, the Transaction File close process is initiated; if the operation type is NOT CLOSE, no action is taken on the Transaction File and the program ends without closing the file"
+            },
+            "Rule_Name": "Validate Close Operation Before Closing Transaction File",
+            "Rule_Description": "The system must verify that the requested operation is a CLOSE before attempting to close the Transaction File. If the operation is not a CLOSE request, no action is taken on the Transaction File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00033",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File (TRNXFILE) has been previously opened and transaction records have been processed, and the calling program has submitted a CLOSE operation request",
+                "When": "The operation type is confirmed as CLOSE",
+                "Then": "The Transaction File is closed, releasing it from active use and marking the end of transaction record processing for this session"
+            },
+            "Rule_Name": "Close Transaction File Upon Valid Close Request",
+            "Rule_Description": "When a valid CLOSE operation is requested for the Transaction File, the system must close the Transaction File to release it and signal completion of all transaction record processing."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00034",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction File close operation has been executed",
+                "When": "The close operation completes (successfully or otherwise)",
+                "Then": "The resulting status of the Transaction File close operation is captured and returned to the calling program, enabling the caller to assess the outcome of the close request"
+            },
+            "Rule_Name": "Capture and Return Transaction File Close Operation Outcome",
+            "Rule_Description": "After the Transaction File close operation is executed, the outcome of the close operation must be captured and returned to the calling program so the caller can determine whether the file was closed successfully."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00035",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has requested an operation on the Cross-Reference File by passing the file identifier 'XREFFILE'",
+                "When": "The operation type requested is evaluated",
+                "Then": "If the operation is OPEN, proceed to open the Cross-Reference File for reading; if the operation is any other type (READ or CLOSE), skip the open logic and return control to the calling program immediately without performing any file action"
+            },
+            "Rule_Name": "Cross-Reference File Open Request Routing",
+            "Rule_Description": "Determines whether the requested operation on the Cross-Reference File is an OPEN request, and routes processing accordingly. If the operation is not OPEN, control is returned immediately to the calling program without performing any file action."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00036",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has requested an OPEN operation on the Cross-Reference File identified as 'XREFFILE'",
+                "When": "The OPEN operation is executed on the Cross-Reference File",
+                "Then": "The Cross-Reference File is opened in read-only (INPUT) mode, making it available for sequential record retrieval; no write or update access is granted"
+            },
+            "Rule_Name": "Cross-Reference File Opening for Sequential Reading",
+            "Rule_Description": "When an OPEN operation is requested for the Cross-Reference File, the file is opened exclusively for sequential reading to enable card-to-account cross-reference lookups. The file is not opened for update or write operations."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00037",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An OPEN operation has been attempted on the Cross-Reference File",
+                "When": "The open operation completes \u2014 either successfully making the file ready for sequential lookups, or unsuccessfully due to the file being unavailable",
+                "Then": "The resulting operation status (success indicating the file is ready for sequential lookups, or failure indicating the file is unavailable) is captured and returned to the calling program via the operation return code, so the caller can take appropriate action"
+            },
+            "Rule_Name": "Cross-Reference File Open Success or Failure Status Capture",
+            "Rule_Description": "After attempting to open the Cross-Reference File, the outcome of the open operation \u2014 whether successful or unsuccessful \u2014 is captured and communicated back to the calling program so it can determine whether the file is available for subsequent cross-reference lookups."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00038",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "Any operation (OPEN, READ, or CLOSE) has been attempted or evaluated on the Cross-Reference File",
+                "When": "The operation processing completes",
+                "Then": "The Cross-Reference File operation status is always moved to the return code field and passed back to the calling program, enabling the caller to determine the outcome and handle it appropriately"
+            },
+            "Rule_Name": "Cross-Reference File Operation Status Return to Caller",
+            "Rule_Description": "Upon completion of any Cross-Reference File operation (including OPEN), the status of that operation is always communicated back to the calling program, regardless of whether the operation succeeded or failed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00039",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Cross-Reference file is open and a sequential read operation has been requested by the calling program",
+                "When": "The system reads the next cross-reference record sequentially from the Cross-Reference file",
+                "Then": "The card number and associated reference data from the next cross-reference record are loaded into the return data area available to the calling program"
+            },
+            "Rule_Name": "Sequential Read of Next Cross-Reference Record",
+            "Rule_Description": "When a sequential read operation is requested on the Cross-Reference file, the system retrieves the next available cross-reference record in file order and loads the card number and associated reference data into the return area for the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00040",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Cross-Reference file",
+                "When": "A cross-reference record is successfully found and retrieved from the file",
+                "Then": "The cross-reference record data, including the card number and all associated reference data, is loaded into the return data area for the calling program to consume"
+            },
+            "Rule_Name": "Cross-Reference Record Successfully Retrieved",
+            "Rule_Description": "When a sequential read of the Cross-Reference file successfully retrieves a record, the card number and associated reference data are made available to the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00041",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Cross-Reference file",
+                "When": "No further cross-reference records are available because the end of the file has been reached",
+                "Then": "An end-of-file indicator is set and communicated back to the calling program, signaling that there are no more cross-reference records available for processing"
+            },
+            "Rule_Name": "End-of-File Reached on Cross-Reference File",
+            "Rule_Description": "When a sequential read of the Cross-Reference file finds no more records, an end-of-file condition is signaled to the calling program indicating that all cross-reference records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00042",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "A sequential read operation has been performed on the Cross-Reference file, resulting in either a successful record retrieval or an end-of-file condition",
+                "When": "The read operation completes regardless of whether a record was found or the end of file was reached",
+                "Then": "The operation outcome status is returned to the calling program, enabling the caller to determine whether to continue processing more records or stop because no more cross-reference records are available"
+            },
+            "Rule_Name": "Return Cross-Reference Read Operation Status to Calling Program",
+            "Rule_Description": "After every sequential read attempt on the Cross-Reference file \u2014 whether a record was found or end-of-file was reached \u2014 the outcome status of the operation is always returned to the calling program so it can determine the next course of action."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00043",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Cross-Reference File processing service has been invoked with XREFFILE as the target file identifier",
+                "When": "The requested operation type is evaluated to determine if it is a CLOSE request",
+                "Then": "If the operation is a CLOSE request, the Cross-Reference File close process proceeds; if the operation is NOT a CLOSE request, no action is taken and the process exits immediately without closing the file"
+            },
+            "Rule_Name": "Validate Close Operation Before Closing Cross-Reference File",
+            "Rule_Description": "Before closing the Cross-Reference File, the system must verify that the requested operation is specifically a CLOSE request. If it is not a CLOSE request, no action is taken and the process exits immediately without affecting the file."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00044",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Cross-Reference File is currently open and has been used for cross-reference record lookups or sequential reads",
+                "When": "A CLOSE operation request is confirmed for the Cross-Reference File",
+                "Then": "The Cross-Reference File is closed and made unavailable for further read operations in the current processing session"
+            },
+            "Rule_Name": "Close Cross-Reference File Upon Valid Close Request",
+            "Rule_Description": "When a valid CLOSE request is received for the Cross-Reference File, the system must close the Cross-Reference File to release it after all required cross-reference records have been processed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00045",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Cross-Reference File close operation has been executed",
+                "When": "The close operation completes \u2014 whether successfully or with an issue",
+                "Then": "The resulting Cross-Reference File operation status is captured and returned to the calling program as the operation result, allowing the caller to assess the outcome of the close request"
+            },
+            "Rule_Name": "Capture and Return Cross-Reference File Close Operation Outcome",
+            "Rule_Description": "After the Cross-Reference File close operation is executed, the outcome of the close operation must be captured and communicated back to the calling program so that the caller can determine whether the file was successfully closed or if an issue occurred."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00046",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A request has been received to process the Customer File",
+                "When": "The operation type is evaluated to determine if it is an OPEN request",
+                "Then": "If the operation type is OPEN, proceed to open the Customer File for read-only access; if the operation type is anything other than OPEN, bypass the open process and end the Customer File open procedure without performing any action"
+            },
+            "Rule_Name": "Customer File Open Operation Routing",
+            "Rule_Description": "Determines whether the requested operation on the Customer File is an Open request, and routes processing accordingly. If the operation is not an Open request, the Customer File open process is bypassed entirely."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00047",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A request has been received to process the Customer File and the operation type is OPEN",
+                "When": "The Customer File open operation is executed",
+                "Then": "The Customer File must be opened in read-only (Input) mode only, making it available for direct customer record lookups by Customer ID; no write or update access is granted"
+            },
+            "Rule_Name": "Customer File Opened for Read-Only Access",
+            "Rule_Description": "When an Open operation is requested for the Customer File, the file is opened exclusively in read-only (Input) mode to enable subsequent customer record lookups by Customer ID. No modifications to customer data are permitted through this operation."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00048",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File open operation has been executed",
+                "When": "The Customer File is opened successfully",
+                "Then": "The Customer File is ready to accept and process customer record lookup requests using Customer ID as the search key"
+            },
+            "Rule_Name": "Customer File Open Success \u2014 File Ready for Lookups",
+            "Rule_Description": "Upon successfully opening the Customer File, the file becomes available for customer record retrieval operations using Customer ID as the lookup key."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00049",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File open operation has been executed",
+                "When": "The Customer File fails to open successfully",
+                "Then": "The Customer File open failure is recorded, the file is not available for customer record lookups, and the failure outcome is returned to the calling program"
+            },
+            "Rule_Name": "Customer File Open Failure \u2014 Operation Unsuccessful",
+            "Rule_Description": "If the Customer File cannot be opened, the failure condition is captured and the outcome is communicated back to the calling program, preventing any subsequent customer record lookup attempts on an unavailable file."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00050",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File open operation has been attempted, resulting in either a success or failure outcome",
+                "When": "The Customer File open process completes",
+                "Then": "The operation outcome status must always be captured and returned to the calling program regardless of whether the open succeeded or failed, so the caller can handle the result appropriately"
+            },
+            "Rule_Name": "Customer File Operation Status Returned to Caller",
+            "Rule_Description": "After every Customer File open operation \u2014 whether successful or failed \u2014 the outcome status of the operation is always captured and returned to the calling program, enabling the caller to determine the result and take appropriate next steps."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00051",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has requested a customer record lookup and has provided a Customer ID key value and the length of that key",
+                "When": "The customer record lookup operation is initiated with file identifier 'CUSTFILE' and a keyed-read operation type",
+                "Then": "The Customer ID key value (trimmed to the specified key length) is accepted and prepared for use as the lookup identifier against the Customer File"
+            },
+            "Rule_Name": "Receive Customer ID Key from Calling Program",
+            "Rule_Description": "The customer record lookup service accepts a Customer ID key and its length from the calling program to identify which customer record to retrieve."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00052",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Customer ID key value and its length have been received from the calling program",
+                "When": "The system prepares to look up the customer record in the Customer File",
+                "Then": "Only the relevant portion of the Customer ID key \u2014 from position 1 up to the specified key length \u2014 is set as the active lookup key for the Customer File"
+            },
+            "Rule_Name": "Set Customer ID as File Lookup Key",
+            "Rule_Description": "The Customer ID provided by the calling program is assigned as the active search key for the Customer File, using only the portion of the key up to the specified key length."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00053",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer ID has been set as the active lookup key for the Customer File",
+                "When": "A keyed read operation is executed against the Customer File",
+                "Then": "The system attempts to directly locate and retrieve the customer record that matches the provided Customer ID from the Customer File"
+            },
+            "Rule_Name": "Retrieve Customer Record from Customer File by Key",
+            "Rule_Description": "The system performs a direct keyed lookup against the Customer File using the Customer ID to retrieve the matching customer record."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00054",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed read operation has been executed against the Customer File using the provided Customer ID",
+                "When": "The Customer File contains a record matching the provided Customer ID",
+                "Then": "The complete customer record data is returned to the calling program in the designated data field"
+            },
+            "Rule_Name": "Return Customer Record Data to Calling Program on Successful Lookup",
+            "Rule_Description": "When a customer record matching the provided Customer ID is found in the Customer File, the full customer record data is returned to the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00055",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed read operation has been executed against the Customer File using the provided Customer ID",
+                "When": "No customer record matching the provided Customer ID exists in the Customer File",
+                "Then": "A 'record not found' status is returned to the calling program, indicating that no customer record was located for the given Customer ID"
+            },
+            "Rule_Name": "Return Not Found Status When Customer Record Does Not Exist",
+            "Rule_Description": "When no customer record matching the provided Customer ID exists in the Customer File, a 'not found' outcome is communicated back to the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00056",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Customer File Close request has been received with file identifier set to 'CUSTFILE'",
+                "When": "The operation type indicator (M03B-CLOSE) is evaluated to determine if it is a CLOSE operation",
+                "Then": "If the operation type is CLOSE, the system proceeds to close the Customer File; if the operation type is not CLOSE, the Customer File close action is skipped and no further processing occurs for this operation"
+            },
+            "Rule_Name": "Verify Close Operation Type Before Closing Customer File",
+            "Rule_Description": "The system must verify that the requested operation is a CLOSE before proceeding to close the Customer File, ensuring the correct operation is executed for the Customer File."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00057",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File (CUST-FILE) is currently open and the operation type is confirmed as CLOSE",
+                "When": "The CLOSE operation is executed on the Customer File",
+                "Then": "The Customer File is closed and released, making it no longer accessible for read operations until it is reopened"
+            },
+            "Rule_Name": "Close Customer File Upon Valid Close Request",
+            "Rule_Description": "When a valid CLOSE operation is requested for the Customer File, the system must close the Customer File to release it and make it available for other processes."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00058",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer File close operation has been executed",
+                "When": "The Customer File close operation status is captured and returned to the calling program",
+                "Then": "The Customer File operation status (CUSTFILE-STATUS) is moved into the return code field (LK-M03B-RC) and made available to the calling program, indicating whether the close was successful or encountered an issue"
+            },
+            "Rule_Name": "Capture and Return Customer File Close Operation Outcome",
+            "Rule_Description": "After the Customer File close operation is performed, the system must capture the outcome of the close operation and return it to the calling program so the caller can determine whether the Customer File was successfully closed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00059",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has submitted a request targeting the Account File (LK-M03B-DD = 'ACCTFILE')",
+                "When": "The operation type indicator (M03B-OPEN) is evaluated to determine if the request is an Open operation",
+                "Then": "If the operation type is OPEN, proceed to open the Account File for reading; if the operation type is not OPEN, bypass the open logic and exit the Account File Open process without performing any action"
+            },
+            "Rule_Name": "Route to Account File Open Operation",
+            "Rule_Description": "Determines whether the requested operation for the Account File is an Open request, and routes accordingly to either initiate the file open process or bypass it for a different operation type."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00060",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has requested an Open operation on the Account File (LK-M03B-DD = 'ACCTFILE') and the operation type is confirmed as OPEN (M03B-OPEN is true)",
+                "When": "The Account File open request is executed",
+                "Then": "The Account File is opened for input (read-only, random access) making it available for subsequent account record lookups by Account ID; the file open status result is captured and returned to the calling program"
+            },
+            "Rule_Name": "Open Account File for Random Access Reading",
+            "Rule_Description": "Opens the Account File in read-only mode to enable direct lookup of account records by Account ID. This is a prerequisite before any account record retrieval can be performed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00061",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "An open operation has been attempted on the Account File (either successfully opened or failed to open)",
+                "When": "The Account File open process completes",
+                "Then": "The Account File operation status (ACCTFILE-STATUS) is moved to the return code field (LK-M03B-RC) and returned to the calling program; if the file opened successfully, the calling program receives a success status indicating the Account File is ready for Account ID lookups; if the file failed to open, the calling program receives a failure status indicating the Account File is unavailable"
+            },
+            "Rule_Name": "Return Account File Open Status to Calling Program",
+            "Rule_Description": "After attempting to open the Account File, the outcome of the open operation \u2014 whether successful or failed \u2014 is always captured and communicated back to the calling program so it can determine whether the Account File is available for account record lookups."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00062",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has requested an account record lookup and has provided an Account ID key value and the length of that key",
+                "When": "The account lookup operation is initiated with the Account ID key and key length supplied by the calling program",
+                "Then": "The Account ID key value (trimmed to the specified key length) is accepted and made ready to be used as the lookup identifier for the Account File"
+            },
+            "Rule_Name": "Receive Account ID Key from Calling Program",
+            "Rule_Description": "The account lookup service receives the Account ID key and its length from the calling program to identify which account record to retrieve."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00063",
+            "Rule_Type": "Definitional Rules",
+            "Acceptance_Criteria": {
+                "Given": "A valid Account ID key and its length have been received from the calling program",
+                "When": "The system prepares to read from the Account File",
+                "Then": "Only the portion of the Account ID key matching the specified key length is set as the active lookup key on the Account File, ensuring the search targets the exact account record requested"
+            },
+            "Rule_Name": "Set Account ID as Lookup Key",
+            "Rule_Description": "The received Account ID key is applied as the search key on the Account File so that the correct account record can be directly located."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00064",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File is open for reading and the Account ID has been set as the lookup key",
+                "When": "A keyed read operation is performed on the Account File using the Account ID",
+                "Then": "The system attempts to directly locate and retrieve the account record matching the provided Account ID from the Account File"
+            },
+            "Rule_Name": "Retrieve Account Record by Account ID Key",
+            "Rule_Description": "The system performs a direct keyed lookup on the Account File using the Account ID to retrieve the specific account record requested by the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00065",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed read has been performed on the Account File using the provided Account ID",
+                "When": "The account record matching the Account ID is found in the Account File",
+                "Then": "The complete account record data is returned to the calling program, and a successful operation status is communicated back to the caller"
+            },
+            "Rule_Name": "Return Account Record Data When Found",
+            "Rule_Description": "When the Account File lookup successfully locates the requested account record, the full account record data is returned to the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00066",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "A keyed read has been performed on the Account File using the provided Account ID",
+                "When": "No account record matching the provided Account ID exists in the Account File",
+                "Then": "No account record data is returned, and a 'record not found' status is communicated back to the calling program so the caller can handle the absence of the account appropriately"
+            },
+            "Rule_Name": "Return Not Found Status When Account Record Does Not Exist",
+            "Rule_Description": "When the Account File lookup cannot locate a record matching the provided Account ID, a 'not found' outcome is communicated back to the calling program."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00067",
+            "Rule_Type": "Decision Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File processing service has been invoked with file identifier 'ACCTFILE' and an operation type has been provided by the calling program",
+                "When": "The operation type is evaluated to determine if it is a CLOSE request",
+                "Then": "If the operation type is CLOSE, the Account File close process is initiated; if the operation type is anything other than CLOSE, the Account File close process is skipped and the process completes without any file action"
+            },
+            "Rule_Name": "Account File Close Operation Verification",
+            "Rule_Description": "Determines whether the requested operation for the Account File is a CLOSE operation before proceeding to close the file. If the operation is not CLOSE, no action is taken and the process completes without closing the file."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00068",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File has been previously opened and the calling program has completed all required account record retrievals",
+                "When": "The operation type is confirmed as CLOSE",
+                "Then": "The Account File is closed and made unavailable for further read operations within this session"
+            },
+            "Rule_Name": "Account File Closure Execution",
+            "Rule_Description": "Closes the Account File once all required account records have been retrieved, ensuring the file is properly released after use."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00069",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File close operation has been executed",
+                "When": "The close operation completes \u2014 whether successfully or with an issue",
+                "Then": "The result status of the Account File close operation is captured and stored for return to the calling program"
+            },
+            "Rule_Name": "Account File Close Operation Result Capture",
+            "Rule_Description": "After the Account File close operation is executed, the outcome of the operation is captured and made available to the calling program so it can determine whether the file was successfully closed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00070",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File close operation has been attempted and the operation result status has been captured",
+                "When": "The Account File close process is complete",
+                "Then": "The operation result status is returned to the calling program so the caller can confirm successful closure of the Account File or handle any closure issue accordingly"
+            },
+            "Rule_Name": "Account File Close Status Return to Caller",
+            "Rule_Description": "The outcome of the Account File close operation is always communicated back to the calling program, allowing the caller to verify whether the file was successfully closed and take appropriate action if needed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00071",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A file operation (open, read, or close) has been requested and executed on one of the supported files: Transaction File, Cross-Reference File, Customer File, or Account File",
+                "When": "The file operation completes \u2014 regardless of whether it succeeded (e.g., record found, file opened successfully, end-of-file reached) or failed (e.g., record not found, file unavailable)",
+                "Then": "The operation result status from the specific file that was operated on is captured and set as the return status code passed back to the calling program: if the Transaction File was operated on, the Transaction File operation result is returned; if the Cross-Reference File was operated on, the Cross-Reference File operation result is returned; if the Customer File was operated on, the Customer File operation result is returned; if the Account File was operated on, the Account File operation result is returned \u2014 in all cases the calling program receives the status indicating success or failure of the requested operation"
+            },
+            "Rule_Name": "Capture and Return File Operation Result to Calling Program",
+            "Rule_Description": "After every file operation (open, read, or close) on any supported file, the outcome of that operation is captured from the respective file and communicated back to the calling program. This allows the calling program to determine whether the requested file operation succeeded or failed and take appropriate action."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00072",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A Customer record lookup has been requested, and the calling program has provided a Key Field containing the Customer ID value and a Key Length specifying the exact number of characters that represent the Customer ID",
+                "When": "The system prepares to perform the Customer record lookup",
+                "Then": "The system must extract the Customer ID by reading characters from the Key Field starting at the first position and reading exactly the number of characters specified by the Key Length, so that only the relevant portion of the Key Field is used as the Customer ID \u2014 no more and no fewer characters than the specified Key Length"
+            },
+            "Rule_Name": "Extract Customer ID from Key Field Using Specified Key Length",
+            "Rule_Description": "When a Customer record lookup is requested, the Customer ID must be precisely extracted from the provided key field by reading only the number of characters specified by the key length, ensuring the correct and exact Customer ID value is isolated for the lookup."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00073",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Customer ID has been successfully extracted from the Key Field using the specified Key Length",
+                "When": "The system is ready to perform the direct Customer record lookup in the Customer File",
+                "Then": "The extracted Customer ID value must be set as the File Lookup Key for the Customer File, so that the subsequent record retrieval targets exactly the Customer record matching that Customer ID"
+            },
+            "Rule_Name": "Set Extracted Customer ID as the File Lookup Key",
+            "Rule_Description": "After the Customer ID has been extracted from the Key Field using the specified Key Length, the extracted value must be assigned as the active File Lookup Key so that the Customer File can locate and retrieve the correct Customer record."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00074",
+            "Rule_Type": "Process Rules",
+            "Acceptance_Criteria": {
+                "Given": "A calling program has requested an Account record lookup by key and has provided a Key Field containing the Account ID value and a Key Length indicating how many characters of the Key Field represent the valid Account ID",
+                "When": "The Account File keyed read operation is triggered by the calling program",
+                "Then": "The program accepts the Key Field (containing the Account ID) and the Key Length from the calling program as the inputs required to identify the specific Account record to be retrieved"
+            },
+            "Rule_Name": "Receive Account ID Key Field and Key Length from Calling Program",
+            "Rule_Description": "When an Account record lookup by key is requested, the program must receive both the Account ID key field value and the key length from the calling program before any key extraction or lookup can proceed."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00075",
+            "Rule_Type": "Computation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The calling program has provided a Key Field containing the Account ID and a Key Length value specifying the number of valid characters in the Key Field",
+                "When": "The program prepares the Account ID for the file lookup",
+                "Then": "The program extracts characters from the Key Field starting at position 1 through the position indicated by the Key Length value, and this extracted substring becomes the Account ID used for the record lookup \u2014 no characters beyond the specified Key Length are included"
+            },
+            "Rule_Name": "Extract Account ID from Key Field Using Specified Key Length",
+            "Rule_Description": "The Account ID must be precisely extracted from the provided Key Field by reading characters starting from position 1 up to the length specified by the Key Length value, ensuring only the valid portion of the key is used for the lookup."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00076",
+            "Rule_Type": "Action Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account ID has been successfully extracted from the Key Field using the specified Key Length",
+                "When": "The program sets up the Account File for a direct keyed record retrieval",
+                "Then": "The extracted Account ID is assigned as the lookup key for the Account File, and the program proceeds to retrieve the Account record that matches this Account ID, returning the matched record data to the calling program"
+            },
+            "Rule_Name": "Set Extracted Account ID as the File Lookup Key",
+            "Rule_Description": "Once the Account ID has been extracted from the Key Field using the specified Key Length, it must be set as the active lookup key on the Account File so that the correct Account record can be directly retrieved."
+        },
+        {
+            "Rule_Id": "R-CBSTM03B-cbl-00077",
+            "Rule_Type": "Validation Rules",
+            "Acceptance_Criteria": {
+                "Given": "The Account File lookup service is designed to accept Account IDs of varying lengths",
+                "When": "A calling program provides a Key Field and a Key Length for an Account record lookup",
+                "Then": "The program uses exactly the number of characters specified by the Key Length \u2014 starting from position 1 of the Key Field \u2014 as the Account ID, ensuring the lookup is performed with the precise key boundary defined by the caller and not a fixed or default key length"
+            },
+            "Rule_Name": "Variable-Length Account ID Key Supports Dynamic Key Lengths",
+            "Rule_Description": "The Account ID key extraction mechanism supports variable-length keys, meaning the calling program controls how much of the Key Field constitutes the Account ID by specifying the Key Length. This allows different callers to use different Account ID lengths without changing the lookup service."
+        }
+    ],
+    "description": "CBSTM03B is a batch COBOL subroutine (called program) that serves as a file I/O handler for the CardDemo Transaction Report application. It provides open, close, sequential read, and keyed read operations on four indexed VSAM files \u2014 Transaction, Cross-Reference, Customer, and Account \u2014 on behalf of a calling driver program. The calling program passes a data area specifying the target file, the operation to perform, an optional key, and a data buffer, and this subroutine returns the file status code after each operation.\n\n<br>\n- **Execution Environment**: Batch\n- **Database Access**: VSAM (Indexed Files)\n- **MQ Calls**: No\n- **Module Type**: Called module\n\n<br>\n\n### Key Functionalities:\n\n1: File Operation Routing - Determine which file to operate on (Transaction, Cross-Reference, Customer, or Account) based on the file identifier passed by the calling program, and route to the appropriate file handling process\n\n2: Transaction File Open - Open the Transaction file for sequential reading to enable subsequent transaction record retrieval\n\n3: Transaction File Sequential Read - Read the next transaction record sequentially from the Transaction file and return the record data to the calling program\n\n4: Transaction File Close - Close the Transaction file after all required transaction records have been processed\n\n5: Cross-Reference File Open - Open the Card Cross-Reference file for sequential reading to enable card-to-account cross-reference lookups\n\n6: Cross-Reference File Sequential Read - Read the next cross-reference record sequentially from the Cross-Reference file and return the record data (card number and associated reference data) to the calling program\n\n7: Cross-Reference File Close - Close the Cross-Reference file after all required cross-reference records have been processed\n\n8: Customer File Open - Open the Customer file for random access reading to enable customer record lookups by customer ID\n\n9: Customer Record Lookup by Key - Retrieve a specific customer record from the Customer file using the customer ID key provided by the calling program, and return the customer data\n\n10: Customer File Close - Close the Customer file after all required customer records have been retrieved\n\n11: Account File Open - Open the Account file for random access reading to enable account record lookups by account ID\n\n12: Account Record Lookup by Key - Retrieve a specific account record from the Account file using the account ID key provided by the calling program, and return the account data\n\n13: Account File Close - Close the Account file after all required account records have been retrieved\n\n14: Operation Status Return - Return the file operation result/status code back to the calling program after each file operation to indicate success or failure of the requested operation\n\n"
+}

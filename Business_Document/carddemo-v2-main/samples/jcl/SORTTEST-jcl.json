@@ -1,0 +1,54 @@
+{
+    "created_on": "2026-11-05",
+    "name": "SORTTEST.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/SORTTEST.jcl",
+    "type": "jcl",
+    "description": "This JCL job filters and sorts daily credit card transaction records from a backup dataset, extracting only those transactions processed on a specific date (2022-06-02) and writing the results to a new generation of a Generation Data Group (GDG) output dataset. The job serves as a daily transaction extraction process, isolating transactions by processing date and organizing them by card number.Key Functionalities:\nReads credit card transaction records from the current generation (generation 0) of the backup dataset AWS.M2.CARDDEMO.TRANSACT.BKUP\nFilters transactions to include only those with a processing date (located at position 305, length 10) equal to 2022-06-02\nSorts the filtered transactions in ascending order by Transaction Card Number (located at position 263, length 16, in Zoned Decimal format)\nWrites the sorted and filtered output to a new generation (+1) of the GDG dataset AWS.M2.CARDDEMO.TRANSACT.DALY, cataloging it upon successful completion or deleting it on failure",
+    "rules": [
+        {
+            "Rule_Id": "R-SORTTEST-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Backup File (current generation: AWS.M2.CARDDEMO.TRANSACT.BKUP(0)) is available and contains transaction records with varying Transaction Processing Dates (TRAN-PROC-DT) across multiple days",
+                "When": "The SORT utility evaluates each transaction record from the Transaction Backup File against the reference date '2022-06-02' (PARM-DATE)",
+                "Then": "Only transaction records where the Transaction Processing Date (TRAN-PROC-DT) is exactly equal to '2022-06-02' are INCLUDED in the output Daily Transaction File; all transaction records where the Transaction Processing Date does NOT equal '2022-06-02' are EXCLUDED and permanently discarded from the output"
+            },
+            "Rule_Name": "STEP05R - SORT - Daily Transaction Date Filtering",
+            "Rule_Description": "Only transaction records that were processed on a specific date (June 2, 2022) are selected from the full Transaction Backup File and carried forward into the Daily Transaction File. All other records are discarded.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-SORTTEST-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records from the Transaction Backup File have been filtered to retain only those with a Transaction Processing Date equal to '2022-06-02'",
+                "When": "The SORT utility arranges the filtered transaction records for output",
+                "Then": "All qualifying transaction records are sorted by Card Number (TRAN-CARD-NUM, 16-digit numeric field) in ascending order \u2014 from the lowest card number to the highest card number \u2014 in the resulting Daily Transaction File"
+            },
+            "Rule_Name": "STEP05R - SORT - Transaction Sequencing by Card Number",
+            "Rule_Description": "After filtering, all qualifying daily transactions are arranged in ascending Card Number order so that the Daily Transaction File is delivered in a consistent, ordered sequence.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-SORTTEST-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The SORT utility has completed processing the filtered and sorted transaction records and is ready to finalize the output file (AWS.M2.CARDDEMO.TRANSACT.DALY(+1))",
+                "When": "The step concludes its execution",
+                "Then": "If the step completes successfully, the new generation of the Daily Transaction File is permanently catalogued and retained for downstream use; if the step fails for any reason, the new generation of the Daily Transaction File is automatically deleted and no partial output is retained"
+            },
+            "Rule_Name": "STEP05R - SORT - Daily Transaction File Output Persistence",
+            "Rule_Description": "A new generation of the Daily Transaction File is created as output. Its permanent retention depends entirely on whether the step completes successfully \u2014 ensuring no partial or corrupt daily file is ever saved.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-SORTTEST-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Transaction Backup File (SORTIN: AWS.M2.CARDDEMO.TRANSACT.BKUP(0)) has a defined record structure and layout",
+                "When": "The SORT utility writes the filtered and sorted transaction records to the new Daily Transaction File (SORTOUT: AWS.M2.CARDDEMO.TRANSACT.DALY(+1))",
+                "Then": "The Daily Transaction File inherits and uses the exact same record structure and layout as the Transaction Backup File \u2014 no fields are added, removed, or reformatted; the record content remains unchanged"
+            },
+            "Rule_Name": "STEP05R - SORT - Daily Transaction File Record Structure Inheritance",
+            "Rule_Description": "The Daily Transaction File output must preserve the exact same record layout and structure as the source Transaction Backup File, ensuring no data transformation or reformatting occurs during the extract process.",
+            "Rule_Type": "Definitional Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCardDemo - Daily Transaction Extract Job]):::start\n\n    STEP05R[STEP05R - SORT Utility\nFilter Transactions by Processing Date\nSort by Card Number]:::process\n\n    DEC1{Transaction Processing Date\nEquals 2022-06-02?}:::decision\n\n    EXCL[Record Excluded\nTransaction Not Processed on June 2 2022]:::error\n\n    SORT[Sort Included Transactions\nBy Card Number - Ascending Order]:::process\n\n    SRC[(AWS.M2.CARDDEMO.TRANSACT.BKUP\nTransaction Backup File\nCurrent Generation - All Transactions)]:::datasource\n\n    TGT[(AWS.M2.CARDDEMO.TRANSACT.DALY\nDaily Transaction File\nNew Generation - June 2 2022 Only)]:::datasource\n\n    Z([JOB END\nDaily Transaction Extract Complete\nNew Generation of Daily File Created]):::final\n\n    A --> STEP05R\n    SRC -.->|Read All Transaction Records| STEP05R\n    STEP05R --> DEC1\n    DEC1 -->|No - Exclude Record| EXCL\n    DEC1 -->|Yes - Include Record| SORT\n    SORT -.->|Write Filtered & Sorted Transactions| TGT\n    TGT --> Z\n\n    classDef start fill:#ff6666,color:#000,font-weight:bold\n    classDef process fill:#6699ff,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,color:#000,font-weight:bold\n    classDef final fill:#ae74de,color:#000,font-weight:bold\n    classDef success fill:#22c55e,color:#000,font-weight:bold\n    classDef error fill:#ef4444,color:#000,font-weight:bold"
+}

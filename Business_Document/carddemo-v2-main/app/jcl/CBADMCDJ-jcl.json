@@ -1,0 +1,186 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CBADMCDJ.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/CBADMCDJ.jcl",
+    "type": "jcl",
+    "description": "This JCL job (CBADMCDJ) configures the CICS environment for the CardDemo application by defining all necessary CICS resources \u2014 including a program library, map sets, programs, and transactions \u2014 into a CICS System Definition (CSD) group named CARDDEMO. It uses the CICS utility DFHCSDUP to register all CardDemo application components so they can be installed and executed within the CICS region.Key Functionalities:\nDefines a CICS library resource (COM2DOLL) pointing to the CardDemo load library (AWS.M2.CARDDEMO.LOADLIB), which contains all compiled application programs.\nRegisters 18 CICS map sets covering all application screens: Login, Account Menu, View/Update/Deactivate Account, Card Menu, View/Update/Deactivate Card, Transaction, Transaction Report, Transaction Details, Add Transactions, Bill Pay Setup, Admin Menu, and four test program screens (PGM1\u2013PGM4).\nRegisters 18 CICS programs covering all application functions: Login (COSGN00C), Account management (COACT00C, COACTVWC, COACTUPC, COACTDEC), Card management, Transaction processing (COTRN00C, COTRNVWC, COTRNVDC, COTRNATC), Bill Pay (COBIL00C), Admin Menu (COADM00C), and four test programs (COTSTP1C\u2013COTSTP4C).\nDefines CICS transactions linking programs to transaction IDs: CC00 (Login), CCAD (Admin Menu), CCDM (Admin Menu via COADM00C), CCT1\u2013CCT4 (Test Programs 1\u20134).\nGenerates a listing of all defined resources in the CARDDEMO group to confirm successful registration.\nNote: The DELETE GROUP(CARDDEMO) command is commented out, meaning existing definitions will not be removed before re-running; this must be manually uncommented if re-execution is needed.",
+    "rules": [
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CICS System Definition file (DFHCSD) is accessible in read/write mode and the CARDDEMO group is being configured for the first time or after a cleanup",
+                "When": "The DEFINE LIBRARY command is executed for the CARDDEMO group",
+                "Then": "Library COM2DOLL is registered under the CARDDEMO group, pointing to AWS.M2.CARDDEMO.LOADLIB as the single physical location containing all CardDemo application programs"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - CardDemo Application Library Registration",
+            "Rule_Description": "Register the physical location of all CardDemo application programs in the CICS resource registry so that CICS can locate and load them when invoked by users.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and the application library has been registered",
+                "When": "DEFINE MAPSET commands are executed for COSGN00M under the CARDDEMO group",
+                "Then": "The Login Screen (COSGN00M) is registered under the CARDDEMO group; note that this screen definition is submitted twice with the same description 'LOGIN SCREEN', resulting in a duplicate registration attempt for the same screen"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Login Screen Registration",
+            "Rule_Description": "Register the login screen layout that users see when authenticating into the CardDemo application. This screen definition appears twice in the source, creating a duplicate registration entry.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS",
+                "When": "DEFINE MAPSET commands are executed for account and card management screens",
+                "Then": "The following screens are registered under CARDDEMO serving dual purposes: Menu screen (COACT00S) is registered as both Account Menu and Card Menu; View screen (COACTVWS) is registered as both View Account and View Card; Update screen (COACTUPS) is registered as both Update Account and Update Card; Deactivate screen (COACTDES) is registered as both Deactivate Account and Deactivate Card"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Account and Card Management Shared Screens Registration",
+            "Rule_Description": "Register screen layouts for Account and Card management functions. Account and Card management intentionally share the same physical screen layouts, with the same screens serving both functional areas under different business contexts.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS",
+                "When": "DEFINE MAPSET commands are executed for transaction management screens",
+                "Then": "The following four screens are registered under CARDDEMO: Transaction Menu screen (COTRN00S), Transaction Report screen (COTRNVWS), Transaction Details screen (COTRNVDS), and Add Transactions screen (COTRNATS)"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Transaction Management Screens Registration",
+            "Rule_Description": "Register all screen layouts required for transaction management functions, covering transaction navigation, reporting, detail viewing, and new transaction entry.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS",
+                "When": "DEFINE MAPSET command is executed for COBIL00S",
+                "Then": "The Bill Pay Setup screen (COBIL00S) is registered under the CARDDEMO group"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Bill Payment Screen Registration",
+            "Rule_Description": "Register the screen layout for the bill payment setup function, enabling users to configure and initiate bill payments.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS",
+                "When": "DEFINE MAPSET commands are executed for administration and test screens",
+                "Then": "The following five screens are registered under CARDDEMO: Admin Menu screen (COADM00S), Test Program 1 screen (COTSTP1S), Test Program 2 screen (COTSTP2S), Test Program 3 screen (COTSTP3S), and Test Program 4 screen (COTSTP4S)"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Administration and Test Screens Registration",
+            "Rule_Description": "Register screen layouts for the administration menu and all four test program screens, supporting administrative operations and application testing activities.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and the Login screen (COSGN00M) has been registered",
+                "When": "DEFINE PROGRAM command is executed for COSGN00C with TRANSID(CC00) under the CARDDEMO group",
+                "Then": "Login program (COSGN00C) is registered under CARDDEMO and associated with transaction code CC00, allowing any user to launch the CardDemo login screen by entering the transaction code CC00"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Login Program Registration with Transaction Code CC00",
+            "Rule_Description": "Register the login program and associate it with transaction code CC00, enabling users to initiate the authentication process by entering a short transaction code.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and account/card management screens have been registered",
+                "When": "DEFINE PROGRAM commands are executed for account and card management programs",
+                "Then": "The following programs are registered under CARDDEMO serving dual purposes: Main Menu program (COACT00C) serves as both Account Main Menu and Card Menu; View program (COACTVWC) serves as both View Account and View Card; Update program (COACTUPC) serves as both Update Account and Update Card; Deactivate program (COACTDEC) serves as both Deactivate Account and Deactivate Card"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Account and Card Management Shared Programs Registration",
+            "Rule_Description": "Register programs for Account and Card management functions. The same programs serve both Account and Card management operations, with business context determining which function is performed.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and transaction management screens have been registered",
+                "When": "DEFINE PROGRAM commands are executed for transaction management programs",
+                "Then": "The following four programs are registered under CARDDEMO: Transaction Menu program (COTRN00C), Transaction Report program (COTRNVWC), Transaction Details program (COTRNVDC), and Add Transactions program (COTRNATC)"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Transaction Management Programs Registration",
+            "Rule_Description": "Register all programs that handle transaction management business functions, covering transaction navigation, report generation, detail retrieval, and new transaction creation.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and the Bill Pay Setup screen (COBIL00S) has been registered",
+                "When": "DEFINE PROGRAM command is executed for COBIL00C",
+                "Then": "Bill Pay program (COBIL00C) is registered under the CARDDEMO group, enabling bill payment processing functionality"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Bill Payment Program Registration",
+            "Rule_Description": "Register the program that handles bill payment processing for CardDemo users.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and the Admin Menu screen (COADM00S) has been registered",
+                "When": "DEFINE PROGRAM command is executed for COADM00C with TRANSID(CCAD) and DEFINE TRANSACTION command is executed for CCDM pointing to COADM00C",
+                "Then": "Admin Menu program (COADM00C) is registered under CARDDEMO with transaction code CCAD at the program level; additionally, a standalone transaction code CCDM is defined also pointing to COADM00C; as a result, both transaction codes CCAD and CCDM launch the same Admin Menu program"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Administration Program Registration with Dual Transaction Code Entry Points",
+            "Rule_Description": "Register the administration menu program and define two separate transaction codes (CCAD and CCDM) that both provide access to the same Admin Menu program, giving administrators two different entry points.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS and test screens (COTSTP1S through COTSTP4S) have been registered",
+                "When": "DEFINE PROGRAM and DEFINE TRANSACTION commands are executed for all four test programs",
+                "Then": "The following test programs and transaction codes are registered under CARDDEMO: Test Program 1 (COTSTP1C) with transaction code CCT1; Test Program 2 (COTSTP2C) with transaction code CCT2; Test Program 3 (COTSTP3C) with transaction code CCT3 \u2014 note the source description for COTSTP3C incorrectly reads 'PGM1 TEST' instead of 'PGM3 TEST', indicating a copy-paste error; Test Program 4 (COTSTP4C) with transaction code CCT4; standalone transaction definitions CCT1, CCT2, CCT3, and CCT4 are also created as separate entries each pointing to their respective test programs"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Test Programs Registration with Transaction Codes CCT1 through CCT4",
+            "Rule_Description": "Register all four test programs and their associated transaction codes, enabling testers to invoke each test program directly by entering its transaction code.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group already exists in the CICS System Definition file from a previous execution of this job",
+                "When": "This job needs to be re-executed to update or refresh CardDemo resource definitions",
+                "Then": "The DELETE GROUP(CARDDEMO) command \u2014 which is currently commented out in the source \u2014 must be uncommented and placed before all DEFINE commands; this removes all previously registered CARDDEMO resources before re-registering them; if this step is skipped, duplicate definition errors will occur and the job will fail"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Re-run Cleanup Requirement Before Re-registration",
+            "Rule_Description": "When this job needs to be re-executed to refresh or update CardDemo resource definitions, all existing CARDDEMO definitions must be removed first to prevent duplicate definition errors.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "All CARDDEMO resources have been successfully defined in the CICS System Definition file by this job",
+                "When": "The job completes successfully",
+                "Then": "A CICS administrator must manually execute the command CEDA INSTALL GROUP(CARDDEMO) to activate all registered resources in the live CICS environment; until this manual installation step is performed, no users can access any CardDemo transaction, screen, or program"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Post-Registration Manual Installation Requirement",
+            "Rule_Description": "Successful completion of this job alone does not make CardDemo available to users. A mandatory manual CICS installation step must be performed by an administrator after the job completes.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "The CARDDEMO group is being configured in CICS",
+                "When": "The resource definition commands are processed by DFHCSDUP",
+                "Then": "Internal message queues CSSD and IRDC (both of type INTRA \u2014 internal to the CICS region) are NOT registered because their DEFINE TDQUEUE commands are commented out; these features remain inactive and unavailable to the application until their definitions are explicitly uncommented and the job is re-run"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - Inactive Internal Message Queue Features",
+            "Rule_Description": "Two internal message queues planned for CardDemo (CSSD and IRDC) are present in the source code but deliberately disabled and will not be registered during this job execution.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CBADMCDJ-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "All CARDDEMO resource definition commands \u2014 library, screens, programs, and transaction codes \u2014 have been processed",
+                "When": "The LIST GROUP(CARDDEMO) command is executed as the final command in the SYSIN stream",
+                "Then": "A complete printed inventory of all resources registered under the CARDDEMO group is generated in the SYSPRINT output report, serving as an audit trail confirming that all screens, programs, and transaction codes were successfully registered and providing a reference document for CICS administrators"
+            },
+            "Rule_Name": "STEP1 - DFHCSDUP - CARDDEMO Resource Verification Report Generation",
+            "Rule_Description": "After all resource definitions are processed, a complete inventory report of all registered CARDDEMO resources is automatically generated for audit, verification, and administrative reference purposes.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Start: CardDemo CICS Resource Setup Job]):::start\n\n    B[_STEP1 - DFHCSDUP - CICS Resource Definition Utility\n    Register All CardDemo Application Resources\n    into the CICS System Definition File\n    under Group: CARDDEMO_]:::process\n\n    C[_Define Application Library: COM2DOLL\n    Link CardDemo Load Library as Source\n    for All Application Programs_]:::process\n\n    D[_Define Screen Layouts - MAPSETs\n    Register 15 Screen Definitions:\n    Login \u00b7 Account Menu \u00b7 View/Update/Deactivate Account\n    Transaction Menu \u00b7 Transaction Report \u00b7 Transaction Details\n    Add Transactions \u00b7 Bill Pay \u00b7 Admin Menu \u00b7 Test Screens 1-4_]:::process\n\n    E[_Define Business Programs\n    Register 15 Business Logic Modules:\n    Sign-On \u00b7 Account Management \u00b7 Transaction Management\n    Bill Pay \u00b7 Admin Menu \u00b7 Test Programs 1-4_]:::process\n\n    F[_Define Transaction Entry Codes\n    Register User-Facing Transaction IDs:\n    CCDM \u2192 Admin Menu\n    CCT1 \u2192 Test Program 1\n    CCT2 \u2192 Test Program 2\n    CCT3 \u2192 Test Program 3\n    CCT4 \u2192 Test Program 4_]:::process\n\n    G[_List CARDDEMO Group\n    Generate Printed Verification Report\n    of All Defined Resources for Audit_]:::process\n\n    H{_STEP1\n    Completed\n    Successfully?_}:::decision\n\n    I([_CardDemo CICS Resources Successfully Defined\n    All Screens, Programs and Transaction Codes\n    Registered under CARDDEMO Group\n    Next Action: CICS Admin to Install CARDDEMO Group\n    using CEDA INSTALL GROUP'CARDDEMO'_]):::success\n\n    J([_STEP1 Failed\n    CICS Resource Definition Incomplete\n    Review SYSPRINT Output for Error Details\n    Possible Cause: Duplicate Definitions Exist\n    Action: Uncomment DELETE GROUP'CARDDEMO' and Re-run_]):::error\n\n    A --> B\n    B --> C\n    C --> D\n    D --> E\n    E --> F\n    F --> G\n    G --> H\n    H -->|Yes - RC = 0| I\n    H -->|No - RC > 0| J\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

@@ -1,0 +1,72 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "READCARD.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **READCARD**, is designed to read and process a Card Master VSAM file as part of the CardDemo application. It executes the program **CBACT02C**, which accesses a Key-Sequenced Data Set (KSDS) containing credit card data stored in **AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS**. The job's business purpose is to retrieve and process card account records, with all output and print results directed to the system output for review or further processing.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "READCARD",
+          "description": "The job name identifier assigned to this job, used to identify the job in the system and in job logs."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is submitted, determining scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages, determining where the job's message output is directed."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the submitting user."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Reads the Card Master VSAM KSDS file (AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS) using the customer application program CBACT02C and writes output to the system output.",
+        "programs": "CBACT02C",
+        "inputs": "CARDFILE: AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+        "outputs": "SYSOUT (standard output), SYSPRINT (print output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "STEPLIB DD loads the program library containing CBACT02C executable for the job step"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDDATA.VSAM.KSDS",
+        "operations": "READ",
+        "description": "CARDFILE DD references the Card Master VSAM KSDS file; program CBACT02C reads card records from this file"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "SYSOUT DD directs standard output from program CBACT02C to the system output class"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSPRINT",
+        "operations": "WRITE",
+        "description": "SYSPRINT DD directs print output from program CBACT02C to the system output class"
+      }
+    ]
+  }
+}

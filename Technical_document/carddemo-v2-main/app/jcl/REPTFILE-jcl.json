@@ -1,0 +1,56 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "REPTFILE.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job defines a Generation Data Group (GDG) named **AWS.M2.CARDDEMO.TRANREPT** to manage report files for the CardDemo application. It uses the IDCAMS utility to create a GDG base entry with a retention limit of 10 generations, allowing up to 10 versions of the transaction report file to be maintained on the system. The business purpose is to establish the catalog infrastructure needed to store and cycle through multiple generations of transaction report output files in an organized manner.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "REPTFILE",
+          "description": "The JOB statement marks the beginning of a job and assigns the job name 'REPTFILE'. It identifies the unit of work to the operating system and initiates job processing."
+        },
+        {
+          "name": "ACCT",
+          "value": "'DEF GDG FOR REPORT FILE'",
+          "description": "The accounting information parameter provides a description or accounting string associated with the job. It is used for job identification and billing/tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class 'A', which determines the job entry subsystem (JES) input queue where the job is placed. It controls scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class '0' for the job log and system messages. It determines where the job's system output (JES message log) is routed, such as to a printer, spool, or held queue."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user whose ID is stored in the symbolic variable &SYSUID (the submitting user) will receive a TSO notification message upon job completion or failure. This helps the user know when the job has finished."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Defines a Generation Data Group (GDG) base entry named AWS.M2.CARDDEMO.TRANREPT with a maximum limit of 10 generations to support versioned report file storage.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE GENERATIONDATAGROUP command for AWS.M2.CARDDEMO.TRANREPT with LIMIT(10))",
+        "outputs": "AWS.M2.CARDDEMO.TRANREPT GDG base catalog entry; SYSPRINT (utility execution messages)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANREPT",
+        "operations": "DEFINE GDG",
+        "description": "Defines a Generation Data Group (GDG) named AWS.M2.CARDDEMO.TRANREPT with a LIMIT of 10 generations using IDCAMS DEFINE GENERATIONDATAGROUP command."
+      }
+    ]
+  }
+}

@@ -1,0 +1,76 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CLOSEFIL.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/CLOSEFIL.jcl",
+    "type": "jcl",
+    "description": "This JCL job closes five specific CICS files in the CICSAWSA region by issuing CEMT SET FILE CLOSE commands through SDSF, ensuring that the files are no longer accessible for transaction processing. This is typically performed during maintenance windows or controlled shutdown procedures to safely quiesce file activity in the CICS environment.Key Functionalities:\nCloses the TRANSACT file in the CICSAWSA CICS region, making it unavailable for transaction data processing.\nCloses the CCXREF file in the CICSAWSA CICS region, making it unavailable for cross-reference data lookups.\nCloses the ACCTDAT file in the CICSAWSA CICS region, making it unavailable for account data access.\nCloses the CXACAIX file in the CICSAWSA CICS region, making it unavailable for alternate index access on account cross-reference data.\nCloses the USRSEC file in the CICSAWSA CICS region, making it unavailable for user security data processing.",
+    "rules": [
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active and the TRANSACT file is currently open and available to online users",
+                "When": "The batch job CLOSEFIL is submitted and the CLCIFIL step executes",
+                "Then": "The TRANSACT file in the CICSAWSA CICS region must be set to CLOSED status, making it inaccessible to online transactions"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close TRANSACT File in CICS Region",
+            "Rule_Description": "When the batch job is initiated, the TRANSACT file in the CICSAWSA CICS region must be closed to prevent online transactions from accessing or modifying transaction data during batch processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active and the CCXREF cross-reference file is currently open and available to online users",
+                "When": "The TRANSACT file closure command has been issued and the CLCIFIL step continues execution",
+                "Then": "The CCXREF file in the CICSAWSA CICS region must be set to CLOSED status, making it inaccessible to online transactions"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CCXREF File in CICS Region",
+            "Rule_Description": "When the batch job is initiated, the CCXREF cross-reference file in the CICSAWSA CICS region must be closed to prevent online transactions from accessing cross-reference data during batch processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active and the ACCTDAT account data file is currently open and available to online users",
+                "When": "The CCXREF file closure command has been issued and the CLCIFIL step continues execution",
+                "Then": "The ACCTDAT file in the CICSAWSA CICS region must be set to CLOSED status, making it inaccessible to online transactions"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close ACCTDAT File in CICS Region",
+            "Rule_Description": "When the batch job is initiated, the ACCTDAT account data file in the CICSAWSA CICS region must be closed to prevent online transactions from accessing or modifying account data during batch processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active and the CXACAIX account cross-reference alternate index file is currently open and available to online users",
+                "When": "The ACCTDAT file closure command has been issued and the CLCIFIL step continues execution",
+                "Then": "The CXACAIX file in the CICSAWSA CICS region must be set to CLOSED status, making alternate-key account lookups inaccessible to online transactions"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close CXACAIX File in CICS Region",
+            "Rule_Description": "When the batch job is initiated, the CXACAIX account cross-reference alternate index file in the CICSAWSA CICS region must be closed to prevent online transactions from performing alternate-key account lookups during batch processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active and the USRSEC user security file is currently open and available to online users",
+                "When": "The CXACAIX file closure command has been issued and the CLCIFIL step continues execution",
+                "Then": "The USRSEC file in the CICSAWSA CICS region must be set to CLOSED status, making user security profile data inaccessible to online transactions"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Close USRSEC File in CICS Region",
+            "Rule_Description": "When the batch job is initiated, the USRSEC user security file in the CICSAWSA CICS region must be closed to prevent online transactions from accessing or modifying user security profiles during batch processing.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CLOSEFIL-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The CICSAWSA CICS region is active with all five files (TRANSACT, CCXREF, ACCTDAT, CXACAIX, USRSEC) open and serving online users",
+                "When": "The CLOSEFIL batch job is submitted to initiate the batch processing window",
+                "Then": "All five files must be closed sequentially in the following fixed order: (1) TRANSACT, (2) CCXREF, (3) ACCTDAT, (4) CXACAIX, (5) USRSEC \u2014 with no conditions, no skips, and no alternate paths \u2014 ensuring the CICSAWSA region is fully quiesced and no online transaction can access any of these files before batch processing begins"
+            },
+            "Rule_Name": "CLCIFIL - SDSF - Sequential Closure of All CICS Business Files Before Batch Processing",
+            "Rule_Description": "All five CICS-managed business files must be closed in a strict sequential order \u2014 TRANSACT, CCXREF, ACCTDAT, CXACAIX, and USRSEC \u2014 to fully quiesce the CICSAWSA region before any batch update jobs are allowed to run. No file is skipped and there are no conditional branches.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start]):::start\n\n    B[_CLCIFIL - SDSF - Close CICS Files\nin CICSAWSA Region_]:::process\n\n    B1[_Close TRANSACT File\n'Transaction File'_]:::process\n    B2[_Close CCXREF File\n'Cross-Reference File'_]:::process\n    B3[_Close ACCTDAT File\n'Account Data File'_]:::process\n    B4[_Close CXACAIX File\n'Account Cross-Reference Index File'_]:::process\n    B5[_Close USRSEC File\n'User Security File'_]:::process\n\n    C{_All CICS Files Closed\nSuccessfully in\nCICSAWSA Region?_}:::decision\n\n    E([_Job Completed Successfully\nAll Files Ready for Batch Processing_]):::success\n    F([_Job Failed\nOne or More CICS Files\nCould Not Be Closed_]):::error\n\n    A --> B\n    B --> B1\n    B1 --> B2\n    B2 --> B3\n    B3 --> B4\n    B4 --> B5\n    B5 --> C\n    C -->|Yes - All Files Closed| E\n    C -->|No - Closure Failed| F\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

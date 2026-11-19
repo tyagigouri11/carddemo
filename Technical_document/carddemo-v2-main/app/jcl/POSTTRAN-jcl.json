@@ -1,0 +1,98 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "POSTTRAN.jcl",
+        "type": "jcl"
+      },
+      "overview": "The POSTTRAN job processes a daily transaction file for a credit card system (CardDemo), validating and loading transactions into a master VSAM transaction file while updating transaction category balances. It cross-references card data to validate transactions against account records, rejecting any invalid transactions into a daily rejects file for further review. The overall business purpose is to perform end-of-day transaction posting, ensuring all daily credit card transactions are accurately recorded, categorized, and reflected in the appropriate account balances.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "POSTTRAN",
+          "description": "The JOB statement marks the beginning of a job and assigns it the name POSTTRAN. This name is used to identify the job in the system and in job logs."
+        },
+        {
+          "name": "ACCT",
+          "value": "'POSTTRAN'",
+          "description": "The accounting information parameter provides billing or accounting data associated with the job. Here it is set to 'POSTTRAN', which may be used for charge-back or tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class, which determines the initiator queue the job is submitted to. CLASS=A assigns the job to job class A, influencing scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log). MSGCLASS=0 directs the job's system messages and JCL listing to output class 0, determining where the job log is routed for printing or viewing."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, so that user receives a notification upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP15",
+        "purpose": "Processes the daily transaction file by reading each transaction, validating it against the card cross-reference and account data, posting accepted transactions to the transaction master VSAM file and updating transaction category balances, while writing rejected transactions to a new daily rejects dataset.",
+        "programs": "CBTRN02C",
+        "inputs": "DALYTRAN (AWS.M2.CARDDEMO.DALYTRAN.PS) - daily transaction flat file; TRANFILE (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) - transaction master VSAM KSDS; XREFFILE (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) - card cross-reference VSAM KSDS; ACCTFILE (AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS) - account data VSAM KSDS; TCATBALF (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) - transaction category balance VSAM KSDS",
+        "outputs": "DALYREJS (AWS.M2.CARDDEMO.DALYREJS(+1)) - new generation of daily rejected transactions file (RECFM=F, LRECL=430), cataloged on success, deleted on failure; TRANFILE (AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS) - updated with posted transactions; TCATBALF (AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS) - updated transaction category balances; SYSPRINT, SYSOUT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Load library used to fetch the executable program CBTRN02C for execution"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DALYTRAN.PS",
+        "operations": "READ",
+        "description": "Daily transaction flat file (physical sequential) read as input to process daily transactions"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ, WRITE, UPDATE",
+        "description": "Transaction master VSAM KSDS file updated with processed daily transaction records"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Card cross-reference VSAM KSDS file read to resolve card number to account number mappings during transaction processing"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+        "operations": "READ, UPDATE",
+        "description": "Account data VSAM KSDS file read and updated with balance changes resulting from processed transactions"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TCATBALF.VSAM.KSDS",
+        "operations": "READ, WRITE, UPDATE",
+        "description": "Transaction category balance VSAM KSDS file read and updated to accumulate balance totals by transaction category"
+      },
+      {
+        "step": "STEP15",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.DALYREJS(+1)",
+        "operations": "WRITE",
+        "description": "New generation of daily rejected transactions GDG dataset created and written with transaction records that failed validation or processing; fixed format RECFM=F, LRECL=430, allocated on SYSDA with 1 cylinder primary and 1 cylinder secondary space"
+      }
+    ]
+  }
+}

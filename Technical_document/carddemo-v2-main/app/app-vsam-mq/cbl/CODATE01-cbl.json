@@ -1,0 +1,322 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CODATE01.cbl",
+        "type": "cobol",
+        "transaction_id": "CDRD"
+      },
+      "overview": "CODATE01 is a CICS-based COBOL program operating within a card services (CARD.DEMO) application environment, serving as a middleware date/time service component in an IBM MQ messaging workflow. The program acts as a request-reply service that listens on an MQ input queue, processes incoming date/time requests, and returns the current system date and time to a reply queue. It solves the need for a centralized, reliable date and time service accessible via asynchronous messaging, ensuring consuming applications receive consistently formatted timestamps without direct CICS API dependencies.",
+      "key_features": [
+        {
+          "feature": "MQ Trigger Activation",
+          "description": "Started via a CICS RETRIEVE of an MQ trigger message (MQTM), dynamically obtaining the input queue name from the trigger data"
+        },
+        {
+          "feature": "Three-Queue Architecture",
+          "description": "Opens and manages three MQ queues: an input request queue, a reply queue (CARD.DEMO.REPLY.DATE), and an error queue (CARD.DEMO.ERROR)"
+        },
+        {
+          "feature": "Date and Time Retrieval",
+          "description": "Uses CICS ASKTIME and FORMATTIME to obtain the current system date (MM-DD-YYYY) and time, then formats them into a human-readable reply message"
+        },
+        {
+          "feature": "Request-Reply Messaging",
+          "description": "Reads request messages from the input queue and puts formatted date/time responses onto the reply queue, preserving message correlation IDs for proper request matching"
+        },
+        {
+          "feature": "Continuous Message Processing",
+          "description": "Loops through all available messages on the input queue with a 5-second wait interval, processing each request until no more messages are available"
+        },
+        {
+          "feature": "CICS Syncpoint Management",
+          "description": "Issues a CICS SYNCPOINT between message processing cycles to ensure transactional integrity of MQ get and put operations"
+        },
+        {
+          "feature": "Centralized Error Handling",
+          "description": "Routes all MQ operation errors (MQOPEN, MQGET, MQPUT, MQCLOSE failures) to a dedicated error queue with descriptive condition and reason codes"
+        },
+        {
+          "feature": "Graceful Termination",
+          "description": "Closes all open MQ queue handles in a controlled shutdown routine before issuing a CICS RETURN, ensuring clean resource release"
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "INPUT-QUEUE (retrieved via CICS RETRIEVE/MQTM-QNAME)",
+        "type": "Read",
+        "description": "IBM MQ input queue - the program retrieves the queue name from the CICS trigger message (MQTM) and uses MQGET to read incoming request messages from this queue"
+      },
+      {
+        "name": "CARD.DEMO.REPLY.DATE",
+        "type": "Write",
+        "description": "IBM MQ reply queue - the program opens this hardcoded queue name as the output queue and uses MQPUT to write reply messages containing the current system date and time"
+      },
+      {
+        "name": "CARD.DEMO.ERROR",
+        "type": "Write",
+        "description": "IBM MQ error queue - the program opens this hardcoded queue name and uses MQPUT to write error messages whenever MQ or CICS errors are encountered during processing"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Initialize and Open Error Queue",
+          "description": "Initializes working storage fields, clears queue names and message buffers, then opens the MQ error queue 'CARD.DEMO.ERROR' for output processing",
+          "records": [
+            "INPUT-QUEUE-NAME",
+            "QMGR-NAME",
+            "QUEUE-MESSAGE",
+            "MQ-ERR-DISPLAY",
+            "ERROR-QUEUE-NAME",
+            "ERROR-QUEUE-HANDLE",
+            "ERR-QUEUE-OPEN"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Retrieve CICS Trigger Message",
+          "description": "Issues a CICS RETRIEVE command to obtain the MQ trigger message (MQTM) that started the transaction. Extracts the input queue name from the trigger message and sets the reply queue name to 'CARD.DEMO.REPLY.DATE'. On failure, writes error to MQ error queue and terminates.",
+          "records": [
+            "MQTM",
+            "MQTM-QNAME",
+            "INPUT-QUEUE-NAME",
+            "REPLY-QUEUE-NAME",
+            "WS-CICS-RESP1-CD",
+            "WS-CICS-RESP2-CD",
+            "MQ-ERROR-PARA",
+            "MQ-APPL-RETURN-MESSAGE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Open Input Queue",
+          "description": "Opens the dynamically determined input MQ queue for shared GET processing with context saving and fail-if-quiescing options. Stores the resulting object handle in INPUT-QUEUE-HANDLE and sets REPLY-QUEUE-OPEN flag.",
+          "records": [
+            "INPUT-QUEUE-NAME",
+            "MQOD-OBJECTNAME",
+            "MQOD-OBJECTQMGRNAME",
+            "MQ-OPTIONS",
+            "MQ-HOBJ",
+            "INPUT-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE",
+            "REPLY-QUEUE-OPEN"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Open Output Reply Queue",
+          "description": "Opens the reply MQ queue 'CARD.DEMO.REPLY.DATE' for PUT processing with pass-all-context and fail-if-quiescing options. Stores the resulting object handle in OUTPUT-QUEUE-HANDLE and sets RESP-QUEUE-OPEN flag.",
+          "records": [
+            "REPLY-QUEUE-NAME",
+            "MQOD-OBJECTNAME",
+            "MQOD-OBJECTQMGRNAME",
+            "MQ-OPTIONS",
+            "MQ-HOBJ",
+            "OUTPUT-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE",
+            "RESP-QUEUE-OPEN"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Get Request Message from Input Queue",
+          "description": "Issues MQGET with a 5-second wait interval against the input queue using syncpoint, convert, and fail-if-quiescing options. On success, extracts message ID, correlation ID, reply-to queue, and message buffer into working storage. Sets NO-MORE-MSGS flag if no message is available.",
+          "records": [
+            "INPUT-QUEUE-HANDLE",
+            "MQ-HOBJ",
+            "MQ-BUFFER",
+            "MQ-BUFFER-LENGTH",
+            "MQ-DATA-LENGTH",
+            "MQMD-MSGID",
+            "MQMD-CORRELID",
+            "MQMD-REPLYTOQ",
+            "MQ-MSG-ID",
+            "MQ-CORRELID",
+            "MQ-QUEUE-REPLY",
+            "REQUEST-MESSAGE",
+            "REQUEST-MSG-COPY",
+            "SAVE-CORELID",
+            "SAVE-REPLY2Q",
+            "SAVE-MSGID",
+            "MQ-MSG-COUNT",
+            "WS-FUNC",
+            "WS-KEY",
+            "MQGMO-WAITINTERVAL",
+            "MQGMO-OPTIONS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Process Request and Build Date/Time Reply",
+          "description": "Clears the reply message and date/time fields. Issues CICS ASKTIME to get the current absolute time, then CICS FORMATTIME to format it as MM-DD-YYYY and HH:MM:SS. Builds a reply string containing 'SYSTEM DATE' and 'SYSTEM TIME' values into REPLY-MESSAGE.",
+          "records": [
+            "REPLY-MESSAGE",
+            "WS-DATE-TIME",
+            "WS-ABS-TIME",
+            "WS-MMDDYYYY",
+            "WS-TIME"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Put Reply Message to Output Queue",
+          "description": "Places the formatted date/time reply message onto the output reply queue using MQPUT with syncpoint, default-context, and fail-if-quiescing options. Restores saved message ID and correlation ID into the message descriptor to correlate the reply with the original request.",
+          "records": [
+            "REPLY-MESSAGE",
+            "MQ-BUFFER",
+            "MQ-BUFFER-LENGTH",
+            "SAVE-MSGID",
+            "SAVE-CORELID",
+            "MQMD-MSGID",
+            "MQMD-CORRELID",
+            "MQMD-FORMAT",
+            "MQMD-CODEDCHARSETID",
+            "MQPMO-OPTIONS",
+            "OUTPUT-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Issue CICS Syncpoint and Loop for Next Message",
+          "description": "Issues a CICS SYNCPOINT to commit the current unit of work (GET and PUT under syncpoint), then loops back to GET the next request message. Continues until no more messages are available on the input queue.",
+          "records": [
+            "WS-MQ-MSG-FLAG",
+            "NO-MORE-MSGS",
+            "MQ-MSG-COUNT"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Error Handling - Write to Error Queue",
+          "description": "On any MQ or processing error, formats the error display record and writes it to the 'CARD.DEMO.ERROR' queue via MQPUT using syncpoint. If the error queue PUT itself fails, displays the error and proceeds to termination.",
+          "records": [
+            "MQ-ERR-DISPLAY",
+            "ERROR-MESSAGE",
+            "MQ-BUFFER",
+            "MQ-BUFFER-LENGTH",
+            "MQMD-FORMAT",
+            "MQMD-CODEDCHARSETID",
+            "MQPMO-OPTIONS",
+            "ERROR-QUEUE-HANDLE",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE",
+            "MQ-ERROR-PARA",
+            "MQ-APPL-RETURN-MESSAGE",
+            "MQ-APPL-CONDITION-CODE",
+            "MQ-APPL-REASON-CODE",
+            "MQ-APPL-QUEUE-NAME"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Termination - Close Queues and Return",
+          "description": "Conditionally closes the input queue (if REPLY-QUEUE-OPEN), output reply queue (if RESP-QUEUE-OPEN), and error queue (if ERR-QUEUE-OPEN) using MQCLOSE with MQCO-NONE options. Issues CICS RETURN to end the transaction and GOBACK.",
+          "records": [
+            "INPUT-QUEUE-HANDLE",
+            "OUTPUT-QUEUE-HANDLE",
+            "ERROR-QUEUE-HANDLE",
+            "MQ-HOBJ",
+            "MQ-OPTIONS",
+            "MQ-CONDITION-CODE",
+            "MQ-REASON-CODE",
+            "REPLY-QUEUE-OPEN",
+            "RESP-QUEUE-OPEN",
+            "ERR-QUEUE-OPEN"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Error queue must open before CICS RETRIEVE",
+          "description": "The error queue 'CARD.DEMO.ERROR' is opened as the very first action in 1000-CONTROL before the CICS RETRIEVE is attempted, ensuring that any subsequent errors can be routed to the error queue immediately."
+        },
+        {
+          "dependency": "CICS RETRIEVE must succeed before queue open",
+          "description": "The input queue name is dynamically obtained from the CICS trigger message (MQTM-QNAME). The input and output queues cannot be opened until RETRIEVE succeeds, creating a hard sequential dependency."
+        },
+        {
+          "dependency": "Input queue must open before GET loop",
+          "description": "INPUT-QUEUE-HANDLE must be populated by 2300-OPEN-INPUT-QUEUE before 3000-GET-REQUEST can issue MQGET. If the open fails, the program terminates immediately."
+        },
+        {
+          "dependency": "Output queue must open before PUT reply",
+          "description": "OUTPUT-QUEUE-HANDLE must be populated by 2400-OPEN-OUTPUT-QUEUE before 4100-PUT-REPLY can issue MQPUT. If the open fails, the program terminates immediately."
+        },
+        {
+          "dependency": "Message correlation ID preservation",
+          "description": "SAVE-MSGID and SAVE-CORELID are captured from the incoming MQGET message descriptor and must be preserved across the date/time formatting logic so they can be restored into MQMD-MSGID and MQMD-CORRELID when the reply is PUT, ensuring proper request-reply correlation."
+        },
+        {
+          "dependency": "CICS Syncpoint controls MQ transactional integrity",
+          "description": "Both MQGET (with MQGMO-SYNCPOINT) and MQPUT (with MQPMO-SYNCPOINT) are issued under CICS syncpoint control. The CICS SYNCPOINT command in 4000-MAIN-PROCESS commits each GET/PUT pair as a unit of work, preventing message loss or duplication across loop iterations."
+        },
+        {
+          "dependency": "NO-MORE-MSGS flag controls processing loop",
+          "description": "The WS-MQ-MSG-FLAG / NO-MORE-MSGS condition controls the PERFORM UNTIL loop in 1000-CONTROL. It is only set to TRUE when MQGET returns MQRC-NO-MSG-AVAILABLE, meaning all available messages have been processed."
+        },
+        {
+          "dependency": "Queue status flags gate close operations",
+          "description": "REPLY-QUEUE-OPEN, RESP-QUEUE-OPEN, and ERR-QUEUE-OPEN flags are checked in 8000-TERMINATION before attempting MQCLOSE. This prevents MQCLOSE calls on handles that were never successfully opened, avoiding spurious errors during cleanup."
+        },
+        {
+          "dependency": "QMGR-HANDLE-CONN required for all MQ calls",
+          "description": "QMGR-HANDLE-CONN is used as the connection handle in all MQOPEN, MQGET, MQPUT, and MQCLOSE calls. However, no explicit MQCONN or MQCONNX call is present in this program, implying the connection handle is either pre-established by the CICS MQ adapter or expected to be zero for CICS-managed connections."
+        },
+        {
+          "dependency": "MQ copybooks define all MQ structure layouts",
+          "description": "CMQGMOV, CMQPMOV, CMQMDV, CMQODV, CMQV, and CMQTML copybooks define the MQ get/put message options, message descriptor, object descriptor, constants, and trigger message layout respectively. All MQ API calls depend on these structures being correctly initialized."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM MQ (WebSphere MQ / MQ Series)",
+          "type": "Message-oriented middleware",
+          "purpose": "Core messaging infrastructure. The program receives date/time request messages from an input queue (dynamically named via CICS trigger), processes them, and puts formatted date/time reply messages onto 'CARD.DEMO.REPLY.DATE'. Errors are routed to 'CARD.DEMO.ERROR'. MQ API calls used: MQOPEN, MQGET, MQPUT, MQCLOSE."
+        },
+        {
+          "system": "IBM CICS (Customer Information Control System)",
+          "type": "Transaction processing monitor",
+          "purpose": "Provides the runtime environment and transaction lifecycle management. CICS RETRIEVE obtains the MQ trigger message that initiated the transaction. CICS ASKTIME and FORMATTIME supply the current system date and time. CICS SYNCPOINT commits MQ GET/PUT units of work. CICS RETURN terminates the transaction."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "CICS Operation Errors",
+        "description": "Checks WS-CICS-RESP1-CD after CICS RETRIEVE command. On failure, populates MQ-ERR-DISPLAY with operation name, response codes (formatted via STRING), then performs 9000-ERROR to write to error queue followed by 8000-TERMINATION for graceful shutdown."
+      },
+      {
+        "category": "MQ Queue Open Errors",
+        "description": "Uses EVALUATE on MQ-CONDITION-CODE after each MQOPEN call (input, output, and error queues). On MQCC-OK, saves handles and sets queue-open status flags (88-level conditions). On OTHER, captures condition/reason codes and queue name into MQ-ERR-DISPLAY, then performs 9000-ERROR and 8000-TERMINATION. Special case: error queue open failure uses DISPLAY instead of 9000-ERROR since the error queue itself is unavailable."
+      },
+      {
+        "category": "MQ Message Get Errors",
+        "description": "After MQGET, distinguishes between two error conditions: MQRC-NO-MSG-AVAILABLE sets NO-MORE-MSGS flag to TRUE to gracefully end message processing loop; all other errors populate MQ-ERR-DISPLAY with condition/reason codes and queue name, then perform 9000-ERROR and 8000-TERMINATION."
+      },
+      {
+        "category": "MQ Message Put Errors (Reply)",
+        "description": "After MQPUT to the reply/output queue in 4100-PUT-REPLY, evaluates MQ-CONDITION-CODE. On failure, captures condition/reason codes and queue name into MQ-ERR-DISPLAY, then performs 9000-ERROR to route error to error queue followed by 8000-TERMINATION."
+      },
+      {
+        "category": "MQ Error Queue Write Errors (9000-ERROR)",
+        "description": "Centralized error handler that writes MQ-ERR-DISPLAY content to the dedicated error queue (CARD.DEMO.ERROR) via MQPUT using ERROR-QUEUE-HANDLE. If the MQPUT to the error queue itself fails, falls back to DISPLAY of MQ-ERR-DISPLAY to system output and performs 8000-TERMINATION, preventing infinite error loops."
+      },
+      {
+        "category": "MQ Queue Close Errors",
+        "description": "After each MQCLOSE call (5000, 5100, 5200 paragraphs), evaluates MQ-CONDITION-CODE. On failure, captures codes and queue name into MQ-ERR-DISPLAY. Close of input/output queues performs 8000-TERMINATION directly; close of error queue performs 9000-ERROR then 8000-TERMINATION."
+      },
+      {
+        "category": "Termination and Resource Cleanup (8000-TERMINATION)",
+        "description": "Centralized shutdown routine that conditionally closes only opened queues by checking 88-level status flags (REPLY-QUEUE-OPEN, RESP-QUEUE-OPEN, ERR-QUEUE-OPEN) before performing respective close paragraphs. Ends with EXEC CICS RETURN and GOBACK to ensure proper CICS task termination regardless of error path taken."
+      }
+    ]
+  }
+}

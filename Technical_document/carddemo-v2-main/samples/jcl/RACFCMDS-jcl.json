@@ -1,0 +1,58 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "RACFCMDS.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **RACFCMDS**, performs two RACF (Resource Access Control Facility) security administration tasks on an IBM mainframe. It first adds a transaction code (CT02) to a CICS transaction profile named CARD, then connects a user (AWSCODR) to the M2APPDEV security group. The job's business purpose is to manage access control by granting a developer user appropriate group membership and enabling a specific CICS transaction within a defined security profile.",
+      "parameters": [
+        {
+          "name": "ACTINFO1",
+          "value": "ACTINFO1",
+          "description": "Positional parameter specifying the accounting information for the job, used for billing and resource tracking purposes."
+        },
+        {
+          "name": "PROGRAMMER NAME",
+          "value": "RACF",
+          "description": "Positional parameter providing a descriptive name or label for the job, identifying it as related to RACF operations."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class that determines the job entry subsystem (JES) input queue where the job is placed, controlling scheduling and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "Y",
+          "description": "Specifies the output class for the job log and system messages, determining where the job's message output is directed."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) prints all JCL statements including those from procedures, and the second value (1) prints all system messages including allocation and termination messages."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified upon job completion. The symbolic parameter &SYSUID resolves to the user ID of the submitting user, so that user receives a notification message when the job finishes."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. A value of 1440 sets the time limit to 1440 minutes (24 hours), effectively allowing the job to run without a CPU time restriction."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "TSOBAT",
+        "purpose": "Executes RACF administrative commands in batch mode to add a transaction (CT02) to the GCICSTRN resource profile CARD, and to connect user AWSCODR to the M2APPDEV group.",
+        "programs": "IKJEFT01 (RALT, CONNECT)*",
+        "inputs": "SYSTSIN (RALT GCICSTRN CARD ADDMEM(CT02)), SYSTSIN (CONNECT AWSCODR GROUP(M2APPDEV))",
+        "outputs": "SYSTSPRT (SYSOUT=*)"
+      }
+    ],
+    "data_operations": []
+  }
+}

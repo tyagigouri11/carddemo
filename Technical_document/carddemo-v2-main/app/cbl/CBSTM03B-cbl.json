@@ -1,0 +1,290 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBSTM03B.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBSTM03B is a batch subroutine within the CardDemo credit card management application, serving as a centralized file I/O handler for transaction reporting workflows. It operates as a called subprogram, meaning it is invoked by a parent reporting program rather than running independently, acting as a reusable file access layer. The program abstracts all direct file handling for four core data files — transactions, card-to-account cross-references, customers, and accounts — providing a single, consistent interface for opening, reading, and closing these files so that the calling program can retrieve and correlate data needed to produce transaction reports.",
+      "key_features": [
+        {
+          "feature": "Unified File Operation Dispatcher",
+          "description": "Routes file operations to the correct handler based on a file identifier and operation code passed in via the linkage interface, supporting Open, Close, Sequential Read, and Keyed Read operations."
+        },
+        {
+          "feature": "Transaction File Access",
+          "description": "Opens and sequentially reads the indexed transaction file (TRNXFILE), which contains card transaction records keyed by card number and transaction ID."
+        },
+        {
+          "feature": "Card Cross-Reference File Access",
+          "description": "Opens and sequentially reads the indexed cross-reference file (XREFFILE), which maps card numbers to account information."
+        },
+        {
+          "feature": "Customer File Keyed Lookup",
+          "description": "Performs random keyed reads on the customer file (CUSTFILE) using a customer ID supplied by the caller, enabling direct retrieval of customer records for report enrichment."
+        },
+        {
+          "feature": "Account File Keyed Lookup",
+          "description": "Performs random keyed reads on the account file (ACCTFILE) using an account ID supplied by the caller, enabling direct retrieval of account details for report enrichment."
+        },
+        {
+          "feature": "Standardized Return Code Reporting",
+          "description": "Returns the file status code from each operation back to the calling program via the linkage area, allowing the caller to handle errors or end-of-file conditions consistently."
+        },
+        {
+          "feature": "Reusable Subroutine Interface",
+          "description": "Accepts all control parameters — file name, operation type, key value, key length, and data buffer — through a single linkage record, making it a flexible and reusable component across multiple calling programs."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TRNX-FILE",
+        "type": "Read",
+        "description": "Transaction file (TRNXFILE) - opened for sequential input, read sequentially to retrieve transaction records containing card number, transaction ID, and account data for the transaction report"
+      },
+      {
+        "name": "XREF-FILE",
+        "type": "Read",
+        "description": "Cross-reference file (XREFFILE) - opened for sequential input, read sequentially to retrieve card-to-account cross-reference records linking card numbers to account data"
+      },
+      {
+        "name": "CUST-FILE",
+        "type": "Read",
+        "description": "Customer master file (CUSTFILE) - opened for random access input, read by key (customer ID) to retrieve customer records containing customer details"
+      },
+      {
+        "name": "ACCT-FILE",
+        "type": "Read",
+        "description": "Account master file (ACCTFILE) - opened for random access input, read by key (account ID) to retrieve account records containing account details"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Receive Linkage Parameters",
+          "description": "Calling program passes a linkage area specifying which file to operate on (LK-M03B-DD), the operation to perform (LK-M03B-OPER), an optional key (LK-M03B-KEY / LK-M03B-KEY-LN), and a 1000-byte data buffer (LK-M03B-FLDT). Return code LK-M03B-RC is initialized by the caller.",
+          "records": [
+            "LK-M03B-DD",
+            "LK-M03B-OPER",
+            "LK-M03B-KEY",
+            "LK-M03B-KEY-LN",
+            "LK-M03B-FLDT",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Route to File Handler",
+          "description": "The EVALUATE on LK-M03B-DD dispatches control to one of four file-processing sections: TRNXFILE (transactions), XREFFILE (card cross-reference), CUSTFILE (customer), or ACCTFILE (account). An unrecognized DD name causes an immediate GOBACK.",
+          "records": [
+            "LK-M03B-DD"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Open Transaction File (TRNXFILE)",
+          "description": "When LK-M03B-OPER = 'O', opens TRNX-FILE for sequential INPUT. File status is returned in LK-M03B-RC. The file is an indexed sequential file keyed on FD-TRNXS-ID (card number + transaction ID).",
+          "records": [
+            "FD-TRNXS-ID",
+            "FD-TRNX-CARD",
+            "FD-TRNX-ID",
+            "TRNXFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Transaction File Sequentially",
+          "description": "When LK-M03B-OPER = 'R', reads the next sequential record from TRNX-FILE into LK-M03B-FLDT (350-byte record: 32-byte key + 318-byte data). File status is returned in LK-M03B-RC.",
+          "records": [
+            "FD-TRNXS-ID",
+            "FD-TRNX-CARD",
+            "FD-TRNX-ID",
+            "FD-ACCT-DATA",
+            "LK-M03B-FLDT",
+            "TRNXFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Close Transaction File",
+          "description": "When LK-M03B-OPER = 'C', closes TRNX-FILE and returns file status in LK-M03B-RC.",
+          "records": [
+            "TRNXFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Open Cross-Reference File (XREFFILE)",
+          "description": "When LK-M03B-OPER = 'O', opens XREF-FILE for sequential INPUT. The file maps card numbers (FD-XREF-CARD-NUM, 16 bytes) to cross-reference data (34 bytes). File status returned in LK-M03B-RC.",
+          "records": [
+            "FD-XREF-CARD-NUM",
+            "XREFFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Read Cross-Reference File Sequentially",
+          "description": "When LK-M03B-OPER = 'R', reads the next sequential record from XREF-FILE into LK-M03B-FLDT (50-byte record). File status returned in LK-M03B-RC.",
+          "records": [
+            "FD-XREF-CARD-NUM",
+            "FD-XREF-DATA",
+            "LK-M03B-FLDT",
+            "XREFFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Close Cross-Reference File",
+          "description": "When LK-M03B-OPER = 'C', closes XREF-FILE and returns file status in LK-M03B-RC.",
+          "records": [
+            "XREFFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Open Customer File (CUSTFILE)",
+          "description": "When LK-M03B-OPER = 'O', opens CUST-FILE for random INPUT. The file is keyed on FD-CUST-ID (9-byte customer ID). File status returned in LK-M03B-RC.",
+          "records": [
+            "FD-CUST-ID",
+            "CUSTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Read Customer File by Key",
+          "description": "When LK-M03B-OPER = 'K', moves LK-M03B-KEY (trimmed to LK-M03B-KEY-LN bytes) into FD-CUST-ID, then performs a random keyed READ of CUST-FILE into LK-M03B-FLDT (500-byte record). File status returned in LK-M03B-RC.",
+          "records": [
+            "LK-M03B-KEY",
+            "LK-M03B-KEY-LN",
+            "FD-CUST-ID",
+            "FD-CUST-DATA",
+            "LK-M03B-FLDT",
+            "CUSTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Close Customer File",
+          "description": "When LK-M03B-OPER = 'C', closes CUST-FILE and returns file status in LK-M03B-RC.",
+          "records": [
+            "CUSTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Open Account File (ACCTFILE)",
+          "description": "When LK-M03B-OPER = 'O', opens ACCT-FILE for random INPUT. The file is keyed on FD-ACCT-ID (11-digit numeric account ID). File status returned in LK-M03B-RC.",
+          "records": [
+            "FD-ACCT-ID",
+            "ACCTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Read Account File by Key",
+          "description": "When LK-M03B-OPER = 'K', moves LK-M03B-KEY (trimmed to LK-M03B-KEY-LN bytes) into FD-ACCT-ID, then performs a random keyed READ of ACCT-FILE into LK-M03B-FLDT (300-byte record). File status returned in LK-M03B-RC.",
+          "records": [
+            "LK-M03B-KEY",
+            "LK-M03B-KEY-LN",
+            "FD-ACCT-ID",
+            "FD-ACCT-DATA",
+            "LK-M03B-FLDT",
+            "ACCTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Close Account File",
+          "description": "When LK-M03B-OPER = 'C', closes ACCT-FILE and returns file status in LK-M03B-RC.",
+          "records": [
+            "ACCTFILE-STATUS",
+            "LK-M03B-RC"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Return Control to Caller",
+          "description": "GOBACK returns control to the calling program (CBSTM03A or equivalent). LK-M03B-RC contains the two-byte file status code from the last operation, and LK-M03B-FLDT contains the retrieved record data (if a READ was performed).",
+          "records": [
+            "LK-M03B-RC",
+            "LK-M03B-FLDT"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Caller-controlled file lifecycle",
+          "description": "This subroutine is stateless between calls; the calling program is solely responsible for issuing Open ('O') before any Read ('R' or 'K') and Close ('C') after processing. Failure to open before reading will result in a non-zero file status returned in LK-M03B-RC."
+        },
+        {
+          "dependency": "LK-M03B-DD routing dependency",
+          "description": "The correct DD name must be passed in LK-M03B-DD ('TRNXFILE', 'XREFFILE', 'CUSTFILE', 'ACCTFILE'). Any other value causes an immediate GOBACK without setting LK-M03B-RC, leaving the caller with no status feedback."
+        },
+        {
+          "dependency": "Key length accuracy for random reads",
+          "description": "For CUSTFILE and ACCTFILE keyed reads (operation 'K'), LK-M03B-KEY-LN must accurately reflect the length of the key in LK-M03B-KEY. An incorrect length will cause an incorrect key to be moved into FD-CUST-ID or FD-ACCT-ID, resulting in a record-not-found condition (file status '23') or retrieval of the wrong record."
+        },
+        {
+          "dependency": "Sequential read ordering for TRNXFILE and XREFFILE",
+          "description": "TRNX-FILE and XREF-FILE are opened and read sequentially. The caller must process records in the order they are returned; there is no mechanism in this subroutine to reposition or restart the sequential read without closing and reopening the file."
+        },
+        {
+          "dependency": "LK-M03B-FLDT buffer size constraint",
+          "description": "LK-M03B-FLDT is defined as 1000 bytes. All four file records fit within this buffer (TRNX: 350 bytes, XREF: 50 bytes, CUST: 500 bytes, ACCT: 300 bytes). Any future expansion of file record sizes beyond 1000 bytes would cause data truncation without error."
+        },
+        {
+          "dependency": "File status propagation",
+          "description": "LK-M03B-RC is only set at the 1900/2900/3900/4900-EXIT paragraphs. If the EVALUATE in 0000-START falls to the WHEN OTHER branch and executes GO TO 9999-GOBACK, LK-M03B-RC is never updated, leaving the caller with a stale or uninitialized return code."
+        },
+        {
+          "dependency": "ACCT-FILE key type mismatch risk",
+          "description": "FD-ACCT-ID is defined as PIC 9(11) (numeric), but LK-M03B-KEY is PIC X(25) (alphanumeric). The MOVE of LK-M03B-KEY into FD-ACCT-ID relies on the caller supplying a purely numeric string of the correct length; non-numeric content will cause undefined behavior or an abend depending on the runtime environment."
+        },
+        {
+          "dependency": "Cross-reference to transaction card number linkage",
+          "description": "The calling program is expected to use FD-TRNX-CARD (from TRNXFILE reads) as the basis for lookups in XREFFILE, and the cross-reference result to drive keyed lookups in CUSTFILE and ACCTFILE. This subroutine does not enforce this chain; the dependency is entirely in the calling program's logic."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Status Tracking",
+        "description": "Each of the four files (TRNXFILE, XREFFILE, CUSTFILE, ACCTFILE) has a dedicated two-character FILE STATUS field (e.g., TRNXFILE-STATUS, XREFFILE-STATUS). After every file operation (OPEN, READ, CLOSE), the corresponding file status is moved to the linkage section return code field LK-M03B-RC, allowing the calling program to inspect the outcome of each operation."
+      },
+      {
+        "category": "Return Code Propagation",
+        "description": "Error handling is delegated entirely to the calling program. This subroutine does not evaluate or act on file status codes itself; it simply captures the file status after each operation and passes it back via LK-M03B-RC in the linkage section. No ABEND, STOP RUN, or inline error messages are issued."
+      },
+      {
+        "category": "Invalid DD Name Handling",
+        "description": "If the calling program passes an unrecognized value in LK-M03B-DD (not TRNXFILE, XREFFILE, CUSTFILE, or ACCTFILE), the EVALUATE WHEN OTHER clause routes execution directly to 9999-GOBACK, performing a GOBACK without setting LK-M03B-RC. This means the caller receives no status code and must detect the unhandled case independently."
+      },
+      {
+        "category": "Unsupported Operation Handling",
+        "description": "Within each file processing section, only specific operations are handled via 88-level condition names (OPEN, CLOSE, READ, READ-K). If an unsupported operation code is passed (e.g., WRITE or REWRITE for read-only files), none of the IF conditions match, execution falls through to the EXIT paragraph, and the file status from the previous operation (or an uninitialized value) is returned in LK-M03B-RC. There is no explicit error raised for unsupported operations."
+      },
+      {
+        "category": "File Operation Error Detection",
+        "description": "Standard COBOL FILE STATUS codes are used to detect errors such as end-of-file (status '10'), record not found (status '23'), or I/O errors (status '9x'). These are captured automatically by the runtime into the status fields after each READ, OPEN, or CLOSE, and surfaced to the caller via LK-M03B-RC without any filtering or transformation."
+      },
+      {
+        "category": "Absence of Defensive Validation",
+        "description": "There is no validation of input parameters such as LK-M03B-KEY-LN bounds, null or blank key values, or operation code correctness before file operations are attempted. Errors resulting from invalid key lengths or malformed keys would manifest as file status errors returned to the caller rather than being caught proactively within the subroutine."
+      }
+    ]
+  }
+}

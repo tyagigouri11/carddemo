@@ -1,0 +1,230 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBTRN01C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBTRN01C is a batch COBOL program within the CardDemo credit card processing application, operating as part of the daily transaction posting workflow. It serves as an early-stage validation and lookup step in the transaction processing pipeline, reading raw daily transaction records and verifying their associated card and account information before downstream posting. The program reads each transaction from a sequential daily transaction file, uses the card number to look up the corresponding account via a cross-reference file, and then retrieves the associated account record — effectively validating that each transaction can be linked to a known, active account. It addresses the need to filter out unverifiable transactions before they are committed to the permanent transaction ledger.",
+      "key_features": [
+        {
+          "feature": "Daily Transaction File Processing",
+          "description": "Sequentially reads all records from the daily transaction input file, processing each transaction one at a time until end-of-file is reached."
+        },
+        {
+          "feature": "Card-to-Account Cross-Reference Lookup",
+          "description": "For each transaction, uses the card number to perform a random lookup in the cross-reference file to resolve the associated account ID and customer ID."
+        },
+        {
+          "feature": "Account Validation",
+          "description": "Reads the account file using the resolved account ID to confirm the account exists, logging a warning if the account cannot be found."
+        },
+        {
+          "feature": "Transaction Skipping on Invalid Card",
+          "description": "If a card number cannot be verified in the cross-reference file, the transaction is skipped and a descriptive message is displayed identifying the unresolvable card and transaction ID."
+        },
+        {
+          "feature": "Multi-File Orchestration",
+          "description": "Opens and manages six files simultaneously — daily transactions, customers, cross-reference, cards, accounts, and transactions — ensuring all required reference data is available during processing."
+        },
+        {
+          "feature": "Error Handling and Abend Control",
+          "description": "Detects file I/O errors at open, read, and close operations, displays diagnostic status codes, and triggers a controlled program abend via CEE3ABD if a critical error occurs."
+        },
+        {
+          "feature": "Structured File Status Reporting",
+          "description": "Translates raw two-byte file status codes into readable diagnostic output to aid in troubleshooting file access issues during batch execution."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "DALYTRAN-FILE",
+        "type": "Read",
+        "description": "Daily transaction file (DALYTRAN) - sequential input file read record by record to obtain daily transaction records including transaction ID, card number, type, category, amount, merchant info, and timestamps"
+      },
+      {
+        "name": "CUSTOMER-FILE",
+        "type": "Read",
+        "description": "Customer master file (CUSTFILE) - indexed file opened for input to support customer lookups by customer ID, containing customer demographic and account information"
+      },
+      {
+        "name": "XREF-FILE",
+        "type": "Read",
+        "description": "Card cross-reference file (XREFFILE) - indexed file read randomly by card number to resolve a card number to its associated account ID and customer ID"
+      },
+      {
+        "name": "CARD-FILE",
+        "type": "Read",
+        "description": "Card master file (CARDFILE) - indexed file opened for input to support card lookups by card number, containing card details such as CVV, embossed name, expiration date, and active status"
+      },
+      {
+        "name": "ACCOUNT-FILE",
+        "type": "Read",
+        "description": "Account master file (ACCTFILE) - indexed file read randomly by account ID to retrieve account details such as balance, credit limit, and status after resolving the account from the cross-reference lookup"
+      },
+      {
+        "name": "TRANSACT-FILE",
+        "type": "Read",
+        "description": "Transaction history file (TRANFILE) - indexed file opened for input; defined for use in the program but no write or update operations are performed against it in the current code"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Open All Files",
+          "description": "Opens all six files in sequence: DALYTRAN (input sequential), CUSTOMER (indexed input), XREF (indexed input), CARD (indexed input), ACCOUNT (indexed input), and TRANSACT (indexed input). Any open failure triggers an abend.",
+          "records": [
+            "DALYTRAN-STATUS",
+            "CUSTFILE-STATUS",
+            "XREFFILE-STATUS",
+            "CARDFILE-STATUS",
+            "ACCTFILE-STATUS",
+            "TRANFILE-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Daily Transaction Record",
+          "description": "Sequentially reads the next record from the daily transaction file (DALYTRAN) into DALYTRAN-RECORD. Sets END-OF-DAILY-TRANS-FILE to 'Y' on EOF, or abends on any other non-zero file status.",
+          "records": [
+            "FD-TRAN-ID",
+            "FD-CUST-DATA",
+            "DALYTRAN-RECORD",
+            "DALYTRAN-CARD-NUM",
+            "DALYTRAN-ID"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Display Transaction Record",
+          "description": "Displays the contents of the current DALYTRAN-RECORD to the system output for logging/audit purposes before further processing.",
+          "records": [
+            "DALYTRAN-RECORD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Cross-Reference Card Number Lookup",
+          "description": "Uses the card number from the daily transaction record (DALYTRAN-CARD-NUM) to perform a random keyed read on the XREF file. On success, retrieves the associated account ID (XREF-ACCT-ID) and customer ID (XREF-CUST-ID). On failure, sets WS-XREF-READ-STATUS to 4 and logs a warning message.",
+          "records": [
+            "DALYTRAN-CARD-NUM",
+            "XREF-CARD-NUM",
+            "FD-XREF-CARD-NUM",
+            "CARD-XREF-RECORD",
+            "XREF-ACCT-ID",
+            "XREF-CUST-ID",
+            "WS-XREF-READ-STATUS"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Read Account Record",
+          "description": "If the XREF lookup was successful (WS-XREF-READ-STATUS = 0), uses the account ID obtained from the XREF record (XREF-ACCT-ID) to perform a random keyed read on the ACCOUNT file. On failure, sets WS-ACCT-READ-STATUS to 4 and logs a warning. On success, ACCOUNT-RECORD is populated.",
+          "records": [
+            "XREF-ACCT-ID",
+            "ACCT-ID",
+            "FD-ACCT-ID",
+            "ACCOUNT-RECORD",
+            "WS-ACCT-READ-STATUS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Loop Until End of Daily Transaction File",
+          "description": "Steps 2 through 5 repeat in a PERFORM UNTIL loop until END-OF-DAILY-TRANS-FILE is set to 'Y', processing every record in the daily transaction file sequentially.",
+          "records": [
+            "END-OF-DAILY-TRANS-FILE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Close All Files",
+          "description": "Closes all six files in sequence: DALYTRAN, CUSTOMER, XREF, CARD, ACCOUNT, and TRANSACT. Any close failure triggers an abend.",
+          "records": [
+            "DALYTRAN-STATUS",
+            "CUSTFILE-STATUS",
+            "XREFFILE-STATUS",
+            "CARDFILE-STATUS",
+            "ACCTFILE-STATUS",
+            "TRANFILE-STATUS"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "XREF Lookup Must Precede Account Read",
+          "description": "The account ID (XREF-ACCT-ID) used to key into the ACCOUNT file is only available after a successful read of the XREF file. If the XREF read fails (WS-XREF-READ-STATUS != 0), the account read is skipped entirely, making the XREF lookup a hard prerequisite for account processing."
+        },
+        {
+          "dependency": "DALYTRAN Card Number Drives Entire Processing Chain",
+          "description": "The card number field (DALYTRAN-CARD-NUM) from the daily transaction record is the root key that initiates all downstream lookups. Without a valid card number, neither the XREF nor the ACCOUNT record can be retrieved."
+        },
+        {
+          "dependency": "Sequential File Open Order",
+          "description": "All six files must be successfully opened before any processing begins. The open sequence is strictly ordered (DALYTRAN, CUSTOMER, XREF, CARD, ACCOUNT, TRANSACT), and a failure at any point abends the program, preventing subsequent opens."
+        },
+        {
+          "dependency": "WS-XREF-READ-STATUS Validation Gate",
+          "description": "The working storage field WS-XREF-READ-STATUS acts as a conditional gate. It is explicitly reset to 0 before each XREF lookup and checked after. Only a value of 0 permits the account read to proceed, preventing stale status values from prior iterations from affecting current processing."
+        },
+        {
+          "dependency": "TRANSACT File Opened But Never Used",
+          "description": "The TRANSACT-FILE (TRANFILE) is opened as INPUT at program start and closed at program end, but no READ or WRITE operations are performed against it in the current code. This represents an incomplete implementation dependency — downstream posting logic expected to write to this file is absent."
+        },
+        {
+          "dependency": "CUSTOMER and CARD Files Opened But Never Used",
+          "description": "CUSTOMER-FILE and CARD-FILE are opened as INPUT but no records are read from them during processing. Their data structures (CVCUS01Y, CVACT02Y) are available in working storage but the lookup logic referencing them has not been implemented, creating latent dependencies."
+        },
+        {
+          "dependency": "Copybook Record Layout Alignment",
+          "description": "The program relies on copybooks CVTRA05Y (DALYTRAN-RECORD layout), CVACT03Y (CARD-XREF-RECORD layout), and CVACT01Y (ACCOUNT-RECORD layout) to correctly map fields such as DALYTRAN-CARD-NUM, XREF-ACCT-ID, and ACCT-ID. Any mismatch between copybook definitions and actual file layouts will cause silent data corruption."
+        },
+        {
+          "dependency": "APPL-RESULT State Management",
+          "description": "The single shared field APPL-RESULT is reused across all open, read, and close operations. Its value must be correctly set and evaluated within each paragraph before control passes to the next, as there is no isolation between paragraphs using this shared status indicator."
+        },
+        {
+          "dependency": "Abend on File Error Halts All Processing",
+          "description": "Any unexpected file I/O error (status not '00' or '10') on the DALYTRAN file, or any non-'00' status on open/close of any file, calls Z-ABEND-PROGRAM via CEE3ABD. This means a single bad record or file issue terminates the entire batch run with no partial commit or restart capability."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "All six file opens (DALYTRAN, CUSTOMER, XREF, CARD, ACCOUNT, TRANSACT) follow an identical pattern: APPL-RESULT is pre-set to 8 before the OPEN, then checked against file status '00' for success or '12' for failure. Any non-zero APPL-RESULT triggers Z-DISPLAY-IO-STATUS to format and display the file status code, followed by Z-ABEND-PROGRAM which calls CEE3ABD with abend code 999, terminating the program immediately. File open errors are always fatal."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "All six file closes (paragraphs 9000–9500) mirror the open error handling pattern using ADD 8 TO ZERO GIVING APPL-RESULT as a pre-set sentinel. On close failure, Z-DISPLAY-IO-STATUS is called to display the formatted status, then Z-ABEND-PROGRAM is invoked. Notably, paragraph 9000-DALYTRAN-CLOSE contains a copy-paste bug: it displays 'ERROR CLOSING CUSTOMER FILE' and uses CUSTFILE-STATUS instead of DALYTRAN-STATUS on failure. Close errors are always fatal."
+      },
+      {
+        "category": "Sequential File Read Errors",
+        "description": "In paragraph 1000-DALYTRAN-GET-NEXT, the DALYTRAN-STATUS is evaluated after each READ: '00' maps to APPL-RESULT=0 (success), '10' maps to APPL-RESULT=16 (EOF), and any other status maps to APPL-RESULT=12 (error). EOF sets END-OF-DAILY-TRANS-FILE to 'Y' to gracefully terminate the processing loop. Any other read error triggers Z-DISPLAY-IO-STATUS and Z-ABEND-PROGRAM, making unexpected read errors fatal."
+      },
+      {
+        "category": "Cross-Reference (XREF) Lookup Errors",
+        "description": "In paragraph 2000-LOOKUP-XREF, an INVALID KEY condition on the indexed READ sets WS-XREF-READ-STATUS to 4 and displays 'INVALID CARD NUMBER FOR XREF'. The calling logic in MAIN-PARA checks WS-XREF-READ-STATUS and, if non-zero, displays a warning message identifying the unverifiable card number and transaction ID, then skips the transaction entirely. This is a non-fatal, record-level skip strategy."
+      },
+      {
+        "category": "Account File Read Errors",
+        "description": "In paragraph 3000-READ-ACCOUNT, an INVALID KEY condition sets WS-ACCT-READ-STATUS to 4 and displays 'INVALID ACCOUNT NUMBER FOUND'. The calling logic in MAIN-PARA checks WS-ACCT-READ-STATUS and displays 'ACCOUNT [ID] NOT FOUND' but does not abend or skip explicitly beyond the conditional block. This is non-fatal but lacks explicit transaction skip or rejection logging, representing an incomplete error recovery path."
+      },
+      {
+        "category": "I/O Status Display and Formatting",
+        "description": "The Z-DISPLAY-IO-STATUS utility paragraph handles both numeric and non-numeric (vendor-specific) file status codes. For non-numeric or '9x' status codes, it extracts the binary second byte via TWO-BYTES-BINARY redefinition to produce a formatted four-digit display code. For numeric statuses, it formats the two-byte status into a four-character display field. This provides consistent, human-readable diagnostic output before any abend."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "Z-ABEND-PROGRAM provides a single centralized abend mechanism. It displays 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then calls the IBM Language Environment routine CEE3ABD to force a controlled abnormal termination. This ensures the program produces a recognizable abend code (999) for operations monitoring and prevents silent failures on critical I/O errors."
+      },
+      {
+        "category": "Transaction Processing Continuity",
+        "description": "The main processing loop uses END-OF-DAILY-TRANS-FILE as a loop control flag and applies a two-level conditional guard (checking the flag both in UNTIL and within the loop body) to prevent processing after EOF. However, there is no transaction counter, rejection file write, or audit trail for skipped transactions. Skipped records due to XREF or account lookup failures are only logged to DISPLAY output, with no formal error accumulation or reporting mechanism."
+      }
+    ]
+  }
+}

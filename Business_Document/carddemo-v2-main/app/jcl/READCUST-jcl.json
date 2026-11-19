@@ -1,0 +1,21 @@
+{
+    "created_on": "2026-11-05",
+    "name": "READCUST.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/READCUST.jcl",
+    "type": "jcl",
+    "description": "The JCL job **READCUST** executes program **CBCUS01C** to read customer data from a VSAM Key-Sequenced Dataset (KSDS). The job accesses the customer master file in shared mode, processes customer records, and directs all output messages to the system output. This is a read-only operation against the customer data store with no updates or writes performed.Key Functionalities:\nReads customer records from the AWS CardDemo customer VSAM KSDS file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) in shared (read-only) mode\nProcesses customer data through program CBCUS01C loaded from the CardDemo application load library\nDirects all program output and print messages to the system output for reporting or logging purposes",
+    "rules": [
+        {
+            "Rule_Id": "R-READCUST-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Customer Master Data file (CUSTFILE: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) is available and accessible in shared mode, and the program CBCUS01C is available in the program library (AWS.M2.CARDDEMO.LOADLIB)",
+                "When": "The CBCUS01C program is executed to read and process customer records from the Customer Master VSAM Key-Sequenced file, where records are organized and retrieved by a unique Customer Key",
+                "Then": "The program reads customer records from the Customer Master file without modifying, updating, or deleting any records, and all processing results and reports are directed to system output (SYSOUT and SYSPRINT) with no physical output files produced"
+            },
+            "Rule_Name": "STEP05 - CBCUS01C - Read Customer Master Data",
+            "Rule_Description": "This step invokes the external program CBCUS01C to read and process customer records from the Customer Master Data file. The program accesses the Customer Master VSAM file in shared (read-only) mode, allowing concurrent access by other business processes, and directs all processing results to system output reports.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nCustomer Data Processing Job]):::start\n\n    STEP05[STEP05 - CBCUS01C\nProcess and Extract Customer Master Records]:::process\n\n    VSAM[(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS\nCustomer Master VSAM Keyed File)]:::datasource\n\n    CF[(CUST-FILE\nCustomer Sequential Data File)]:::datasource\n\n    CFF[(CUSTFILE-FILE\nCustomer File Reference)]:::datasource\n\n    CUSTOUT[(CUSTOMER-FILE\nCustomer Output Sequential File)]:::datasource\n\n    SUCCESS([JOB END\nCustomer Data Processing Complete]):::final\n\n    A --> STEP05\n\n    VSAM -.->|Read Customer Master Records\nby Customer Key| STEP05\n    CF -.->|Read Customer Sequential Records| STEP05\n    CFF -.->|Read Customer File Data| STEP05\n    STEP05 -.->|Write Processed Customer Records| CUSTOUT\n\n    STEP05 --> SUCCESS\n\n    classDef start fill:#ff6666,color:#000,font-weight:bold\n    classDef process fill:#6699ff,color:#000,font-weight:bold\n    classDef decision fill:#ffcc00,color:#000,font-weight:bold\n    classDef datasource fill:#66ff66,color:#000,font-weight:bold\n    classDef final fill:#ae74de,color:#000,font-weight:bold\n    classDef success fill:#22c55e,color:#000,font-weight:bold\n    classDef error fill:#ef4444,color:#000,font-weight:bold"
+}

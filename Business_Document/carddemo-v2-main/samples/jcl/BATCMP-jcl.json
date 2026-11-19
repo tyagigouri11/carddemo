@@ -1,0 +1,9 @@
+{
+    "created_on": "2026-11-05",
+    "name": "BATCMP.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/BATCMP.jcl",
+    "type": "jcl",
+    "description": "This JCL job compiles a COBOL batch program named BATCHPGM using a standardized build procedure (BUILDBAT) defined in the utility procedure library. It automates the compilation process by referencing a shared procedure library under the AWS.M2.CARDDEMO environment, producing a compiled batch executable ready for deployment.Key Functionalities:\nCompiles the COBOL batch program identified as BATCHPGM using the BUILDBAT procedure from the AWS.M2.CARDDEMO utility procedure library\nUtilizes parameterized settings (member name and high-level qualifier) to allow flexible and reusable compilation across different program members\nProduces a compiled batch program output suitable for execution in the CardDemo application environment",
+    "rules": [],
+    "flow_diagram_code": "flowchart TD\n    A([JCL Job Start]):::start\n    Z([JCL Job End]):::final\n    N[No Job Steps or Datasources Identified\nNo JCL code or datasource definitions were provided\nfor analysis]:::process\n\n    A --> N\n    N --> Z\n\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000"
+}

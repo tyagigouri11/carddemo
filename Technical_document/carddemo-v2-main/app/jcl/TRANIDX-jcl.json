@@ -1,0 +1,119 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "TRANIDX.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **TRANIDX**, creates and builds an Alternate Index (AIX) on the Transaction Master VSAM dataset (`AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS`) for the CardDemo application. The alternate index is defined on the **Processed Timestamp** field (26 bytes long, starting at position 304), allowing the transaction data to be accessed by timestamp in addition to the primary key. The job completes the full AIX setup in three steps: defining the alternate index structure, establishing a path to link it to the base cluster, and physically building the index from the existing dataset records.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "TRANIDX",
+          "description": "The JOB statement marks the beginning of a job and assigns the job name 'TRANIDX', which uniquely identifies this job to the system."
+        },
+        {
+          "name": "ACCT",
+          "value": "'Define AIX on Transaction Master'",
+          "description": "The accounting/description field provides a textual description of the job's purpose, indicating it defines an Alternate Index (AIX) on the Transaction Master dataset."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class 'A', which determines the job entry subsystem (JES) input queue where the job is placed, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class '0' for the job log messages, determining where the system messages and job log are routed for output."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user identified by the symbolic parameter &SYSUID (the submitting user's ID) will receive a notification message when the job completes, informing them of the job's completion status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP20",
+        "purpose": "Defines an Alternate Index (AIX) on the Transaction Master VSAM KSDS dataset, keyed on the processed timestamp field (26-byte key at offset 304), with non-unique keys and automatic upgrade enabled.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE ALTERNATEINDEX command); Base cluster: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "outputs": "Alternate Index cluster: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX; Data component: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA; Index component: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX (allocated on volume AWSHJ1, CYLINDERS(5,1), RECORDSIZE(350,350)); SYSPRINT"
+      },
+      {
+        "step": "STEP25",
+        "purpose": "Defines a PATH to associate the Alternate Index with its base VSAM KSDS cluster, enabling access to the base cluster through the alternate index.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (DEFINE PATH command); Alternate Index: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "outputs": "PATH: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH; SYSPRINT"
+      },
+      {
+        "step": "STEP30",
+        "purpose": "Builds the Alternate Index cluster by reading the base VSAM KSDS dataset and populating the alternate index with key-pointer pairs for all existing records.",
+        "programs": "IDCAMS*",
+        "inputs": "SYSIN (BLDINDEX command); Input dataset: AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "outputs": "Populated Alternate Index: AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX; SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "DEFINE ALTERNATEINDEX",
+        "description": "Defines an Alternate Index (AIX) named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX related to base cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS, with a key offset of 26 and length of 304, non-unique key, upgrade enabled, record size 350, on volume AWSHJ1, allocated 5 cylinders primary and 1 secondary"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "RELATE",
+        "description": "Base VSAM KSDS cluster related to the newly defined Alternate Index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.DATA",
+        "operations": "DEFINE",
+        "description": "Defines the DATA component of the Alternate Index cluster"
+      },
+      {
+        "step": "STEP20",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.INDEX",
+        "operations": "DEFINE",
+        "description": "Defines the INDEX component of the Alternate Index cluster"
+      },
+      {
+        "step": "STEP25",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH",
+        "operations": "DEFINE PATH",
+        "description": "Defines a PATH named AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX.PATH with PATHENTRY pointing to the Alternate Index AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX, relating the AIX to the base cluster"
+      },
+      {
+        "step": "STEP25",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "PATHENTRY",
+        "description": "Alternate Index referenced as the PATHENTRY for the defined PATH"
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS",
+        "operations": "READ",
+        "description": "BLDINDEX reads the base VSAM KSDS cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS as the input dataset to build the Alternate Index"
+      },
+      {
+        "step": "STEP30",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX",
+        "operations": "WRITE",
+        "description": "BLDINDEX writes to the Alternate Index cluster AWS.M2.CARDDEMO.TRANSACT.VSAM.AIX as the output dataset, populating the AIX with index entries built from the base cluster"
+      }
+    ]
+  }
+}

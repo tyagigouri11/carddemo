@@ -1,0 +1,315 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COUSR03C.cbl",
+        "type": "cobol",
+        "transaction_id": "CU03"
+      },
+      "overview": "COUSR03C is part of the CardDemo application, a credit card management system, and operates within the administrative user management workflow. It serves as the user deletion screen handler, allowing administrators to remove user records from the system's security file (USRSEC). The program manages the full lifecycle of a user deletion request — from displaying the deletion confirmation screen, looking up the user record, and executing the delete — ensuring that only valid, existing users are removed and that the administrator is informed of the outcome at each step.",
+      "key_features": [
+        {
+          "feature": "User Lookup",
+          "description": "Reads the USRSEC file by User ID to retrieve and display the user's first name, last name, and user type before deletion, allowing the administrator to confirm the correct record."
+        },
+        {
+          "feature": "Delete Confirmation Flow",
+          "description": "Requires the administrator to first look up a user (Enter key) and then explicitly press PF5 to confirm and execute the deletion, preventing accidental removals."
+        },
+        {
+          "feature": "User Deletion",
+          "description": "Deletes the selected user record from the USRSEC security file using a CICS DELETE command and displays a success message upon completion."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates that the User ID field is not empty before attempting any file operations, displaying an appropriate error message if the field is blank."
+        },
+        {
+          "feature": "Error Handling",
+          "description": "Handles file response codes for record-not-found and unexpected errors, displaying descriptive messages to guide the administrator."
+        },
+        {
+          "feature": "Screen Navigation",
+          "description": "Supports PF3 and PF12 to return to the previous or admin menu screen, and PF4 to clear the current screen, providing flexible navigation within the application."
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Uses a CICS COMMAREA to maintain session context across interactions, including tracking the calling program and re-entry state to support proper screen flow."
+        },
+        {
+          "feature": "Dynamic Screen Header",
+          "description": "Populates the screen header with the current date, time, transaction ID, and program name on every screen send, providing consistent contextual information to the user."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "USRSEC",
+        "type": "Read/Write",
+        "description": "User security file - read to retrieve user details (ID, first name, last name, type) for display and confirmation, then deleted to remove the user record from the system"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program checks EIBCALEN; if zero, redirects to sign-on screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA and determines if this is a first-time entry or re-entry.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-PGM-REENTER",
+            "CDEMO-CU03-USR-SELECTED"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "First Entry Screen Initialization",
+          "description": "On first entry, sets re-enter flag, clears screen output map, and if a user ID was pre-selected from a prior program (e.g., list screen), populates the user ID input field and triggers Enter key processing to pre-load user data.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "COUSR3AO",
+            "COUSR3AI",
+            "CDEMO-CU03-USR-SELECTED",
+            "USRIDINI",
+            "USRIDINL"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive User Input from Screen",
+          "description": "On re-entry, receives the BMS map COUSR3A from mapset COUSR03 into COUSR3AI, capturing the user-entered User ID and any other screen fields.",
+          "records": [
+            "COUSR3AI",
+            "USRIDINI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Evaluate Attention Identifier (AID Key)",
+          "description": "Evaluates EIBAID to determine user action: Enter key triggers lookup, PF3 returns to prior screen, PF4 clears screen, PF5 triggers deletion, PF12 returns to admin menu. Invalid keys set error flag.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "DFHPF4",
+            "DFHPF5",
+            "DFHPF12",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Validate User ID Input",
+          "description": "Checks that the User ID field (USRIDINI) is not spaces or low-values. If empty, sets error flag and message, sets cursor to User ID field, and sends error screen.",
+          "records": [
+            "USRIDINI",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "USRIDINL"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Read User Security File (Lookup)",
+          "description": "Moves the entered User ID to SEC-USR-ID and issues a CICS READ with UPDATE intent against the USRSEC dataset. On success, displays user details and prompts PF5 confirmation. On NOTFND, sets error. On other errors, displays diagnostic.",
+          "records": [
+            "SEC-USR-ID",
+            "SEC-USER-DATA",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-TYPE",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Populate and Send User Delete Screen",
+          "description": "Populates header fields (title, transaction ID, program name, current date and time) into COUSR3AO, moves the message to ERRMSGO, and sends the BMS map COUSR3A to the terminal with ERASE and CURSOR options.",
+          "records": [
+            "COUSR3AO",
+            "TITLE01O",
+            "TITLE02O",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "ERRMSGO",
+            "FNAMEI",
+            "LNAMEI",
+            "USRTYPEI"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Delete User from Security File (PF5)",
+          "description": "After re-validating User ID is not empty and re-reading the record with UPDATE lock, issues a CICS DELETE against the USRSEC dataset. On success, clears all fields and displays confirmation message in green. On NOTFND or error, sets appropriate error message.",
+          "records": [
+            "SEC-USR-ID",
+            "WS-USRSEC-FILE",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "ERRMSGC",
+            "COUSR3AO"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Initialize All Screen Fields",
+          "description": "Clears all input fields on the screen (User ID, First Name, Last Name, User Type) and resets the message field to spaces. Sets cursor position to User ID field.",
+          "records": [
+            "USRIDINL",
+            "USRIDINI",
+            "FNAMEI",
+            "LNAMEI",
+            "USRTYPEI",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Return to Previous Screen or Navigation",
+          "description": "Sets CDEMO-FROM-TRANID and CDEMO-FROM-PROGRAM in the commarea, then issues CICS XCTL to transfer control to the target program (COADM01C or the originating program). If no target is set, defaults to COSGN00C.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA",
+            "WS-TRANID",
+            "WS-PGMNAME"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Return with COMMAREA",
+          "description": "Issues CICS RETURN with transaction ID CU03 and the updated CARDDEMO-COMMAREA to maintain state across interactions.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "COMMAREA presence required",
+          "description": "If EIBCALEN is zero, the program cannot proceed with normal logic and immediately redirects to the sign-on program COSGN00C. All state information depends on a valid CARDDEMO-COMMAREA being passed."
+        },
+        {
+          "dependency": "Pre-selected User ID from calling program",
+          "description": "CDEMO-CU03-USR-SELECTED in the commarea is populated by a prior program (e.g., a user list screen). If present, it pre-fills the User ID field and triggers an automatic lookup on first entry, creating a dependency on the calling program's data."
+        },
+        {
+          "dependency": "READ with UPDATE before DELETE (file lock dependency)",
+          "description": "The DELETE-USER-INFO paragraph explicitly calls READ-USER-SEC-FILE with UPDATE intent before calling DELETE-USER-SEC-FILE. The CICS UPDATE lock obtained during READ must be held for the subsequent DELETE to succeed. No explicit token is passed, relying on CICS implicit record-level locking within the same task."
+        },
+        {
+          "dependency": "Error flag state controls processing flow",
+          "description": "WS-ERR-FLG (ERR-FLG-ON/ERR-FLG-OFF) is a critical gate. Both PROCESS-ENTER-KEY and DELETE-USER-INFO check this flag before proceeding to file I/O. Any prior validation failure that sets ERR-FLG-ON prevents file operations from executing."
+        },
+        {
+          "dependency": "User ID validation precedes all file operations",
+          "description": "Both PROCESS-ENTER-KEY and DELETE-USER-INFO require USRIDINI to be non-spaces and non-low-values before any USRSEC file access is attempted. Empty User ID unconditionally sets the error flag and halts further processing."
+        },
+        {
+          "dependency": "READ-USER-SEC-FILE called within DELETE-USER-INFO",
+          "description": "DELETE-USER-INFO calls READ-USER-SEC-FILE before DELETE-USER-SEC-FILE. If the READ fails (NOTFND or other error), READ-USER-SEC-FILE internally calls SEND-USRDEL-SCREEN and sets ERR-FLG-ON, but control returns to DELETE-USER-INFO which then still calls DELETE-USER-SEC-FILE regardless of ERR-FLG-ON state, creating a potential logic gap where DELETE may be attempted after a failed READ."
+        },
+        {
+          "dependency": "CDEMO-FROM-PROGRAM determines return navigation target",
+          "description": "On PF3, the program navigates back to CDEMO-FROM-PROGRAM if set, otherwise defaults to COADM01C. This creates a dependency on the calling program correctly populating CDEMO-FROM-PROGRAM in the commarea before transferring control."
+        },
+        {
+          "dependency": "BMS map COUSR03 / COUSR3A field layout",
+          "description": "All screen I/O depends on the BMS mapset COUSR03 and map COUSR3A as defined in the COUSR03 copybook. Field names USRIDINI, FNAMEI, LNAMEI, USRTYPEI, ERRMSGO, ERRMSGC must match the BMS map definitions exactly."
+        },
+        {
+          "dependency": "USRSEC file record layout from CSUSR01Y",
+          "description": "File read and delete operations depend on SEC-USER-DATA, SEC-USR-ID, SEC-USR-FNAME, SEC-USR-LNAME, and SEC-USR-TYPE being correctly defined in the CSUSR01Y copybook and matching the actual VSAM USRSEC file structure."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction processing middleware",
+          "purpose": "Provides the runtime environment for all program operations including terminal I/O (SEND MAP, RECEIVE MAP), VSAM file access (READ with UPDATE, DELETE), program transfer (XCTL), and transaction lifecycle management (RETURN with TRANSID and COMMAREA). EIBAID and EIBCALEN from the Execute Interface Block are used for input handling and commarea length detection."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates that User ID field is not empty or low-values before any file operation. On failure, sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with a descriptive message (e.g., 'User ID can NOT be empty...'), positions cursor to the offending field via USRIDINL=-1, and redisplays the screen via SEND-USRDEL-SCREEN. The ERR-FLG-ON condition prevents downstream processing from executing."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "After EXEC CICS READ, evaluates WS-RESP-CD against three conditions: DFHRESP(NORMAL) continues processing and prompts user to confirm deletion; DFHRESP(NOTFND) sets error flag and displays 'User ID NOT found...' with cursor repositioning; WHEN OTHER logs RESP and REAS codes via DISPLAY to SYSOUT, sets error flag, and displays 'Unable to lookup User...' with cursor on FNAMEL field."
+      },
+      {
+        "category": "File Delete Errors",
+        "description": "After EXEC CICS DELETE, evaluates WS-RESP-CD: DFHRESP(NORMAL) clears all fields, sets message color to DFHGREEN, and displays a success confirmation with the deleted user ID; DFHRESP(NOTFND) sets error flag and displays 'User ID NOT found...' with cursor repositioning; WHEN OTHER logs RESP and REAS codes via DISPLAY, sets error flag, and displays 'Unable to Update User...' with cursor on FNAMEL field."
+      },
+      {
+        "category": "Navigation and Session Errors",
+        "description": "Checks EIBCALEN at entry; if zero (no commarea), redirects to sign-on program COSGN00C via XCTL. Validates CDEMO-TO-PROGRAM before XCTL transfer, defaulting to COSGN00C if blank or low-values, preventing invalid program transfers."
+      },
+      {
+        "category": "Invalid Key / Unsupported AID Errors",
+        "description": "In the EVALUATE EIBAID block, a WHEN OTHER clause catches any unrecognized attention identifier keys. Sets WS-ERR-FLG to 'Y' and moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, then redisplays the screen to inform the user that the pressed key is not supported."
+      },
+      {
+        "category": "Error State Propagation",
+        "description": "Uses a centralized error flag (WS-ERR-FLG / ERR-FLG-ON condition) to short-circuit subsequent processing steps. Once an error is detected and the flag is set, downstream IF NOT ERR-FLG-ON guards prevent further file operations from executing, avoiding cascading failures within the same transaction cycle."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COUSR03",
+        "map_name": "COUSR3A",
+        "business_function": "Provides the interface for deleting a user from the USRSEC security file in the CardDemo application. The screen allows an administrator to look up a user by User ID, review the user's details (first name, last name, and user type), and then confirm deletion by pressing PF5. The screen is part of the administrative user management subsystem (transaction CU03)."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COUSR03 - Delete User</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;width:80ch;border:1px solid #444;padding:4px;line-height:1.4;font-size:14px;} .row{white-space:pre;height:1.4em;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .turquoise{color:#00ffff;} .red{color:#ff5555;} .neutral{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background:#000;border:none;border-bottom:1px solid currentColor;outline:none;font-family:'Courier New',Courier,monospace;font-size:14px;color:#00ff00;} .input-display{color:#00ff00;text-decoration:underline;} .input-blue{color:#5555ff;text-decoration:underline;}</style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CU03</span><span class='blue'>              </span><span class='yellow'>  CardDemo                      </span><span class='blue'>          Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COUSR03C</span><span class='blue'>              </span><span class='yellow'>  User Management               </span><span class='blue'>          Time: </span><span class='blue'>23:12:35</span></div><div class='row'></div><div class='row'><span class='neutral bright'>                                   Delete User</span></div><div class='row'></div><div class='row'><span class='green'>      Enter User ID: </span><span class='input-display'>USER0001</span><span class='green'>  </span></div><div class='row'></div><div class='row'><span class='yellow'>      *****************************************************************************</span></div><div class='row'></div><div class='row'></div><div class='row'><span class='turquoise'>      First Name: </span><span class='input-blue'>John                </span></div><div class='row'></div><div class='row'><span class='turquoise'>      Last Name:  </span><span class='input-blue'>Smith               </span></div><div class='row'></div><div class='row'><span class='turquoise'>      User Type:  </span><span class='input-blue'>A</span><span class='blue'> (A=Admin, U=User)</span></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'></div><div class='row'><span class='red bright'>Press PF5 key to delete this user ...                                          </span></div><div class='row'><span class='yellow'>ENTER=Fetch  F3=Back  F4=Clear  F5=Delete                                 </span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Fetch user details from USRSEC file using the entered User ID. Displays first name, last name, and user type for review before deletion."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen. If a calling program is recorded in the communication area, control transfers back to that program; otherwise defaults to the Admin Menu (COADM01C)."
+        },
+        {
+          "key": "F4",
+          "action": "Clear the current screen, resetting all input fields (User ID, First Name, Last Name, User Type) to spaces and refreshing the display."
+        },
+        {
+          "key": "F5",
+          "action": "Delete the currently displayed user from the USRSEC security file. Requires a valid User ID to be present. On success, displays a confirmation message in green: 'User <ID> has been deleted ...' and clears all fields."
+        },
+        {
+          "key": "F12",
+          "action": "Return to the Admin Menu screen (COADM01C) unconditionally."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "READACCT.jcl",
+        "type": "jcl"
+      },
+      "overview": "The READACCT job is designed to read account data from a VSAM Key-Sequenced Data Set (KSDS) and extract its contents into multiple sequential output files for further processing. It runs the CBACT01C program, which produces three output datasets: a fixed-block compressed file, an array-structured file, and a variable-block file, all containing account master data from the CardDemo application. From a business perspective, this job serves as a data extraction utility that converts VSAM-stored account records into sequential flat files, likely to support reporting, batch processing, or data migration activities.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "READACCT",
+          "description": "The JOB statement marks the beginning of a job and assigns it the name READACCT. This name is used to identify the job in the system and in job logs."
+        },
+        {
+          "name": "ACCT",
+          "value": "'READACCT'",
+          "description": "The accounting information parameter passed as the first positional parameter on the JOB statement. It is used for billing and tracking purposes to associate the job with an account."
+        },
+        {
+          "name": "REGION",
+          "value": "8M",
+          "description": "Specifies the maximum amount of virtual storage (8 megabytes) available to the entire job for execution. This limits memory usage across all job steps."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Assigns the job to input job class A, which determines the job entry subsystem (JES) queue where the job will be placed and can influence scheduling priority and available resources."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class H for the job log and system messages. This determines where the job's message output (JES job log) is routed, such as to a specific output queue or sysout class."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that the user whose user ID is stored in the symbolic variable &SYSUID (the submitting user) will receive a TSO notification message when the job completes, informing them of the job's completion status."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "PREDEL",
+        "purpose": "Pre-deletes three output datasets before the main processing step to ensure clean allocation. This step uses the do-nothing utility IEFBR14 to trigger dataset deletion via disposition processing.",
+        "programs": "IEFBR14*",
+        "inputs": "N/A",
+        "outputs": "Deletes AWS.M2.CARDDEMO.ACCTDATA.PSCOMP, AWS.M2.CARDDEMO.ACCTDATA.ARRYPS, AWS.M2.CARDDEMO.ACCTDATA.VBPS"
+      },
+      {
+        "step": "STEP05",
+        "purpose": "Reads account records from the Account Master VSAM KSDS file and writes the data to three sequential output files: a fixed-block compressed output file, a fixed-block array output file, and a variable-block output file.",
+        "programs": "CBACT01C",
+        "inputs": "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS (ACCTFILE - VSAM KSDS account master file)",
+        "outputs": "AWS.M2.CARDDEMO.ACCTDATA.PSCOMP (OUTFILE - PS, FB, LRECL=107); AWS.M2.CARDDEMO.ACCTDATA.ARRYPS (ARRYFILE - PS, FB, LRECL=110); AWS.M2.CARDDEMO.ACCTDATA.VBPS (VBRCFILE - PS, VB, LRECL=84); SYSOUT, SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "PREDEL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.PSCOMP",
+        "operations": "DELETE",
+        "description": "Pre-delete step using IEFBR14 to delete the compressed account data PS dataset if it exists, using MOD disposition with DELETE on normal and abnormal termination"
+      },
+      {
+        "step": "PREDEL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.ARRYPS",
+        "operations": "DELETE",
+        "description": "Pre-delete step using IEFBR14 to delete the array PS dataset if it exists, using MOD disposition with DELETE on normal and abnormal termination"
+      },
+      {
+        "step": "PREDEL",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VBPS",
+        "operations": "DELETE",
+        "description": "Pre-delete step using IEFBR14 to delete the variable block PS dataset if it exists, using MOD disposition with DELETE on normal and abnormal termination"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Load library referenced as STEPLIB to load the CBACT01C program for execution"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Program CBACT01C reads the account master VSAM KSDS file via DD name ACCTFILE as input source"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.PSCOMP",
+        "operations": "WRITE",
+        "description": "Program CBACT01C writes output to a new fixed-block PS dataset via DD name OUTFILE with LRECL=107, cataloged on success and deleted on failure"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.ARRYPS",
+        "operations": "WRITE",
+        "description": "Program CBACT01C writes array-format output to a new fixed-block PS dataset via DD name ARRYFILE with LRECL=110, cataloged on success and deleted on failure"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.ACCTDATA.VBPS",
+        "operations": "WRITE",
+        "description": "Program CBACT01C writes variable-block output to a new VB PS dataset via DD name VBRCFILE with LRECL=84, cataloged on success and deleted on failure"
+      }
+    ]
+  }
+}

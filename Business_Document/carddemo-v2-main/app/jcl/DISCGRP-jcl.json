@@ -1,0 +1,120 @@
+{
+    "created_on": "2026-11-05",
+    "name": "DISCGRP.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/DISCGRP.jcl",
+    "type": "jcl",
+    "description": "This JCL job sets up the Disclosure Group VSAM file by first removing any existing version, recreating it with defined storage and key specifications, and then loading it with data from a sequential flat file. The job ensures a fresh, properly structured Disclosure Group file is available for the CardDemo application.Key Functionalities:\nDeletes the existing Disclosure Group VSAM KSDS cluster (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS) to ensure a clean slate, suppressing any errors if the file does not exist.\nRecreates the Disclosure Group VSAM KSDS cluster with a fixed record size of 50 bytes, a 16-byte key starting at position 0, allocated on 1 primary and 5 secondary cylinders on volume AWSHJ1, with share options (2 3) and erase-on-delete enabled.\nLoads the newly created Disclosure Group VSAM file by copying all records from the sequential source file (AWS.M2.CARDDEMO.DISCGRP.PS) into the VSAM KSDS cluster.",
+    "rules": [
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group VSAM cluster (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS) may or may not exist in the system prior to job execution",
+                "When": "The job step is triggered to initialize or refresh the Disclosure Group VSAM file",
+                "Then": "1. If the Disclosure Group VSAM cluster EXISTS: The entire cluster \u2014 including all its data, index, and catalog entries \u2014 is completely deleted from the system, and processing continues to the next step successfully. 2. If the Disclosure Group VSAM cluster DOES NOT EXIST: The deletion attempt fails internally, but the failure is suppressed and overridden to a success state (condition code forced to zero), and processing continues to the next step without any error or interruption. 3. In BOTH cases, the job is guaranteed to proceed to the next step \u2014 ensuring the job is safely re-runnable at any time without manual intervention."
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Existing Disclosure Group VSAM File",
+            "Rule_Description": "Before creating a fresh Disclosure Group VSAM file, any previously existing Disclosure Group VSAM cluster must be fully removed from the system. This ensures a clean state before re-initialization. The process is designed to be re-runnable \u2014 if the file does not exist, the deletion failure is suppressed and processing continues normally.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of the Disclosure Group VSAM cluster has been attempted, regardless of whether the file existed or not",
+                "When": "The deletion step completes \u2014 either successfully or with a failure due to the file not being found",
+                "Then": "The overall condition code for the step is forcibly set to zero (success), ensuring no downstream steps are skipped or blocked due to a deletion failure, and the job continues to the Disclosure Group VSAM file creation step"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Suppress Deletion Failure for Re-Runability",
+            "Rule_Description": "After the deletion of the Disclosure Group VSAM file is attempted, any error condition resulting from the deletion (such as file not found) must be suppressed. This policy ensures the job can be executed on a fresh system or after a previously failed run without requiring manual cleanup or intervention.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group master file does not yet exist in the system and needs to be established for storing Disclosure Group records",
+                "When": "The Disclosure Group master file creation process is initiated",
+                "Then": "A new Disclosure Group master file named 'AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS' is created as a key-sequenced indexed file, with a dedicated data component named 'AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.DATA' for storing records and a dedicated index component named 'AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS.INDEX' for enabling fast key-based lookups"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Disclosure Group Master File Creation",
+            "Rule_Description": "Defines and creates the Disclosure Group master file as a key-indexed data store with separate data and index components to support Disclosure Group record storage and retrieval.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group master file is being defined with a key structure",
+                "When": "A Disclosure Group record is stored in or retrieved from the master file",
+                "Then": "Each Disclosure Group record must carry a unique 16-character identifier starting at the first byte (position 0) of the record; any attempt to store a record with a duplicate 16-character key must be rejected to maintain uniqueness of Disclosure Group entries"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Disclosure Group Record Unique Key Identification",
+            "Rule_Description": "Enforces that every Disclosure Group record is uniquely identified by a 16-character key located at the very beginning of the record, ensuring no duplicate Disclosure Group entries exist.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group master file is defined with a fixed record size requirement",
+                "When": "A Disclosure Group record is written to or read from the master file",
+                "Then": "Every Disclosure Group record must be exactly 50 bytes in length; both the minimum and maximum allowable record size is fixed at 50 bytes, and records that do not conform to this size must not be accepted into the Disclosure Group master file"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Disclosure Group Fixed Record Size Enforcement",
+            "Rule_Description": "Enforces a strict fixed-length record structure for all Disclosure Group records, ensuring every record stored in the master file is exactly 50 bytes \u2014 no more, no less.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group master file is defined with a mandatory data erasure policy",
+                "When": "The Disclosure Group master file is deleted from the system",
+                "Then": "All Disclosure Group records and associated data must be physically erased from the storage media \u2014 not merely logically removed \u2014 ensuring that sensitive Disclosure Group information cannot be recovered, reconstructed, or accessed by any means after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Disclosure Group Sensitive Data Erasure on Deletion",
+            "Rule_Description": "Enforces a data security policy requiring that all Disclosure Group data is physically erased from storage media whenever the Disclosure Group master file is deleted, preventing any recovery of sensitive disclosure information.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group master file is being accessed by one or more programs or users at the same time",
+                "When": "Concurrent read or write requests are made against the Disclosure Group master file",
+                "Then": "Multiple programs must be permitted to read the Disclosure Group master file simultaneously without restriction; write access must be controlled so that only one program can update the file at a time within the same system (SHAREOPTIONS 2), while across multiple systems, concurrent read and write operations are permitted (SHAREOPTIONS 3), preventing data corruption during simultaneous access"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Disclosure Group Concurrent Access Control",
+            "Rule_Description": "Defines the concurrent access permissions for the Disclosure Group master file, allowing multiple programs to read simultaneously while enforcing controlled write access to protect data integrity.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "A sequential flat file (AWS.M2.CARDDEMO.DISCGRP.PS) exists and contains Disclosure Group records, AND a freshly created empty Disclosure Group VSAM KSDS (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS) is available and ready to receive data",
+                "When": "The Disclosure Group data load process is triggered",
+                "Then": "Every Disclosure Group record from the sequential flat file must be copied into the VSAM KSDS without any filtering, transformation, or omission \u2014 the VSAM file must contain a complete and exact replica of all records from the source flat file, automatically organized in key sequence within the VSAM structure"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Load All Disclosure Group Records from Flat File into VSAM",
+            "Rule_Description": "This step copies all Disclosure Group records from the sequential master flat file into the operational VSAM Key-Sequenced Dataset, making the Disclosure Group data available for key-based lookups by downstream applications.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group data load process is initiated AND the source sequential flat file (AWS.M2.CARDDEMO.DISCGRP.PS) is referenced as the input",
+                "When": "Records are being read from the source Disclosure Group flat file",
+                "Then": "The source flat file (AWS.M2.CARDDEMO.DISCGRP.PS) must be accessed in read-only shared mode \u2014 its contents must NOT be altered, deleted, or locked exclusively, ensuring the source data remains intact and available to other users or processes during the load"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Protect Source Disclosure Group Flat File During Load",
+            "Rule_Description": "The source Disclosure Group sequential flat file must remain unmodified and accessible to other processes during the data load operation.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-DISCGRP-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Disclosure Group data load process is initiated AND the target VSAM KSDS (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS) is referenced as the output destination",
+                "When": "Records are being written into the Disclosure Group VSAM KSDS",
+                "Then": "The target VSAM file (AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS) must be held under exclusive access \u2014 no other program or user is permitted to read from or write to the Disclosure Group VSAM file until the load operation is fully completed, guaranteeing that the loaded data is consistent and uncorrupted"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Exclusive Access Control on Target Disclosure Group VSAM During Load",
+            "Rule_Description": "The target Disclosure Group VSAM file must be exclusively locked during the data load to prevent concurrent access conflicts and ensure data integrity of the loaded records.",
+            "Rule_Type": "Authorization Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([JOB START\nDiscount Group VSAM File Initialization]):::start\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Discount Group VSAM File]:::process\n\n    VSAM_DS1[(AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS\nDiscount Group VSAM KSDS)]:::datasource\n\n    D1{Discount Group\nVSAM File Exists?}:::decision\n\n    DEL_OVERRIDE[SET MAXCC=0\nForce Success - Override Error & Continue]:::process\n\n    STEP10[STEP10 - IDCAMS\nCreate New Discount Group VSAM File]:::process\n\n    VSAM_DS2[(AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS\nDiscount Group VSAM KSDS - Newly Created)]:::datasource\n\n    D2{STEP10\nSuccessful?}:::decision\n\n    STEP15[STEP15 - IDCAMS\nLoad Discount Group Records into VSAM File]:::process\n\n    SEQ_FILE[(DISCGRP-FILE\nDiscount Group Sequential Source File)]:::datasource\n\n    VSAM_DS3[(AWS.M2.CARDDEMO.DISCGRP.VSAM.KSDS\nDiscount Group VSAM KSDS - Fully Loaded)]:::datasource\n\n    D3{STEP15\nSuccessful?}:::decision\n\n    SUCCESS([JOB COMPLETED SUCCESSFULLY\nDiscount Group VSAM File Fully Loaded & Ready for Use]):::success\n\n    ERR1([JOB FAILED\nUnable to Create Discount Group VSAM File]):::error\n    ERR2([JOB FAILED\nUnable to Load Discount Group Records into VSAM File]):::error\n\n    A --> STEP05\n    STEP05 -.->|Delete Existing File| VSAM_DS1\n    VSAM_DS1 --> D1\n    D1 -->|Yes - File Found & Deleted Successfully| STEP10\n    D1 -->|No - File Not Found\nDeletion Error Encountered| DEL_OVERRIDE\n    DEL_OVERRIDE -->|Error Suppressed\nJob Continues Normally| STEP10\n\n    STEP10 -.->|Define & Create New VSAM KSDS Cluster| VSAM_DS2\n    VSAM_DS2 --> D2\n    D2 -->|Yes - VSAM File Created Successfully| STEP15\n    D2 -->|No - VSAM File Creation Failed| ERR1\n\n    SEQ_FILE -.->|Read All Discount Group Records| STEP15\n    STEP15 -.->|Load All Records into VSAM File| VSAM_DS3\n    VSAM_DS3 --> D3\n    D3 -->|Yes - All Records Loaded Successfully| SUCCESS\n    D3 -->|No - Record Load Failed| ERR2\n\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000"
+}

@@ -1,0 +1,300 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "BATCMP.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job is designed to compile a batch COBOL program within an IBM mainframe environment. It uses a parameterized approach, allowing users to substitute the placeholder program name **BATCHPGM** with their actual program name, and references a high-level qualifier (HLQ) of **AWS.M2** to locate necessary libraries and procedures. The job invokes the **BUILDBAT** procedure from a utility procedure library to perform the compilation, producing an executable batch program ready for deployment.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "'Compile Batch COBOL Program'",
+          "description": "The accounting information and job name identifier. The string 'Compile Batch COBOL Program' serves as the programmer name or accounting information associated with the job."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input queue) to which the job is assigned. CLASS=A routes the job to job class A, which determines scheduling priority and resource allocation based on installation-defined class definitions."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class for the job log (system messages). MSGCLASS=H routes the job's message output to output class H, which determines how and where the job log is printed or held."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of JCL and system messages printed in the job log. The first value (1) prints all JCL statements including those from procedures; the second value (1) prints all system messages including those for non-abnormal terminations."
+        },
+        {
+          "name": "REGION",
+          "value": "0M",
+          "description": "Specifies the maximum amount of memory the job can use. REGION=0M allows the job to use the maximum available region size, effectively removing memory constraints on the job."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the user ID to be notified when the job completes. &SYSUID is a symbolic parameter that resolves to the user ID of the person who submitted the job, sending a completion notification message to that user."
+        },
+        {
+          "name": "TIME",
+          "value": "1440",
+          "description": "Specifies the maximum CPU time allowed for the entire job in minutes. TIME=1440 sets the limit to 1440 minutes (24 hours), effectively allowing the job to run without a practical CPU time restriction."
+        }
+      ],
+      "procedures": [
+        "BUILDBAT"
+      ]
+    },
+    "job_details": [
+      {
+        "step": "COMPILE",
+        "purpose": "Compiles the COBOL source program specified by the MEMNAME symbolic variable (BATCHPGM) using the IBM COBOL compiler IGYCRCTL. The compiler options APOST, LIST, MAP, NUMBER, and NOSEQ are applied, and the resulting object code is passed to a temporary dataset for subsequent link-editing.",
+        "programs": "IGYCRCTL*",
+        "inputs": "SYSIN: AWS.M2.CARDDEMO.CBL(BATCHPGM) (COBOL source), SYSLIB: AWS.M2.CARDDEMO.CPY (copybooks), CEE.SCEESAMP (Language Environment samples)",
+        "outputs": "SYSPRINT: AWS.M2.CARDDEMO.LST(BATCHPGM) (compiler listing), SYSLIN: &&LOADSET (temporary object deck passed to linker), SYSUT1-SYSUT15 and SYSMDECK: temporary work datasets on 3390"
+      },
+      {
+        "step": "CBLPRINT",
+        "purpose": "Copies the compiler listing from the partitioned dataset member to SYSOUT using the IBM utility IEBGENER, making the compiler output available in the job log for review.",
+        "programs": "IEBGENER*",
+        "inputs": "SYSUT1: AWS.M2.CARDDEMO.LST(BATCHPGM) (compiler listing)",
+        "outputs": "SYSUT2: SYSOUT=* (compiler listing printed to job output)"
+      },
+      {
+        "step": "LKED",
+        "purpose": "Link-edits the compiled object deck produced by the COMPILE step into an executable load module using the IBM Linkage Editor HEWL, with LIST and XREF options. This step is skipped if the COMPILE step returned a condition code of 8 or higher.",
+        "programs": "HEWL*",
+        "inputs": "SYSLIN: &&LOADSET (object deck from COMPILE step), SYSLIB: SYS1.LINKLIB, CSF.SCSFMOD0, CEE.SCEELKED, CEE.SCEELKEX, AWS.M2.CARDDEMO.LOADLIB (link-edit libraries)",
+        "outputs": "SYSLMOD: AWS.M2.CARDDEMO.LOADLIB(BATCHPGM) (executable load module), SYSPRINT: SYSOUT=* (link-edit map and cross-reference listing), SYSUT1: temporary work dataset on 3390"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "IGY.SIGYCOMP.V63",
+        "operations": "READ",
+        "description": "STEPLIB - IBM COBOL compiler load library read for program execution"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CBL(BATCHPGM)",
+        "operations": "READ",
+        "description": "SYSIN - COBOL source code member BATCHPGM read as input to the compiler"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CPY",
+        "operations": "READ",
+        "description": "SYSLIB - COBOL copybook library read during compilation for COPY statements"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "CEE.SCEESAMP",
+        "operations": "READ",
+        "description": "SYSLIB concatenation - Language Environment sample library read during compilation"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(BATCHPGM)",
+        "operations": "WRITE",
+        "description": "SYSPRINT - Compiler listing output written to member BATCHPGM in the listing PDS"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "WRITE",
+        "description": "SYSLIN - Temporary dataset created to hold compiled object code (passed to LKED step)"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT1 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT2 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT2 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT3 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT3 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT4 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT4 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT5 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT5 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT6 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT6 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT7 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT7 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT8 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT8 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT9 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT9 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT10 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT10 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT11 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT11 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT12 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT12 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT13 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT13 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT14 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT14 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSUT15 (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSUT15 allocated on 3390 unit"
+      },
+      {
+        "step": "COMPILE",
+        "type": "Dataset",
+        "objects": "SYSMDECK (temporary)",
+        "operations": "WRITE",
+        "description": "Compiler work dataset SYSMDECK allocated on 3390 unit for modified source deck"
+      },
+      {
+        "step": "CBLPRINT",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LST(BATCHPGM)",
+        "operations": "READ",
+        "description": "SYSUT1 - IEBGENER reads the compiler listing member BATCHPGM as input"
+      },
+      {
+        "step": "CBLPRINT",
+        "type": "Dataset",
+        "objects": "SYSOUT=*",
+        "operations": "WRITE",
+        "description": "SYSUT2 - IEBGENER copies the compiler listing to SYSOUT for printing"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "&&LOADSET",
+        "operations": "READ, DELETE",
+        "description": "SYSLIN - Temporary object deck passed from COMPILE step is read and deleted after link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYS1.LINKLIB",
+        "operations": "READ",
+        "description": "SYSLIB - System link library searched for unresolved external references during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CSF.SCSFMOD0",
+        "operations": "READ",
+        "description": "SYSLIB concatenation - CSF library searched for unresolved external references during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKED",
+        "operations": "READ",
+        "description": "SYSLIB concatenation - Language Environment link-edit library searched for unresolved external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "CEE.SCEELKEX",
+        "operations": "READ",
+        "description": "SYSLIB concatenation - Language Environment link-edit exit library searched for unresolved external references"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "SYSLIB concatenation - Application load library searched for unresolved external references during link-edit"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB(BATCHPGM)",
+        "operations": "WRITE",
+        "description": "SYSLMOD - Linked executable load module BATCHPGM written to the application load library"
+      },
+      {
+        "step": "LKED",
+        "type": "Dataset",
+        "objects": "SYSUT1 (temporary)",
+        "operations": "WRITE",
+        "description": "Linkage editor work dataset allocated on 3390 unit with BLKSIZE=1024"
+      }
+    ]
+  }
+}

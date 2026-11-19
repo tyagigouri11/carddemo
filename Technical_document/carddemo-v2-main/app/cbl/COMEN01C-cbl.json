@@ -1,0 +1,351 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COMEN01C.cbl",
+        "type": "cobol",
+        "transaction_id": "CM00"
+      },
+      "overview": "COMEN01C serves as the main navigation hub for regular users within the CardDemo credit card management application, operating as a CICS transaction under transaction ID 'CM00'. It sits at the center of the user workflow, presenting available menu options after successful sign-on and directing users to the appropriate functional programs. The program controls access by enforcing user-type restrictions, ensuring regular users cannot access administrator-only options, and dynamically builds the menu based on configured options stored in the shared communication area.",
+      "key_features": [
+        {
+          "feature": "Main Menu Display",
+          "description": "Presents a dynamically built menu of up to 12 numbered options to regular users, populated from the shared communication area configuration."
+        },
+        {
+          "feature": "User Access Control",
+          "description": "Enforces role-based access by blocking regular users from selecting administrator-only menu options and displaying an appropriate denial message."
+        },
+        {
+          "feature": "Menu Option Navigation",
+          "description": "Transfers control to the selected functional program using CICS XCTL, passing the shared communication area to maintain session context."
+        },
+        {
+          "feature": "Program Availability Check",
+          "description": "For specific programs (e.g., COPAUS0C), verifies the target program is installed before attempting transfer, displaying a friendly error if not found."
+        },
+        {
+          "feature": "Placeholder Option Handling",
+          "description": "Detects 'DUMMY' program entries and displays a 'coming soon' message in green, gracefully handling menu options not yet implemented."
+        },
+        {
+          "feature": "Sign-On Return",
+          "description": "Allows users to exit the main menu and return to the sign-on screen via the PF3 key, transferring control to COSGN00C."
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Uses the shared COMMAREA to track program re-entry state, ensuring the menu is sent on first entry and input is processed on subsequent interactions."
+        },
+        {
+          "feature": "Screen Header Population",
+          "description": "Dynamically populates the screen header with the current date, time, transaction ID, and program name for consistent display across the application."
+        },
+        {
+          "feature": "Input Validation",
+          "description": "Validates the user-entered option number to ensure it is numeric, non-zero, and within the valid range of available menu options before processing."
+        }
+      ]
+    },
+    "input_output": [],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Validation",
+          "description": "Program checks EIBCALEN to determine if a communication area was passed. If zero, redirects to sign-on screen. Otherwise, copies DFHCOMMAREA into CARDDEMO-COMMAREA for processing.",
+          "records": [
+            "EIBCALEN",
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-FROM-PROGRAM"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "First Entry Detection and Screen Initialization",
+          "description": "Checks CDEMO-PGM-REENTER flag to determine if this is the first time the menu is being displayed. On first entry, sets the re-enter flag to TRUE and initializes the output map with LOW-VALUES before sending the menu screen.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "COMEN1AO"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Receive Menu Screen Input",
+          "description": "On re-entry, receives the BMS map COMEN1A from the terminal into COMEN1AI, capturing the user's menu option selection. Response codes are stored for error handling.",
+          "records": [
+            "COMEN1AI",
+            "OPTIONI",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "AID Key Evaluation",
+          "description": "Evaluates the EIBAID to determine the user's action. ENTER key triggers option processing, PF3 redirects to sign-on screen, and any other key sets an error flag with an invalid key message.",
+          "records": [
+            "EIBAID",
+            "DFHENTER",
+            "DFHPF3",
+            "WS-ERR-FLG",
+            "WS-MESSAGE",
+            "CDEMO-TO-PROGRAM"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Menu Option Input Parsing",
+          "description": "Trims trailing spaces from the OPTIONI field by iterating from the right. Converts the trimmed input to a numeric option value, replacing spaces with zeros, and stores the result in WS-OPTION.",
+          "records": [
+            "OPTIONI",
+            "WS-IDX",
+            "WS-OPTION-X",
+            "WS-OPTION",
+            "OPTIONO"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Option Validity and Access Control Check",
+          "description": "Validates that WS-OPTION is numeric, non-zero, and within the allowed menu option count. Also checks if a regular user (CDEMO-USRTYP-USER) is attempting to access an admin-only option (CDEMO-MENU-OPT-USRTYPE = 'A'), setting error flags accordingly.",
+          "records": [
+            "WS-OPTION",
+            "CDEMO-MENU-OPT-COUNT",
+            "CDEMO-USRTYP-USER",
+            "CDEMO-MENU-OPT-USRTYPE",
+            "WS-ERR-FLG",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Program Availability Check for COPAUS0C",
+          "description": "For the specific program COPAUS0C, issues a CICS INQUIRE PROGRAM command to verify the program is installed before attempting transfer. If not installed, an error message is built using the option name.",
+          "records": [
+            "CDEMO-MENU-OPT-PGMNAME",
+            "EIBRESP",
+            "WS-MESSAGE",
+            "ERRMSGC",
+            "CDEMO-MENU-OPT-NAME"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Program Transfer or Placeholder Handling",
+          "description": "Evaluates the selected program name. If it starts with 'DUMMY', displays a coming-soon message. Otherwise, sets CDEMO-FROM-TRANID and CDEMO-FROM-PROGRAM in the COMMAREA and issues CICS XCTL to transfer control to the selected program.",
+          "records": [
+            "CDEMO-MENU-OPT-PGMNAME",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA",
+            "WS-TRANID",
+            "WS-PGMNAME"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Populate Screen Header Information",
+          "description": "Retrieves the current system date and time using FUNCTION CURRENT-DATE. Formats date (MM-DD-YY) and time (HH-MM-SS) and populates screen header fields including titles, transaction ID, program name, date, and time.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "WS-CURDATE-MM-DD-YY",
+            "WS-CURTIME-HH-MM-SS"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Build Menu Options Display",
+          "description": "Iterates through all menu options defined in CDEMO-MENU-OPT-COUNT, concatenating the option number and name into WS-MENU-OPT-TXT, then maps each entry to the corresponding output field (OPTN001O through OPTN012O) on the screen.",
+          "records": [
+            "CDEMO-MENU-OPT-COUNT",
+            "CDEMO-MENU-OPT-NUM",
+            "CDEMO-MENU-OPT-NAME",
+            "WS-MENU-OPT-TXT",
+            "OPTN001O",
+            "OPTN002O",
+            "OPTN003O",
+            "OPTN004O",
+            "OPTN005O",
+            "OPTN006O",
+            "OPTN007O",
+            "OPTN008O",
+            "OPTN009O",
+            "OPTN010O",
+            "OPTN011O",
+            "OPTN012O"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Send Menu Screen to Terminal",
+          "description": "Sends the populated BMS map COMEN1A (mapset COMEN01) to the terminal with ERASE option, displaying the fully built menu including header, options, and any error messages.",
+          "records": [
+            "COMEN1AO",
+            "ERRMSGO",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Return with Transaction and COMMAREA",
+          "description": "Issues CICS RETURN with transaction ID CM00 and the updated CARDDEMO-COMMAREA, suspending the program and awaiting the next user interaction under the same transaction.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN Non-Zero Requirement",
+          "description": "The program requires a non-zero EIBCALEN to proceed with normal menu processing. A zero value unconditionally redirects to the sign-on program COSGN00C, making a valid COMMAREA a prerequisite for all downstream logic."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER State Flag",
+          "description": "The re-entry flag in CARDDEMO-COMMAREA controls whether the program sends a fresh menu screen or processes user input. This flag must be correctly set on the first pass and persisted across CICS RETURN cycles to distinguish initial display from input processing."
+        },
+        {
+          "dependency": "CDEMO-USRTYP-USER Access Control Dependency",
+          "description": "Option access control depends on the user type stored in CARDDEMO-COMMAREA (CDEMO-USRTYP-USER). Regular users are blocked from admin-only options (CDEMO-MENU-OPT-USRTYPE = 'A'). This value must have been correctly set by the sign-on program prior to invoking this menu."
+        },
+        {
+          "dependency": "CDEMO-MENU-OPT-COUNT and Option Array Consistency",
+          "description": "The menu option arrays (CDEMO-MENU-OPT-NUM, CDEMO-MENU-OPT-NAME, CDEMO-MENU-OPT-PGMNAME, CDEMO-MENU-OPT-USRTYPE) defined in COMEN02Y must be consistently populated. WS-OPTION is used as a direct index into these arrays, so CDEMO-MENU-OPT-COUNT must accurately reflect the number of valid entries to prevent out-of-bounds access."
+        },
+        {
+          "dependency": "WS-ERR-FLG Sequential Check Dependency",
+          "description": "The error flag WS-ERR-FLG is checked sequentially across multiple validation steps (numeric check, range check, access control check). Each step independently sets the flag but does not short-circuit subsequent checks, meaning the final SEND-MENU-SCREEN call after the EVALUATE block depends on the cumulative state of this flag."
+        },
+        {
+          "dependency": "CICS INQUIRE Result for COPAUS0C Transfer",
+          "description": "The XCTL transfer to COPAUS0C is conditionally dependent on EIBRESP returning DFHRESP(NORMAL) from the CICS INQUIRE PROGRAM command. A non-normal response suppresses the transfer and triggers an error message, making program installation state a runtime dependency."
+        },
+        {
+          "dependency": "CDEMO-TO-PROGRAM for Sign-On Redirect",
+          "description": "The RETURN-TO-SIGNON-SCREEN paragraph depends on CDEMO-TO-PROGRAM being set before invocation. A default of COSGN00C is applied only if the field is LOW-VALUES or SPACES, meaning callers must ensure this field is correctly initialized in the COMMAREA."
+        },
+        {
+          "dependency": "BMS Map COMEN1A Availability",
+          "description": "Both SEND-MENU-SCREEN and RECEIVE-MENU-SCREEN depend on the BMS mapset COMEN01 containing map COMEN1A being installed and available in the CICS region. Absence of this mapset would cause runtime CICS errors."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction Processing Monitor",
+          "purpose": "Provides the runtime environment for all terminal I/O operations (SEND MAP, RECEIVE MAP), inter-program control transfer (XCTL), program availability inquiry (INQUIRE PROGRAM), and pseudo-conversational transaction management (RETURN with TRANSID and COMMAREA). EIBAID, EIBCALEN, EIBRESP, and DFHCOMMAREA are all CICS-provided execution interface block and communication area facilities."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COACTUPC.cbl",
+          "purpose": "COACTUPC is a business logic component within a CICS-based credit card management system, operating as part of an interactive mainframe application that manages credit card accounts and associated customer data. It serves as the account update transaction (CAUP), sitting between the main menu and other card management screens in the application workflow. The program accepts user input from a formatted screen, validates all account and customer fields, detects changes against previously fetched data, and commits approved updates to the account master (ACCTDAT) and customer master (CUSTDAT) files, ensuring data integrity through optimistic locking and change detection before any write operations are performed."
+        },
+        {
+          "name": "COACTVWC.cbl",
+          "purpose": "This program is part of a credit card management system (CardDemo), operating within the business logic layer to support customer service and account management workflows. It runs as a CICS online transaction (transaction ID: CAVW) that allows users to look up and view detailed credit card account information. The program accepts an account number from a user via a BMS map screen, validates the input, retrieves the associated account details, card cross-reference data, and customer demographic information from their respective VSAM files, and displays the combined results on the Account View screen. It solves the need for a unified, single-screen view of all relevant account and customer data for a given account number."
+        },
+        {
+          "name": "COBIL00C.cbl",
+          "purpose": "COBIL00C is part of the CardDemo credit card management application, operating within the online bill payment workflow as a CICS interactive transaction (CB00). It serves customers who need to pay their outstanding credit card balance in full through an online self-service interface. The program manages the complete bill payment lifecycle: it presents the current account balance to the user, collects and validates a payment confirmation, creates a formal transaction record, and updates the account balance to zero upon successful payment. It solves the need for a controlled, auditable online payment process that ensures data integrity across account and transaction files."
+        },
+        {
+          "name": "COCRDLIC.cbl",
+          "purpose": "COCRDLIC is a business logic component within a CICS-based credit card management application, operating as part of the card administration workflow. It serves as the credit card listing screen, enabling both administrative users and regular account holders to browse credit card records. The program retrieves and displays credit card records from the CARDDAT file, showing up to 7 cards per page, with filtering capabilities based on account ID or card number. It solves the need for a paginated, role-sensitive browsing interface that allows users to navigate card records and launch into detail view or update operations for a selected card."
+        },
+        {
+          "name": "COCRDSLC.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COCRDUPC.cbl",
+          "purpose": "This program is part of a credit card management system operating within a CICS mainframe environment, serving as the business logic layer for card account maintenance workflows. It sits between the card listing screen (COCRDLIC) and the underlying card data files, enabling authorized users to locate and modify credit card details. The program (COCRDUPC, transaction ID 'CCUP') accepts user input to retrieve a specific credit card record by account and card number, presents the current card details for editing, validates all proposed changes, and upon user confirmation, commits the updates to the card master file (CARDDAT). It solves the problem of controlled, validated updates to sensitive credit card data by enforcing a multi-step review-and-confirm workflow before any changes are persisted."
+        },
+        {
+          "name": "COPAUS0C.cbl",
+          "purpose": "COPAUS0C is part of the CardDemo credit card management application's Authorization Module, serving as the summary view screen for pending authorization messages. It operates within a CICS/IMS environment, acting as an interactive inquiry screen that allows authorized users to look up and review pending authorization activity for a given credit card account. The program retrieves and displays a paginated list of up to 5 pending authorization records at a time, showing transaction details such as approval status, amounts, dates, and types, while also presenting account-level summary statistics including approved/declined counts and balances. It solves the operational need for customer service or back-office staff to quickly review the authorization history and pending status for a specific account."
+        },
+        {
+          "name": "CORPT00C.cbl",
+          "purpose": "CORPT00C is part of the CardDemo credit card management application, operating within the online transaction reporting workflow. It serves as the user-facing interface that bridges online CICS users with batch report generation, allowing business users to request transaction reports without direct access to batch job submission systems. The program enables users to generate transaction reports for three time periods — monthly, yearly, or a custom date range — by collecting report parameters through an interactive screen and submitting a pre-built JCL batch job to the internal reader via an extra-partition Transient Data Queue (TDQ named 'JOBS'). This solves the operational need for on-demand report generation from an online terminal without requiring direct JES/batch access."
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": "COSGN00C is the entry point for the CardDemo application, a credit card management system running on IBM mainframe under CICS. It serves as the security gateway that controls access to all downstream application functions, operating as the first screen users encounter when initiating the CC00 transaction. The program presents a signon screen to collect user credentials, validates them against a security file, and routes authenticated users to the appropriate menu based on their user type — either an administrative dashboard or a standard customer menu — effectively enforcing role-based access control for the entire application."
+        },
+        {
+          "name": "COTRN00C.cbl",
+          "purpose": "COTRN00C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program serves as the transaction listing screen, acting as a navigation hub that allows users to browse and select credit card transactions for further review. The program provides a paginated list view of transactions from the TRANSACT file, displaying up to 10 transactions per page with forward and backward navigation, and allowing users to select individual transactions to view their full details via the COTRN01C program."
+        },
+        {
+          "name": "COTRN01C.cbl",
+          "purpose": "COTRN01C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program operates within the transaction inquiry workflow, allowing authorized users to look up and view detailed information about individual credit card transactions. The program serves as a read-only transaction viewer, enabling customer service or back-office staff to retrieve and display full transaction details from the TRANSACT file by entering a transaction ID, supporting research, dispute resolution, and audit activities."
+        },
+        {
+          "name": "COTRN02C.cbl",
+          "purpose": "COTRN02C is part of the CardDemo application, a credit card management system that handles transaction processing and account management. This program operates within the transaction entry workflow, allowing authorized users to manually add new financial transactions to the system. The program serves as the Add Transaction screen handler (transaction ID CT02), enabling users to create new transaction records in the TRANSACT file by entering transaction details such as type, amount, merchant information, and associated card or account numbers. It solves the need for manual transaction entry by providing a validated, interactive CICS screen interface that ensures data integrity before committing records to the file system."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Session/Communication Area Errors",
+        "description": "Checks EIBCALEN at program entry; if zero (no commarea), redirects user to signon screen via XCTL to COSGN00C, preventing unauthorized or stateless access to the menu."
+      },
+      {
+        "category": "Invalid Key/AID Errors",
+        "description": "Uses EVALUATE on EIBAID to handle valid keys (ENTER, PF3). Any unrecognized key sets WS-ERR-FLG to 'Y', moves CCDA-MSG-INVALID-KEY to WS-MESSAGE, and redisplays the menu screen with the error message."
+      },
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates the entered menu option by checking if it is numeric, non-zero, and within the valid range (CDEMO-MENU-OPT-COUNT). On failure, sets WS-ERR-FLG to 'Y', populates WS-MESSAGE with 'Please enter a valid option number...', and redisplays the menu screen without transferring control."
+      },
+      {
+        "category": "Authorization/Access Control Errors",
+        "description": "Checks if a regular user (CDEMO-USRTYP-USER) attempts to select an admin-only option (CDEMO-MENU-OPT-USRTYPE = 'A'). If so, sets ERR-FLG-ON, populates WS-MESSAGE with 'No access - Admin Only option...', and redisplays the menu screen, blocking the navigation."
+      },
+      {
+        "category": "Program Installation/Availability Errors",
+        "description": "For the special case program 'COPAUS0C', issues a CICS INQUIRE with NOHANDLE before XCTL. If EIBRESP is not DFHRESP(NORMAL), constructs a message using STRING indicating the option 'is not installed...', sets ERRMSGC to DFHRED for visual emphasis, and redisplays the menu instead of attempting the transfer."
+      },
+      {
+        "category": "Placeholder/Unimplemented Option Errors",
+        "description": "Detects menu options whose program name starts with 'DUMMY', sets ERRMSGC to DFHGREEN, and displays a 'coming soon' message via WS-MESSAGE, preventing any XCTL attempt and informing the user gracefully."
+      },
+      {
+        "category": "CICS RECEIVE Errors",
+        "description": "RECEIVE MAP captures RESP and RESP2 codes into WS-RESP-CD and WS-REAS-CD respectively, but no explicit conditional handling follows in the shown code; the codes are stored for potential diagnostic use without active branching on failure."
+      },
+      {
+        "category": "Error State Management",
+        "description": "Uses a centralized error flag (WS-ERR-FLG with 88-level conditions ERR-FLG-ON/ERR-FLG-OFF) and a single WS-MESSAGE field to coordinate error state across paragraphs. The SEND-MENU-SCREEN paragraph always moves WS-MESSAGE to ERRMSGO before display, providing a consistent error presentation mechanism."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COMEN01",
+        "map_name": "COMEN1A",
+        "business_function": "Main Menu screen for regular (non-admin) users of the CardDemo application. Displays up to 12 selectable menu options dynamically populated from the commarea. Users enter a numeric option to navigate to the corresponding program. Admin-only options are blocked for regular users. The screen supports up to 12 menu items and transfers control via CICS XCTL to the selected program."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COMEN01 - Main Menu</title><style>body{background:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background:#000;color:#00ff00;width:80ch;padding:10px;border:1px solid #444;font-size:15px;line-height:1.5;} .row{white-space:pre;height:1.5em;} .blue{color:#4444ff;} .yellow{color:#ffff00;} .turquoise{color:#00ffff;} .red{color:#ff4444;} .green{color:#00ff00;} .white{color:#ffffff;} .neutral-brt{color:#ffffff;font-weight:bold;} .brt{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background:#000;border:none;border-bottom:1px solid #00ff00;color:#00ff00;font-family:'Courier New',Courier,monospace;font-size:15px;outline:none;width:2ch;} </style></head><body><div class='terminal'><div class='row'><span class='blue'>Tran: </span><span class='blue'>CM00</span><span>                </span><span class='yellow brt'>CardDemo                               </span><span class='blue'>  Date: </span><span class='blue'>07/19/22</span></div><div class='row'><span class='blue'>Prog: </span><span class='blue'>COMEN01C</span><span>            </span><span class='yellow brt'>Credit Card Demo Application           </span><span class='blue'>  Time: </span><span class='blue'>23:12:33</span></div><div class='row'>&nbsp;</div><div class='row'><span>                                  </span><span class='neutral-brt'>Main Menu</span></div><div class='row'>&nbsp;</div><div class='row'><span>                   </span><span class='blue'>01. View Account Summary</span></div><div class='row'><span>                   </span><span class='blue'>02. List Credit Card Transactions</span></div><div class='row'><span>                   </span><span class='blue'>03. View Credit Card Details</span></div><div class='row'><span>                   </span><span class='blue'>04. Add Credit Card</span></div><div class='row'><span>                   </span><span class='blue'>05. Update Credit Card</span></div><div class='row'><span>                   </span><span class='blue'>06. Delete Credit Card</span></div><div class='row'><span>                   </span><span class='blue'>07. View Transaction Details</span></div><div class='row'><span>                   </span><span class='blue'>08. Add Transaction</span></div><div class='row'><span>                   </span><span class='blue'>09. Update Transaction</span></div><div class='row'><span>                   </span><span class='blue'>10. Delete Transaction</span></div><div class='row'><span>                   </span><span class='blue'>11. View User Profile</span></div><div class='row'><span>                   </span><span class='blue'>12. Update User Profile</span></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span>              </span><span class='turquoise brt'>Please select an option : </span><input class='input-field underline' type='text' maxlength='2' value='' /></div><div class='row'>&nbsp;</div><div class='row'>&nbsp;</div><div class='row'><span class='red brt'>                                                                              </span></div><div class='row'><span class='yellow'>ENTER=Continue  F3=Exit</span></div></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the selected menu option number and transfer control to the corresponding program via CICS XCTL"
+        },
+        {
+          "key": "F3",
+          "action": "Exit to the Sign-On screen (COSGN00C)"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,235 @@
+================================================================================
+PHASE 3 - CREATE TRANSACTIONS (15 Requests)
+================================================================================
+Endpoint: POST /api/transactions
+Base URL: http://localhost:8080/swagger-ui.html
+
+Copy each JSON below and paste into Swagger POST /api/transactions request body
+================================================================================
+
+PURCHASE TRANSACTIONS (5 requests)
+================================================================================
+
+REQUEST 1 - PURCHASE Walmart:
+{
+  "accountId": 1,
+  "cardNumber": "4111111111111111",
+  "amount": 150,
+  "date": "2026-10-15",
+  "postDate": "2026-10-15",
+  "type": "PURCHASE",
+  "status": "PENDING",
+  "merchantId": "M123",
+  "merchantName": "Walmart"
+}
+
+REQUEST 2 - PURCHASE Target:
+{
+  "accountId": 1,
+  "cardNumber": "4111111111111111",
+  "amount": 89.99,
+  "date": "2026-10-15",
+  "postDate": "2026-10-15",
+  "type": "PURCHASE",
+  "status": "PENDING",
+  "merchantId": "M124",
+  "merchantName": "Target"
+}
+
+REQUEST 3 - PURCHASE Amazon:
+{
+  "accountId": 2,
+  "cardNumber": "5500005555555559",
+  "amount": 249.99,
+  "date": "2026-10-16",
+  "postDate": "2026-10-16",
+  "type": "PURCHASE",
+  "status": "PENDING",
+  "merchantId": "M125",
+  "merchantName": "Amazon"
+}
+
+REQUEST 4 - PURCHASE Best Buy:
+{
+  "accountId": 2,
+  "cardNumber": "5500005555555559",
+  "amount": 599.99,
+  "date": "2026-10-16",
+  "postDate": "2026-10-16",
+  "type": "PURCHASE",
+  "status": "PENDING",
+  "merchantId": "M126",
+  "merchantName": "Best Buy"
+}
+
+REQUEST 5 - PURCHASE Shell Gas Station:
+{
+  "accountId": 3,
+  "cardNumber": "378282246310005",
+  "amount": 65.50,
+  "date": "2026-10-17",
+  "postDate": "2026-10-17",
+  "type": "PURCHASE",
+  "status": "PENDING",
+  "merchantId": "M127",
+  "merchantName": "Shell Gas Station"
+}
+
+================================================================================
+PAYMENT TRANSACTIONS (5 requests)
+================================================================================
+
+REQUEST 6 - PAYMENT Online Portal:
+{
+  "accountId": 1,
+  "cardNumber": "4111111111111111",
+  "amount": 1000.00,
+  "date": "2026-10-15",
+  "postDate": "2026-10-15",
+  "type": "PAYMENT",
+  "status": "PENDING",
+  "merchantId": "PAY001",
+  "merchantName": "Online Payment Portal"
+}
+
+REQUEST 7 - PAYMENT Bank Wire Transfer:
+{
+  "accountId": 2,
+  "cardNumber": "5500005555555559",
+  "amount": 500.00,
+  "date": "2026-10-16",
+  "postDate": "2026-10-16",
+  "type": "PAYMENT",
+  "status": "PENDING",
+  "merchantId": "PAY002",
+  "merchantName": "Bank Wire Transfer"
+}
+
+REQUEST 8 - PAYMENT Automatic Bill Payment:
+{
+  "accountId": 3,
+  "cardNumber": "378282246310005",
+  "amount": 250.00,
+  "date": "2026-10-17",
+  "postDate": "2026-10-17",
+  "type": "PAYMENT",
+  "status": "PENDING",
+  "merchantId": "PAY003",
+  "merchantName": "Automatic Bill Payment"
+}
+
+REQUEST 9 - PAYMENT Mobile App:
+{
+  "accountId": 4,
+  "cardNumber": "6011111111111117",
+  "amount": 350.50,
+  "date": "2026-10-18",
+  "postDate": "2026-10-18",
+  "type": "PAYMENT",
+  "status": "PENDING",
+  "merchantId": "PAY004",
+  "merchantName": "Mobile App Payment"
+}
+
+REQUEST 10 - PAYMENT Minimum Payment:
+{
+  "accountId": 5,
+  "cardNumber": "3530111333300000",
+  "amount": 100.00,
+  "date": "2026-10-19",
+  "postDate": "2026-10-19",
+  "type": "PAYMENT",
+  "status": "PENDING",
+  "merchantId": "PAY005",
+  "merchantName": "Minimum Payment"
+}
+
+================================================================================
+CASH_ADVANCE TRANSACTIONS (5 requests)
+================================================================================
+
+REQUEST 11 - CASH_ADVANCE Chase ATM:
+{
+  "accountId": 1,
+  "cardNumber": "4111111111111111",
+  "amount": 200.00,
+  "date": "2026-10-15",
+  "postDate": "2026-10-15",
+  "type": "CASH_ADVANCE",
+  "status": "PENDING",
+  "merchantId": "ATM001",
+  "merchantName": "Chase ATM Withdrawal"
+}
+
+REQUEST 12 - CASH_ADVANCE Bank Counter:
+{
+  "accountId": 2,
+  "cardNumber": "5500005555555559",
+  "amount": 500.00,
+  "date": "2026-10-16",
+  "postDate": "2026-10-16",
+  "type": "CASH_ADVANCE",
+  "status": "PENDING",
+  "merchantId": "ATM002",
+  "merchantName": "Bank of America Counter"
+}
+
+REQUEST 13 - CASH_ADVANCE International ATM London:
+{
+  "accountId": 3,
+  "cardNumber": "378282246310005",
+  "amount": 1500.00,
+  "date": "2026-10-17",
+  "postDate": "2026-10-17",
+  "type": "CASH_ADVANCE",
+  "status": "PENDING",
+  "merchantId": "ATM003",
+  "merchantName": "International ATM - London"
+}
+
+REQUEST 14 - CASH_ADVANCE Casino:
+{
+  "accountId": 4,
+  "cardNumber": "6011111111111117",
+  "amount": 1000.00,
+  "date": "2026-10-18",
+  "postDate": "2026-10-18",
+  "type": "CASH_ADVANCE",
+  "status": "PENDING",
+  "merchantId": "ATM004",
+  "merchantName": "Las Vegas Casino"
+}
+
+REQUEST 15 - CASH_ADVANCE Foreign ATM Tokyo:
+{
+  "accountId": 5,
+  "cardNumber": "3530111333300000",
+  "amount": 300.00,
+  "date": "2026-10-19",
+  "postDate": "2026-10-19",
+  "type": "CASH_ADVANCE",
+  "status": "PENDING",
+  "merchantId": "ATM005",
+  "merchantName": "Foreign ATM - Tokyo"
+}
+
+================================================================================
+SUMMARY
+================================================================================
+Total Requests: 15
+- PURCHASE: 5 requests
+- PAYMENT: 5 requests
+- CASH_ADVANCE: 5 requests
+
+Each should return: 201 Created
+
+Steps:
+1. Open: http://localhost:8080/swagger-ui.html
+2. Find: POST /api/transactions
+3. Click: "Try it out"
+4. Copy one request above
+5. Paste into request body
+6. Click: Execute
+7. Verify: 201 Created
+8. Repeat for all 15 requests
+================================================================================

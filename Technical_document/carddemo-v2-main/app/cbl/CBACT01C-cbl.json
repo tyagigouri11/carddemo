@@ -1,0 +1,279 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBACT01C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBACT01C is a batch COBOL program within the CardDemo application, a credit card account management system. It operates as a data extraction and transformation component in the batch processing workflow, reading account data from a master file and distributing it across multiple output formats. The program sequentially reads all records from an indexed VSAM account file (ACCTFILE) and writes the data into three distinct output files: a standard sequential output file, an array-structured file, and a variable-length record file. It solves the need to reformat and distribute account data into different layouts for downstream processing, including a date formatting transformation via an external assembler routine (COBDATFT).",
+      "key_features": [
+        {
+          "feature": "Sequential Account File Processing",
+          "description": "Reads all records from an indexed VSAM account master file sequentially, processing each account until end-of-file is reached."
+        },
+        {
+          "feature": "Standard Output File Generation",
+          "description": "Writes account data to a fixed-format sequential output file containing key fields such as account ID, balance, credit limits, dates, and group ID."
+        },
+        {
+          "feature": "Array-Structured File Output",
+          "description": "Produces a secondary output file where each record contains an account ID paired with an array of five balance/debit entries, partially populated with hardcoded test values."
+        },
+        {
+          "feature": "Variable-Length Record File Output",
+          "description": "Writes two variable-length records per account to a VBRC file: a short record (12 bytes) with account ID and status, and a longer record (39 bytes) with balance and credit details."
+        },
+        {
+          "feature": "Date Format Conversion",
+          "description": "Calls an external assembler program (COBDATFT) to reformat the account reissue date, demonstrating integration between COBOL and assembler routines."
+        },
+        {
+          "feature": "Account Data Display",
+          "description": "Displays all key account fields to the system output for each record processed, providing an audit trail of processed accounts."
+        },
+        {
+          "feature": "Error Handling and Abend Control",
+          "description": "Monitors file status codes on all I/O operations and triggers a controlled program abend via CEE3ABD if any file error is encountered, ensuring failures are visible and traceable."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "ACCTFILE",
+        "type": "Read",
+        "description": "Input VSAM KSDS account master file - sequentially reads account records containing account ID, active status, balances, credit limits, dates, and group ID"
+      },
+      {
+        "name": "OUTFILE",
+        "type": "Write",
+        "description": "Sequential output file - receives formatted account records with account ID, active status, current balance, credit limit, cash credit limit, open/expiration/reissue dates, cycle credit/debit amounts, and group ID"
+      },
+      {
+        "name": "ARRYFILE",
+        "type": "Write",
+        "description": "Sequential output file - receives array-structured account records containing account ID and repeating balance/debit arrays (5 occurrences) with hardcoded and derived values"
+      },
+      {
+        "name": "VBRCFILE",
+        "type": "Write",
+        "description": "Variable-length sequential output file - receives two variable-length record types per account: VB1 record (12 bytes) with account ID and active status, and VB2 record (39 bytes) with account ID, current balance, credit limit, and reissue year"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Open All Files",
+          "description": "Opens ACCTFILE (indexed VSAM KSDS) for input and OUT-FILE, ARRY-FILE, VBRC-FILE for output. Any open failure triggers an abend.",
+          "records": [
+            "ACCTFILE-STATUS",
+            "OUTFILE-STATUS",
+            "ARRYFILE-STATUS",
+            "VBRCFILE-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Sequential Read of Account File",
+          "description": "Reads each account record sequentially from the indexed VSAM KSDS file (ACCTFILE) into the ACCOUNT-RECORD structure defined by copybook CVACT01Y. Loop continues until end-of-file (status '10') is detected.",
+          "records": [
+            "FD-ACCT-ID",
+            "FD-ACCT-DATA",
+            "ACCOUNT-RECORD",
+            "END-OF-FILE"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Display Account Record to SYSOUT",
+          "description": "Displays all fields of the current account record to standard output for audit/logging purposes.",
+          "records": [
+            "ACCT-ID",
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-GROUP-ID"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Populate Sequential Output Record",
+          "description": "Maps account fields from ACCOUNT-RECORD into OUT-ACCT-REC. The reissue date is passed to the external date-formatting routine COBDATFT for conversion. If ACCT-CURR-CYC-DEBIT is zero, a hardcoded default value of 2525.00 is substituted.",
+          "records": [
+            "OUT-ACCT-ID",
+            "OUT-ACCT-ACTIVE-STATUS",
+            "OUT-ACCT-CURR-BAL",
+            "OUT-ACCT-CREDIT-LIMIT",
+            "OUT-ACCT-CASH-CREDIT-LIMIT",
+            "OUT-ACCT-OPEN-DATE",
+            "OUT-ACCT-EXPIRAION-DATE",
+            "OUT-ACCT-REISSUE-DATE",
+            "OUT-ACCT-CURR-CYC-CREDIT",
+            "OUT-ACCT-CURR-CYC-DEBIT",
+            "OUT-ACCT-GROUP-ID",
+            "CODATECN-INP-DATE",
+            "CODATECN-0UT-DATE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Write Sequential Output Record",
+          "description": "Writes the populated OUT-ACCT-REC to the sequential flat output file (OUTFILE). Any write failure other than status '00' or '10' triggers an abend.",
+          "records": [
+            "OUT-ACCT-REC",
+            "OUTFILE-STATUS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Populate Array Output Record",
+          "description": "Maps ACCT-ID and ACCT-CURR-BAL into ARR-ARRAY-REC. Populates a 5-occurrence array structure with current balance and hardcoded debit values for occurrences 1 and 2, and hardcoded negative values for occurrence 3. Occurrences 4 and 5 remain at initialized (zero) values.",
+          "records": [
+            "ARR-ACCT-ID",
+            "ARR-ACCT-CURR-BAL(1)",
+            "ARR-ACCT-CURR-CYC-DEBIT(1)",
+            "ARR-ACCT-CURR-BAL(2)",
+            "ARR-ACCT-CURR-CYC-DEBIT(2)",
+            "ARR-ACCT-CURR-BAL(3)",
+            "ARR-ACCT-CURR-CYC-DEBIT(3)"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Write Array Output Record",
+          "description": "Writes the populated ARR-ARRAY-REC to the sequential array file (ARRYFILE). Any write failure triggers an abend.",
+          "records": [
+            "ARR-ARRAY-REC",
+            "ARRYFILE-STATUS"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Populate Variable-Length Record Structures",
+          "description": "Builds two variable-length record structures (VBRC-REC1 and VBRC-REC2) from the current account record. VBRC-REC1 contains account ID and active status (12 bytes). VBRC-REC2 contains account ID, current balance, credit limit, and reissue year (39 bytes). Both are displayed to SYSOUT.",
+          "records": [
+            "VB1-ACCT-ID",
+            "VB1-ACCT-ACTIVE-STATUS",
+            "VB2-ACCT-ID",
+            "VB2-ACCT-CURR-BAL",
+            "VB2-ACCT-CREDIT-LIMIT",
+            "VB2-ACCT-REISSUE-YYYY",
+            "WS-ACCT-REISSUE-YYYY"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Write Variable-Length Record 1 (VB1)",
+          "description": "Sets WS-RECD-LEN to 12, moves VBRC-REC1 into VBR-REC, and writes the variable-length record to VBRC-FILE. Record length is controlled by WS-RECD-LEN as defined in the DEPENDING ON clause.",
+          "records": [
+            "VBR-REC",
+            "WS-RECD-LEN",
+            "VBRCFILE-STATUS"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Write Variable-Length Record 2 (VB2)",
+          "description": "Sets WS-RECD-LEN to 39, moves VBRC-REC2 into VBR-REC, and writes the second variable-length record to VBRC-FILE.",
+          "records": [
+            "VBR-REC",
+            "WS-RECD-LEN",
+            "VBRCFILE-STATUS"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Close Account Input File",
+          "description": "Closes ACCTFILE after all records have been processed. Any close failure triggers an abend. Output files are not explicitly closed, relying on implicit close at GOBACK.",
+          "records": [
+            "ACCTFILE-STATUS",
+            "APPL-RESULT"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "File Open Sequencing",
+          "description": "All four files (ACCTFILE, OUTFILE, ARRYFILE, VBRCFILE) must be successfully opened before any record processing begins. The main processing loop is only entered after all open operations complete without error."
+        },
+        {
+          "dependency": "ACCTFILE Sequential Read Dependency",
+          "description": "All output record populations (steps 4, 6, 8) are entirely dependent on a successful read from ACCTFILE returning status '00'. A status of '10' sets END-OF-FILE to 'Y' and terminates the loop; any other status causes an abend."
+        },
+        {
+          "dependency": "Date Formatting External Call Dependency",
+          "description": "Population of OUT-ACCT-REISSUE-DATE depends on a successful CALL to external program COBDATFT. ACCT-REISSUE-DATE must be moved to both CODATECN-INP-DATE and WS-REISSUE-DATE before the call, and CODATECN-TYPE and CODATECN-OUTTYPE must be set to '2'. The formatted result is returned in CODATECN-0UT-DATE. No error handling is coded for this call."
+        },
+        {
+          "dependency": "WS-RECD-LEN Variable-Length Record Control",
+          "description": "The VBRC-FILE uses RECORDING MODE IS V with record size DEPENDING ON WS-RECD-LEN. WS-RECD-LEN must be explicitly set to 12 before writing VB1 and to 39 before writing VB2, otherwise incorrect record lengths will be written."
+        },
+        {
+          "dependency": "ACCT-CURR-CYC-DEBIT Zero-Value Substitution",
+          "description": "OUT-ACCT-CURR-CYC-DEBIT is only populated from ACCT-CURR-CYC-DEBIT when the source field is non-zero. When zero, a hardcoded value of 2525.00 is used, creating a data dependency on the zero-check condition prior to the MOVE."
+        },
+        {
+          "dependency": "WS-ACCT-REISSUE-YYYY Availability for VBR Record",
+          "description": "VB2-ACCT-REISSUE-YYYY is populated from WS-ACCT-REISSUE-YYYY, which is derived from WS-ACCT-REISSUE-DATE (a redefinition of WS-REISSUE-DATE). This field is only valid after ACCT-REISSUE-DATE has been moved to WS-REISSUE-DATE in paragraph 1300-POPUL-ACCT-RECORD, so paragraph 1500-POPUL-VBRC-RECORD must execute after 1300."
+        },
+        {
+          "dependency": "CVACT01Y Copybook Record Layout",
+          "description": "The entire program depends on the CVACT01Y copybook to define the ACCOUNT-RECORD structure including ACCT-ID and all account attribute fields. Any structural change to this copybook directly impacts all field-level MOVEs and DISPLAYs throughout the program."
+        },
+        {
+          "dependency": "CODATECN Copybook Record Layout",
+          "description": "The date conversion call to COBDATFT depends on the CODATECN copybook defining CODATECN-REC, CODATECN-INP-DATE, CODATECN-TYPE, CODATECN-OUTTYPE, and CODATECN-0UT-DATE with the correct layout expected by the assembler routine."
+        },
+        {
+          "dependency": "ARR-ARRAY-REC Initialization Before Population",
+          "description": "ARR-ARRAY-REC is explicitly initialized (INITIALIZE) before paragraph 1400-POPUL-ARRAY-RECORD executes, ensuring array occurrences 4 and 5 contain zeros rather than residual data from a prior iteration."
+        },
+        {
+          "dependency": "Abend Program CEE3ABD Availability",
+          "description": "Error handling throughout the program depends on the LE (Language Environment) runtime routine CEE3ABD being available. This routine is called with ABCODE=999 and TIMING=0 to force a controlled abend on any I/O error."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "All four file opens (ACCTFILE, OUTFILE, ARRYFILE, VBRCFILE) check FILE STATUS after OPEN. If status is not '00', APPL-RESULT is set to 12, an error message is displayed with the file status, 9910-DISPLAY-IO-STATUS is called for formatted status output, and 9999-ABEND-PROGRAM is invoked to terminate the program abnormally. Initial APPL-RESULT is pre-set to 8 before each open to detect cases where the status check itself is bypassed."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "After each READ of ACCTFILE, FILE STATUS is evaluated: '00' sets APPL-RESULT to 0 (success), '10' sets APPL-RESULT to 16 (EOF condition), any other status sets APPL-RESULT to 12 (error). EOF triggers END-OF-FILE flag set to 'Y' to exit the read loop. Non-EOF errors display 'ERROR READING ACCOUNT FILE', copy status to IO-STATUS, call 9910-DISPLAY-IO-STATUS, and invoke 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "File Write Errors",
+        "description": "Write operations for OUT-FILE, ARRY-FILE, and VBRC-FILE (both VB1 and VB2 records) check FILE STATUS after each WRITE. If status is not '00' and not '10', an error message is displayed with the offending file status, IO-STATUS is populated, 9910-DISPLAY-IO-STATUS is called for formatted output, and 9999-ABEND-PROGRAM is called to abnormally terminate. Status '10' is explicitly tolerated as a non-error condition."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "ACCTFILE close checks FILE STATUS after CLOSE. Success ('00') zeroes APPL-RESULT using arithmetic subtraction. Failure sets APPL-RESULT to 12 via ADD. If not APPL-AOK, an error message is displayed, IO-STATUS is set, 9910-DISPLAY-IO-STATUS is called, and 9999-ABEND-PROGRAM is invoked. Notably, output files (OUTFILE, ARRYFILE, VBRCFILE) have no explicit close or close-error handling."
+      },
+      {
+        "category": "Abnormal Termination (ABEND)",
+        "description": "9999-ABEND-PROGRAM is a centralized abend routine called for all unrecoverable errors. It displays 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then calls the IBM LE routine 'CEE3ABD' to force a controlled abnormal termination with a user-defined abend code, ensuring the job fails visibly in the JES job log."
+      },
+      {
+        "category": "I/O Status Display and Formatting",
+        "description": "9910-DISPLAY-IO-STATUS is a shared diagnostic routine that formats and displays the two-byte FILE STATUS. For non-numeric status or status beginning with '9' (vendor-specific codes), it extracts the binary second byte via TWO-BYTES-BINARY redefine to produce a numeric representation. For standard numeric statuses, it formats the two-byte value into a four-character display field. This provides consistent, human-readable error diagnostics across all file error paths."
+      },
+      {
+        "category": "End-of-File Handling",
+        "description": "EOF is not treated as an error but as a normal loop termination condition. When ACCTFILE-STATUS '10' is detected, APPL-RESULT is set to 16 (mapped to APPL-EOF condition-name), which sets END-OF-FILE to 'Y', cleanly exiting the PERFORM UNTIL loop without triggering any error messages or abend processing."
+      },
+      {
+        "category": "External Call Error Handling",
+        "description": "The CALL to external assembler program 'COBDATFT' for date formatting has no error handling or return code checking. If this call fails or returns unexpected results, the program will silently continue with potentially incorrect date data in OUT-ACCT-REISSUE-DATE, representing a gap in the error handling strategy."
+      }
+    ]
+  }
+}

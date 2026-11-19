@@ -1,0 +1,108 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COBSWAIT.cbl",
+        "type": "cobol"
+      },
+      "overview": "COBSWAIT is a utility program within the CardDemo batch processing application, serving as a timing control mechanism used to introduce deliberate pauses between batch job steps or processes. In batch workflows, controlled waiting periods are often necessary to manage resource contention, synchronize dependent processes, or throttle execution rates. This program accepts a wait duration (specified in centiseconds) from the SYSIN input stream and delegates the actual wait operation to an external routine called MVSWAIT, providing a simple, reusable way to insert timed delays into batch job control language (JCL) streams without requiring custom logic in each calling program.",
+      "key_features": [
+        {
+          "feature": "Configurable Wait Duration",
+          "description": "Accepts a wait time value in centiseconds via SYSIN, allowing the delay to be specified at runtime through JCL parameters without recompiling the program."
+        },
+        {
+          "feature": "Batch Process Synchronization",
+          "description": "Enables batch job streams to introduce controlled pauses between steps, helping synchronize dependent processes or manage resource availability."
+        },
+        {
+          "feature": "Delegation to MVSWAIT",
+          "description": "Calls the external MVSWAIT routine to perform the actual system wait, leveraging a platform-level utility for reliable timing behavior."
+        },
+        {
+          "feature": "Reusable Utility Design",
+          "description": "Designed as a standalone utility program that can be invoked from any batch JCL job stream across the CardDemo application, promoting reuse and consistency."
+        },
+        {
+          "feature": "Minimal Footprint",
+          "description": "Implements a simple, single-purpose design with minimal working storage and no file I/O, making it lightweight and easy to maintain."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "SYSIN",
+        "type": "Read",
+        "description": "System input stream - accepts a numeric parameter value (up to 8 characters) representing the wait duration in centiseconds, which is passed to the MVSWAIT routine"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Accept Wait Duration Parameter",
+          "description": "Reads an 8-character numeric value from SYSIN representing the wait duration in centiseconds",
+          "records": [
+            "PARM-VALUE"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Convert Parameter to Numeric",
+          "description": "Moves the alphanumeric PARM-VALUE into the binary computational field MVSWAIT-TIME for use as a numeric wait duration",
+          "records": [
+            "PARM-VALUE",
+            "MVSWAIT-TIME"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Invoke Wait Routine",
+          "description": "Calls the external subroutine MVSWAIT, passing MVSWAIT-TIME as the wait interval in centiseconds, causing the program to pause execution for the specified duration",
+          "records": [
+            "MVSWAIT-TIME"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Terminate Program",
+          "description": "Ends program execution after the wait period has elapsed",
+          "records": []
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "SYSIN Availability",
+          "description": "The program depends on a valid 8-character numeric value being provided via SYSIN at runtime. If SYSIN is unavailable or contains non-numeric data, the MOVE to MVSWAIT-TIME (COMP field) may produce unpredictable results or an abend"
+        },
+        {
+          "dependency": "MVSWAIT Subroutine Availability",
+          "description": "The program has a hard dependency on the external subroutine MVSWAIT being present and loadable in the runtime library. If MVSWAIT is not found, the CALL will fail and the program will abend"
+        },
+        {
+          "dependency": "Numeric Validity of PARM-VALUE",
+          "description": "PARM-VALUE must contain a valid numeric string before being moved into the binary COMP field MVSWAIT-TIME. No explicit validation is performed, creating a dependency on the caller to supply correct input"
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "Input validation errors",
+        "description": "No input validation is performed. The PARM-VALUE accepted from SYSIN is directly moved to MVSWAIT-TIME without any checks for numeric validity, range, or empty/null values. Invalid input would cause undefined behavior or abend."
+      },
+      {
+        "category": "CALL statement errors",
+        "description": "No error handling exists for the CALL to 'MVSWAIT'. There is no ON EXCEPTION or ON OVERFLOW clause, meaning if the called program is unavailable or fails, the program will abend without a controlled error message or recovery."
+      },
+      {
+        "category": "Runtime/system errors",
+        "description": "No general error handling routines, declaratives, or USE statements are defined. Any runtime error (e.g., data conversion failure when moving alphanumeric PARM-VALUE to numeric MVSWAIT-TIME) will result in an unhandled abend with no diagnostic output."
+      },
+      {
+        "category": "Return code handling",
+        "description": "No return code is set or passed back to the calling environment. STOP RUN is issued unconditionally regardless of success or failure, providing no indication to the job control layer of whether the wait operation succeeded."
+      }
+    ]
+  }
+}

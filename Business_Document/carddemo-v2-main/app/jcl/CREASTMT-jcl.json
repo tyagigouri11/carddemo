@@ -1,0 +1,142 @@
+{
+    "created_on": "2026-11-05",
+    "name": "CREASTMT.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/CREASTMT.jcl",
+    "type": "jcl",
+    "description": "The CREASTMT job creates customer account statements by extracting and reorganizing transaction data, then generating both a plain-text statement file and an HTML-formatted statement file. It sorts transactions by card number and transaction ID, loads them into a VSAM file, and runs the statement generation program (CBSTM03A) that cross-references account, customer, and card data to produce the final outputs.Key Functionalities:\nDeletes and recreates the transaction working VSAM KSDS file (AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS) with fixed 350-byte records, indexed on a 32-byte key at position 0, to ensure a clean starting state before processing.\nSorts all transactions from the master transaction VSAM file by card number (positions 263\u2013278, ascending) and then by transaction ID (positions 1\u201316, ascending), and reformats each record by placing the card number first (bytes 1\u201316), followed by the original transaction fields (bytes 17\u2013278), and appending the remaining 50 bytes (bytes 279\u2013328), writing results to a sequential work file.\nLoads the sorted and reformatted sequential transaction work file into the recreated VSAM KSDS file using IDCAMS REPRO, making the data available for keyed access by the statement generation program.\nCleans up any pre-existing statement output files (HTML and plain-text) before the statement generation step to ensure no stale data carries forward.\nExecutes the statement generation program (CBSTM03A) which reads the sorted transaction VSAM file, cross-references card numbers to accounts (CARDXREF), retrieves account details (ACCTDATA), and customer information (CUSTDATA) to produce a plain-text statement file (80-byte records) and an HTML statement file (100-byte records), both catalogued as new datasets.",
+    "rules": [
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "A new statement generation run is initiated",
+                "When": "The transaction working file initialization step executes",
+                "Then": "The existing sequential transaction working file (AWS.M2.CARDDEMO.TRXFL.SEQ) is deleted AND the existing VSAM transaction working file cluster (AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS) is deleted to ensure a clean starting state for the current run"
+            },
+            "Rule_Name": "DELDEF01 - IDCAMS - Transaction Working Files Cleanup Before Statement Run",
+            "Rule_Description": "At the start of each statement generation run, both the sequential and VSAM transaction working files must be deleted to ensure no stale data from prior runs contaminates the current statement generation process.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of transaction working files is attempted during the initialization step",
+                "When": "Either or both transaction working files (TRXFL.SEQ or TRXFL.VSAM.KSDS) do not exist and the deletion fails",
+                "Then": "The deletion failure is ignored, the error condition is reset to zero, and processing continues to the next operation of creating the new VSAM transaction working file without aborting the job"
+            },
+            "Rule_Name": "DELDEF01 - IDCAMS - Missing Transaction File Tolerance During Initialization",
+            "Rule_Description": "If the transaction working files do not exist at the time of deletion (e.g., first-ever execution of the statement generation job), the process must not fail and must continue forward to create fresh files.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "Old transaction working files have been removed or confirmed absent during the initialization step",
+                "When": "The initialization step creates the new VSAM transaction working file",
+                "Then": "A new empty indexed VSAM transaction working file named AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS is created where: (1) Transaction ID \u2014 32 bytes starting at position 0 \u2014 serves as the unique key for each record, (2) every record is exactly 350 bytes in fixed length, (3) the data component is named AWS.M2.CARDDEMO.TRXFL.DATA, and (4) the index component is named AWS.M2.CARDDEMO.TRXFL.INDEX"
+            },
+            "Rule_Name": "DELDEF01 - IDCAMS - VSAM Transaction Working File Structure Definition",
+            "Rule_Description": "After cleanup, a fresh empty VSAM transaction working file must be created with a precisely defined structure to support efficient keyed access by Transaction ID during statement generation.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The VSAM transaction working file (AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS) is being defined during the initialization step",
+                "When": "The file is subsequently deleted at the start of any future statement generation run",
+                "Then": "All transaction data stored in the file is securely and physically erased from storage, ensuring no residual transaction data remains accessible after deletion"
+            },
+            "Rule_Name": "DELDEF01 - IDCAMS - Secure Data Erasure Policy for Transaction Working File",
+            "Rule_Description": "The VSAM transaction working file must be defined with secure erasure enabled, ensuring that all transaction data is physically removed from storage whenever the file is deleted, preventing any residual sensitive transaction data from remaining accessible.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records are available in the master transaction VSAM file (TRANSACT.VSAM.KSDS)",
+                "When": "The sort process is executed on all transaction records",
+                "Then": "All transaction records are sorted first by Card Number (16-character field at input positions 263\u2013278) in ascending order as the primary sort key, AND within each Card Number group, records are further sorted by Transaction ID (16-character field at input positions 1\u201316) in ascending order as the secondary sort key; the resulting sorted records are written to a new sequential transaction file (TRXFL.SEQ)"
+            },
+            "Rule_Name": "STEP010 - SORT - Sort Transactions by Card Number and Transaction ID",
+            "Rule_Description": "All transaction records from the master transaction file must be sorted by Card Number as the primary key and Transaction ID as the secondary key, both in ascending order, so that all transactions belonging to the same card are grouped together and arranged in order before statement generation begins.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "Transaction records have been sorted and are ready to be written to the output sequential file (TRXFL.SEQ)",
+                "When": "Each output transaction record is constructed during the sort output phase",
+                "Then": "The output record (350 bytes total) is restructured as follows: output positions 1\u201316 contain the Card Number taken from input positions 263\u2013278 (16 bytes); output positions 17\u2013278 contain the Transaction ID and transaction detail fields taken from input positions 1\u2013262 (262 bytes); output positions 279\u2013328 contain the remaining transaction fields taken from input positions 279\u2013328 (50 bytes), which remain unchanged in position"
+            },
+            "Rule_Name": "STEP010 - SORT - Restructure Transaction Record Layout by Promoting Card Number to Leading Position",
+            "Rule_Description": "During the sort output phase, each transaction record must be restructured so that the Card Number is repositioned to the beginning of the record. This restructuring ensures that the downstream statement generation program can efficiently identify and group transactions by Card Number, as it becomes the leading key field in the output record.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The statement generation job has executed prior steps (transaction file initialization and transaction sort)",
+                "When": "Any prior step in the job has returned a non-zero (failure) return code",
+                "Then": "The loading of sorted transaction records into the VSAM transaction working file must be skipped entirely \u2014 no transaction data is loaded and subsequent statement generation steps will also be bypassed"
+            },
+            "Rule_Name": "STEP020 - IDCAMS - Conditional Execution of Transaction VSAM Load",
+            "Rule_Description": "This step ensures that the sorted sequential transaction file is only loaded into the VSAM working file when all prior data preparation steps have completed successfully. If any prior step failed, this load is skipped entirely to prevent incomplete or invalid transaction data from being used in statement generation.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps have completed successfully with return code zero AND the sorted sequential transaction file (AWS.M2.CARDDEMO.TRXFL.SEQ) contains all transaction records sorted by Card Number (primary) and Transaction ID (secondary) with Card Number repositioned as the leading field",
+                "When": "The transaction load step is executed",
+                "Then": "Every transaction record from the sorted sequential transaction file must be copied completely and without modification into the VSAM transaction working file (AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS), making all transaction records available for keyed retrieval by Card Number and Transaction ID during customer statement generation"
+            },
+            "Rule_Name": "STEP020 - IDCAMS REPRO - Load Sorted Transactions into VSAM Working File",
+            "Rule_Description": "All sorted and reformatted transaction records from the sequential working file must be fully transferred into the VSAM transaction working file. This makes the transaction data available for keyed access during customer statement generation. Every record from the sorted sequential file is loaded \u2014 no filtering or transformation is applied at this stage.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The statement generation job has been triggered AND all prior steps (transaction file initialization, transaction sort, and VSAM load) have completed with a return code of 0 (success)",
+                "When": "STEP030 executes and processes the HTML statement file (AWS.M2.CARDDEMO.STATEMNT.HTML)",
+                "Then": "The existing HTML statement file must be deleted upon successful completion of this step AND the HTML statement file must also be deleted if this step terminates abnormally \u2014 ensuring no prior-period HTML statement data remains on the system under any outcome"
+            },
+            "Rule_Name": "STEP030 - IEFBR14 - Delete Existing HTML Statement File Before New Statement Generation",
+            "Rule_Description": "Before generating new customer account statements in HTML format, any previously existing HTML statement file must be completely removed to ensure no stale or prior-period statement data is retained. This cleanup only occurs when all prior data preparation steps have completed successfully.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The statement generation job has been triggered AND all prior steps (transaction file initialization, transaction sort, and VSAM load) have completed with a return code of 0 (success)",
+                "When": "STEP030 executes and processes the print statement file (AWS.M2.CARDDEMO.STATEMNT.PS)",
+                "Then": "The existing print statement file must be deleted upon successful completion of this step AND the print statement file must also be deleted if this step terminates abnormally \u2014 ensuring no prior-period print statement data remains on the system under any outcome"
+            },
+            "Rule_Name": "STEP030 - IEFBR14 - Delete Existing Print Statement File Before New Statement Generation",
+            "Rule_Description": "Before generating new customer account statements in print format, any previously existing print statement file must be completely removed to ensure no stale or prior-period statement data is retained. This cleanup only occurs when all prior data preparation steps have completed successfully.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The statement generation job is executing AND one or more prior steps (transaction file initialization, transaction sort, or VSAM load) have completed with a return code that is NOT equal to 0 (failure)",
+                "When": "The job reaches STEP030",
+                "Then": "STEP030 must be skipped entirely \u2014 neither the HTML statement file (AWS.M2.CARDDEMO.STATEMNT.HTML) nor the print statement file (AWS.M2.CARDDEMO.STATEMNT.PS) must be deleted \u2014 preserving any existing valid statement files on the system"
+            },
+            "Rule_Name": "STEP030 - IEFBR14 - Skip Statement File Cleanup When Prior Steps Have Failed",
+            "Rule_Description": "The deletion of existing statement files (both HTML and print formats) must be bypassed entirely if any prior step in the statement generation job has failed. This prevents accidental deletion of existing valid statement files when the job is in an error state.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-CREASTMT-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "All prior job steps (transaction file initialization, transaction sort, VSAM load, and old statement file cleanup) have completed successfully with a return code of 0, AND the following input files are available and accessible: the Working Transaction VSAM File (TRNXFILE) containing sorted card transaction records, the Card Cross-Reference File (XREFFILE) mapping card numbers to account numbers, the Account Master Data File (ACCTFILE) containing account financial details, and the Customer Master Data File (CUSTFILE) containing customer personal information",
+                "When": "The statement generation program CBSTM03A is executed with all four input files (TRNXFILE, XREFFILE, ACCTFILE, CUSTFILE) and two new output files are allocated \u2014 a Print Statement File (STMTFILE: AWS.M2.CARDDEMO.STATEMNT.PS) and an HTML Statement File (HTMLFILE: AWS.M2.CARDDEMO.STATEMNT.HTML)",
+                "Then": "The program generates complete customer account statements by joining transaction records with card-to-account mappings, account financial summaries, and customer personal details \u2014 producing two output files: (1) a Print-Ready Statement File (STMTFILE) containing 80-character fixed-width formatted statements for physical or print delivery, which is permanently retained on successful completion or automatically deleted on failure; and (2) an HTML Statement File (HTMLFILE) containing 100-character fixed-width HTML-formatted statements for web or email delivery, which is permanently retained on successful completion or automatically deleted on failure. If any prior step had failed (return code not equal to 0), this entire step is skipped and no statements are generated."
+            },
+            "Rule_Name": "STEP040 - CBSTM03A - Customer Account Statement Generation",
+            "Rule_Description": "This step invokes the external statement generation program CBSTM03A to produce customer account statements in both print-ready and HTML formats. The program consolidates transaction history, card-to-account mappings, account financial details, and customer personal information into complete statements. This step is conditionally executed \u2014 it only runs when all prior data preparation steps have completed successfully. If the program fails, both output statement files are automatically discarded to prevent incomplete statements from being retained.",
+            "Rule_Type": "Action Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    START([Job Start\nCardDemo Statement Generation Job]):::start\n\n    %% \u2500\u2500\u2500 DELDEF01 \u2500\u2500\u2500\n    DELDEF01[_DELDEF01 - IDCAMS\nInitialize Transaction VSAM File\nDelete Old Files & Create Fresh Empty VSAM Dataset_]:::process\n    DS_TRXFL_SEQ_DEL[(TRNX-FILE\nAWS.M2.CARDDEMO.TRXFL.SEQ\nDeleted - Prior Sequential File Removed)]:::datasource\n    DS_TRXFL_VSAM_INIT[(AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS\nDeleted & Recreated as Fresh Empty VSAM)]:::datasource\n\n    %% \u2500\u2500\u2500 STEP010 \u2500\u2500\u2500\n    STEP010[_STEP010 - SORT\nSort & Reformat Transaction Records\nOrdered by Card Number then Transaction ID_]:::process\n    DS_TRANSACT_VSAM[(AWS.M2.CARDDEMO.TRANSACT.VSAM.KSDS\nSource Transaction VSAM File\nAll Card Transaction Records)]:::datasource\n    DS_TRNX_SEQ[(TRNX-FILE\nSorted Sequential Transaction File\nCard Number as Leading Field)]:::datasource\n\n    %% \u2500\u2500\u2500 Decision Gate 1 \u2500\u2500\u2500\n    DEC1{_All Prior Steps\nCompleted Successfully?\nCOND=0,NE Applies to STEP020_}:::decision\n\n    %% \u2500\u2500\u2500 STEP020 \u2500\u2500\u2500\n    STEP020[_STEP020 - IDCAMS REPRO\nLoad Sorted Transactions\ninto VSAM Transaction File_]:::process\n    DS_TRXFL_VSAM_LOADED[(AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS\nFully Loaded with Sorted Transaction Records)]:::datasource\n\n    %% \u2500\u2500\u2500 Decision Gate 2 \u2500\u2500\u2500\n    DEC2{_All Prior Steps\nCompleted Successfully?\nCOND=0,NE Applies to STEP030_}:::decision\n\n    %% \u2500\u2500\u2500 STEP030 \u2500\u2500\u2500\n    STEP030[_STEP030 - IEFBR14\nDelete Old Statement Output Files\nPrepare Clean Slate for Statement Generation_]:::process\n    DS_HTML_DEL[(HTML-FILE\nAWS.M2.CARDDEMO.STATEMNT.HTML\nDeleted - Prior HTML Statements Removed)]:::datasource\n    DS_STMT_DEL[(STMT-FILE\nAWS.M2.CARDDEMO.STATEMNT.PS\nDeleted - Prior Print Statements Removed)]:::datasource\n\n    %% \u2500\u2500\u2500 Decision Gate 3 \u2500\u2500\u2500\n    DEC3{_All Prior Steps\nCompleted Successfully?\nCOND=0,NE Applies to STEP040_}:::decision\n\n    %% \u2500\u2500\u2500 STEP040 \u2500\u2500\u2500\n    STEP040[_STEP040 - CBSTM03A\nGenerate Customer Account Statements\nProduce Print-Ready & HTML Format Statements_]:::process\n\n    %% Input Datasources for STEP040\n    DS_TRXFL_VSAM_READ[(AWS.M2.CARDDEMO.TRXFL.VSAM.KSDS\nTransaction Records\nTRNX-FILE - All Card Transactions)]:::datasource\n    DS_XREF_VSAM[(AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS\nCard-to-Account Cross Reference\nXREF-FILE / XREFFILE-FILE)]:::datasource\n    DS_ACCT_VSAM[(AWS.M2.CARDDEMO.ACCTDATA.VSAM.KSDS\nAccount Master Data\nACCOUNT-FILE / ACCT-FILE / ACCTFILE-FILE)]:::datasource\n    DS_CUST_VSAM[(AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS\nCustomer Master Data\nCUST-FILE / CUSTFILE-FILE / CUSTOMER-FILE)]:::datasource\n\n    %% Output Datasources for STEP040\n    DS_STMT_OUT[(STMT-FILE\nAWS.M2.CARDDEMO.STATEMNT.PS\nNewly Generated Print-Ready Customer Statements)]:::datasource\n    DS_HTML_OUT[(HTML-FILE\nAWS.M2.CARDDEMO.STATEMNT.HTML\nNewly Generated HTML Customer Statements)]:::datasource\n    DS_OUT_FILE[(OUT-FILE\nStatement Summary & Control Report\nGenerated by Statement Program)]:::datasource\n\n    %% \u2500\u2500\u2500 Decision Gate 4 \u2500\u2500\u2500\n    DEC4{_STEP040\nCompleted Successfully?_}:::decision\n\n    %% \u2500\u2500\u2500 End Nodes \u2500\u2500\u2500\n    SUCCESS([Job Completed Successfully\nAll Customer Statements Generated\nPrint & HTML Files Ready]):::success\n    ERR1([Job Failed\nSTEP020 STEP030 STEP040 Skipped\nTransaction File Initialization or Sort Error]):::error\n    ERR2([Job Failed\nSTEP030 STEP040 Skipped\nVSAM Transaction Load Error]):::error\n    ERR3([Job Failed\nSTEP040 Skipped\nStatement File Cleanup Error]):::error\n    ERR4([Job Failed\nStatement Generation Error\nOutput Files Deleted]):::error\n\n    %% \u2500\u2500\u2500 Flow Connections \u2500\u2500\u2500\n    START --> DELDEF01\n    DELDEF01 -.->|Delete Prior Sequential Transaction File| DS_TRXFL_SEQ_DEL\n    DELDEF01 -.->|Delete Old VSAM & Recreate Empty VSAM| DS_TRXFL_VSAM_INIT\n    DELDEF01 --> STEP010\n\n    DS_TRANSACT_VSAM -.->|Read All Card Transaction Records| STEP010\n    STEP010 -.->|Write Sorted & Reformatted Records\nCard Number as Leading Field| DS_TRNX_SEQ\n    STEP010 --> DEC1\n\n    DEC1 -->|No - Initialization or Sort Failed\nSTEP020 STEP030 STEP040 All Skipped| ERR1\n    DEC1 -->|Yes - Proceed to Load VSAM| STEP020\n\n    DS_TRNX_SEQ -.->|Read Sorted Transaction Records| STEP020\n    STEP020 -.->|Load All Transaction Records into VSAM| DS_TRXFL_VSAM_LOADED\n    STEP020 --> DEC2\n\n    DEC2 -->|No - VSAM Load Failed\nSTEP030 STEP040 Skipped| ERR2\n    DEC2 -->|Yes - Proceed to File Cleanup| STEP030\n\n    STEP030 -.->|Delete Old HTML Statement File| DS_HTML_DEL\n    STEP030 -.->|Delete Old Print Statement File| DS_STMT_DEL\n    STEP030 --> DEC3\n\n    DEC3 -->|No - File Cleanup Failed\nSTEP040 Skipped| ERR3\n    DEC3 -->|Yes - Proceed to Generate Statements| STEP040\n\n    DS_TRXFL_VSAM_READ -.->|Read Card Transaction Records| STEP040\n    DS_XREF_VSAM -.->|Lookup Card Number to Account Number Mapping| STEP040\n    DS_ACCT_VSAM -.->|Lookup Account Balance Credit Limit & Payment Details| STEP040\n    DS_CUST_VSAM -.->|Lookup Customer Name Address & Contact Info| STEP040\n    STEP040 -.->|Write Print-Formatted Customer Statements| DS_STMT_OUT\n    STEP040 -.->|Write HTML-Formatted Customer Statements| DS_HTML_OUT\n    STEP040 -.->|Write Statement Summary & Control Report| DS_OUT_FILE\n    STEP040 --> DEC4\n\n    DEC4 -->|No - Statement Generation Failed\nOutput Files Deleted| ERR4\n    DEC4 -->|Yes - All Customer Statements Generated| SUCCESS\n\n    %% \u2500\u2500\u2500 Class Definitions \u2500\u2500\u2500\n    classDef start fill:#ff6666,stroke:#333,color:#000\n    classDef process fill:#6699ff,stroke:#333,color:#000\n    classDef decision fill:#ffcc00,stroke:#333,color:#000\n    classDef datasource fill:#66ff66,stroke:#333,color:#000\n    classDef final fill:#ae74de,stroke:#333,color:#000\n    classDef success fill:#22c55e,stroke:#333,color:#000\n    classDef error fill:#ef4444,stroke:#333,color:#000"
+}

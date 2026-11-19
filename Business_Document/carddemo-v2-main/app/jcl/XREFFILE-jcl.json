@@ -1,0 +1,252 @@
+{
+    "created_on": "2026-11-05",
+    "name": "XREFFILE.jcl",
+    "file_path": "carddemo-v2-main/app/jcl/XREFFILE.jcl",
+    "type": "jcl",
+    "description": "This JCL job (XREFFILE) sets up the Card Cross-Reference VSAM file infrastructure by deleting any existing cross-reference files, recreating the primary VSAM cluster, loading data from a flat file source, and building an alternate index to enable lookups by a secondary key. The job ensures a clean, fully indexed cross-reference file is available for card-related processing.Key Functionalities:\nDeletes the existing primary VSAM KSDS cluster (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) and the existing Alternate Index (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX), suppressing non-critical errors (condition codes up to 8) to allow the job to continue even if the files do not exist.\nRecreates the primary VSAM KSDS cluster with a key length of 16 bytes starting at position 0, fixed record size of 50 bytes, allocated on volume AWSHJ1 with 1 primary and 5 secondary cylinders, and share options (2,3).\nLoads card cross-reference data from the sequential flat file (AWS.M2.CARDDEMO.CARDXREF.PS) into the newly created VSAM KSDS cluster.\nDefines an Alternate Index (AIX) on the KSDS cluster using an 11-byte key starting at position 25, configured as non-unique (multiple records can share the same alternate key), with upgrade enabled, 50-byte record size, and allocated 5 primary and 1 secondary cylinders on volume AWSHJ1.\nDefines an Access Path (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH) linked to the Alternate Index to allow applications to access the KSDS via the alternate key.\nBuilds the Alternate Index by reading the primary KSDS cluster and populating the AIX, making the cross-reference file fully accessible via both the primary key and the alternate key.",
+    "rules": [
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference rebuild job is initiated and STEP05 begins execution",
+                "When": "The system attempts to delete the primary Card Cross-Reference VSAM Cluster named 'AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS' along with all its associated components (data component and index component)",
+                "Then": "The primary Card Cross-Reference VSAM Cluster and all its components are removed from the system, freeing the storage and clearing the environment for a fresh rebuild"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Primary Card Cross-Reference VSAM Cluster",
+            "Rule_Description": "When the Card Cross-Reference rebuild process is initiated, the existing primary Card Cross-Reference VSAM Cluster (including its data and index components) must be deleted to ensure a clean environment before the new structure is created.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of the primary Card Cross-Reference VSAM Cluster has been attempted in STEP05",
+                "When": "The return code from the delete operation is evaluated",
+                "Then": "If the return code is less than or equal to 8 (including the case where the file does not exist, which returns RC=8), the return code is reset to 0 and the job continues to the next operation without error; If the return code is greater than 8 (indicating a severe system error), the return code is NOT reset, the step is marked as failed, and the job cannot proceed further"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Error Suppression After Primary Card Cross-Reference Cluster Deletion",
+            "Rule_Description": "After attempting to delete the primary Card Cross-Reference VSAM Cluster, the outcome must be evaluated to determine whether the job should continue or halt. A missing file (e.g., first-time run) must not be treated as a failure.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of the primary Card Cross-Reference VSAM Cluster has been processed and STEP05 continues to the next operation",
+                "When": "The system attempts to delete the Card Cross-Reference Alternate Index named 'AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX'",
+                "Then": "The Card Cross-Reference Alternate Index and all its associated components (data component and index component) are removed from the system, clearing the environment for the new Alternate Index to be created in a subsequent step"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Delete Card Cross-Reference Alternate Index",
+            "Rule_Description": "When the Card Cross-Reference rebuild process is initiated, the existing Alternate Index \u2014 which enables Account Number-based lookups on the Card Cross-Reference file \u2014 must be deleted to ensure a clean environment before the new Alternate Index is created.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The deletion of the Card Cross-Reference Alternate Index has been attempted in STEP05",
+                "When": "The return code from the Alternate Index delete operation is evaluated",
+                "Then": "If the return code is less than or equal to 8 (including the case where the Alternate Index does not exist, which returns RC=8), the return code is reset to 0 and STEP05 completes successfully, allowing the job to proceed to the next step; If the return code is greater than 8 (indicating a severe system error), the return code is NOT reset, STEP05 is marked as failed, and the job cannot proceed to rebuild the Card Cross-Reference structures"
+            },
+            "Rule_Name": "STEP05 - IDCAMS - Error Suppression After Card Cross-Reference Alternate Index Deletion",
+            "Rule_Description": "After attempting to delete the Card Cross-Reference Alternate Index, the outcome must be evaluated to determine whether the job should continue or halt. A missing Alternate Index (e.g., first-time run) must not be treated as a failure.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "A new Card Cross-Reference VSAM file needs to be created for card-to-account linkage data storage",
+                "When": "The Card Cross-Reference VSAM file is defined",
+                "Then": "The file must be created with the name 'AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS' as an INDEXED (keyed) cluster, with a separate data component named 'AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.DATA' and a separate index component named 'AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS.INDEX'"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Card Cross-Reference Primary VSAM File Identity",
+            "Rule_Description": "Establishes the Card Cross-Reference VSAM file as a named, indexed data structure with separate data and index components, making it accessible to all card processing applications by its registered name.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference VSAM file is being defined with a primary key for direct record access",
+                "When": "The primary key is configured for the Card Cross-Reference file",
+                "Then": "The Card Number must be defined as exactly 16 characters in length, starting at position 1 (offset 0) of every Card Cross-Reference record, serving as the unique identifier for each card record"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Card Number as Primary Key for Card Cross-Reference Records",
+            "Rule_Description": "Establishes the Card Number as the unique primary key for every Card Cross-Reference record, defining its exact length and position within the record layout so that every card record can be directly retrieved by its Card Number.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference VSAM file is being defined with a record format",
+                "When": "A Card Cross-Reference record is written to or read from the file",
+                "Then": "Every record must be exactly 50 characters in both minimum and maximum length (RECORDSIZE 50 50) \u2014 variable-length records are not permitted in the Card Cross-Reference file"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Fixed Record Length for Card Cross-Reference Records",
+            "Rule_Description": "Mandates that every Card Cross-Reference record must be exactly 50 characters in length \u2014 no shorter, no longer \u2014 ensuring uniform record structure across all card-to-account linkage data.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference VSAM file is being created on storage volume AWSHJ1",
+                "When": "The storage allocation is configured for the Card Cross-Reference file",
+                "Then": "The file must be initially allocated 1 cylinder of primary storage on volume AWSHJ1, and must be permitted to automatically expand by up to 5 additional cylinders as card record volume grows"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Allocate Scalable Storage for Card Cross-Reference File",
+            "Rule_Description": "Defines the initial storage capacity and automatic growth allowance for the Card Cross-Reference file, ensuring the file can accommodate growing card volumes without manual intervention.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference VSAM file contains sensitive card-to-account linkage data",
+                "When": "The Card Cross-Reference VSAM file is deleted",
+                "Then": "All data in the Card Cross-Reference file must be physically overwritten and erased from the storage medium (ERASE) \u2014 logical deletion alone is not sufficient; no residual card data may remain recoverable after deletion"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Enforce Secure Erasure Policy for Card Cross-Reference Data",
+            "Rule_Description": "Mandates that when the Card Cross-Reference file is deleted, all card-to-account linkage data stored in it must be physically erased from disk, preventing unauthorized recovery of sensitive card data.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference VSAM file may be accessed by multiple programs or jobs concurrently",
+                "When": "The concurrent access policy is configured for the Card Cross-Reference file",
+                "Then": "The file must be defined with SHAREOPTIONS(2 3), meaning: within a single system, multiple programs may read the file simultaneously but only one program may write at a time (share option 2); across multiple systems, the file may be fully shared for both read and write access (share option 3)"
+            },
+            "Rule_Name": "STEP10 - IDCAMS - Define Concurrent Access Rules for Card Cross-Reference File",
+            "Rule_Description": "Establishes the rules governing how multiple programs or jobs may simultaneously access the Card Cross-Reference file, balancing data integrity with operational availability.",
+            "Rule_Type": "Authorization Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "A flat sequential Card Cross-Reference source file (AWS.M2.CARDDEMO.CARDXREF.PS) exists and is accessible in read-only shared mode, AND an empty VSAM indexed Card Cross-Reference file (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) has been created with a 16-character Card Number as the primary key and a fixed record length of 50 characters",
+                "When": "The Card Cross-Reference data load process is initiated to copy all records from the flat source file into the VSAM indexed file",
+                "Then": "Every record from the flat sequential Card Cross-Reference source file is written into the VSAM indexed file in its entirety without any filtering or transformation, AND each loaded record is automatically indexed by its 16-character Card Number enabling direct Card Number-based retrieval, AND if any record contains a Card Number that already exists in the VSAM file the load process fails and rejects the duplicate record, AND the flat sequential source file remains unchanged and intact after the load completes"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Load Card Cross-Reference Records into VSAM Indexed File",
+            "Rule_Description": "All Card Cross-Reference records from the flat sequential source file are transferred into the VSAM indexed file, making them accessible via Card Number-based lookups. The source file is preserved unchanged during this process.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The flat sequential Card Cross-Reference source file (AWS.M2.CARDDEMO.CARDXREF.PS) is referenced with shared read-only access (DISP=SHR)",
+                "When": "The Card Cross-Reference data load process reads records from the source file",
+                "Then": "The flat sequential Card Cross-Reference source file must not be modified, deleted, or exclusively locked during or after the load process, AND the file remains available for access by other processes concurrently"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Preserve Source Card Cross-Reference File Integrity",
+            "Rule_Description": "The flat sequential Card Cross-Reference source file must remain unmodified and available for shared access during and after the data load process.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The VSAM Card Cross-Reference file (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) is defined with a unique 16-character Card Number as its primary key, AND the flat sequential source file (AWS.M2.CARDDEMO.CARDXREF.PS) contains Card Cross-Reference records to be loaded",
+                "When": "A Card Cross-Reference record from the source file is being written to the VSAM indexed file during the load process",
+                "Then": "If the Card Number of the incoming record does not already exist in the VSAM file, the record is successfully written and indexed, AND if the Card Number of the incoming record already exists in the VSAM file, the record is rejected and the load process terminates with an error, AND no partial or duplicate Card Number entries are permitted in the VSAM Card Cross-Reference file"
+            },
+            "Rule_Name": "STEP15 - IDCAMS REPRO - Enforce Unique Card Number on Load",
+            "Rule_Description": "Each Card Cross-Reference record loaded into the VSAM file must have a unique Card Number. The VSAM file structure enforces that no two records can share the same 16-character Card Number.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "The primary Card Cross-Reference VSAM file (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) exists and contains card records indexed by Card Number",
+                "When": "The Alternate Index definition process is executed for the Card Cross-Reference file",
+                "Then": "An Alternate Index named AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX must be created and permanently associated (related) to the primary Card Cross-Reference VSAM file (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS), with separate DATA component (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.DATA) and INDEX component (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.INDEX) created as distinct named structures"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Card Cross-Reference Alternate Index Structure",
+            "Rule_Description": "Create the Alternate Index structure on the Card Cross-Reference VSAM file to enable Account Number-based lookups, linking it to the primary Card Number-indexed file.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "A Card Cross-Reference record exists with a fixed length of 50 characters",
+                "When": "The Alternate Index key definition is applied to the Card Cross-Reference file",
+                "Then": "The Account Number field \u2014 defined as exactly 11 characters in length starting at position 26 (offset 25) of each Card Cross-Reference record \u2014 must be designated as the alternate lookup key for the Card Cross-Reference Alternate Index"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Define Account Number as Alternate Lookup Key",
+            "Rule_Description": "Establish the Account Number field within the Card Cross-Reference record as the alternate key, enabling card records to be retrieved by Account Number in addition to Card Number.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index is being defined with Account Number as the alternate key",
+                "When": "Multiple Card Cross-Reference records share the same Account Number value",
+                "Then": "The Alternate Index must allow non-unique alternate key values (NONUNIQUEKEY), meaning multiple Card Cross-Reference records with the same Account Number are all valid and retrievable \u2014 the system must NOT reject or deduplicate records that share the same Account Number"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Allow Multiple Cards per Account Number",
+            "Rule_Description": "Enforce the business rule that a single Account Number can be associated with multiple Card Numbers, supporting multi-card account relationships in the Card Cross-Reference file.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index is being defined",
+                "When": "Record size parameters are applied to the Alternate Index definition",
+                "Then": "Both the minimum and maximum record size of the Alternate Index must be set to exactly 50 characters (RECORDSIZE 50,50), enforcing a fixed-length record format \u2014 no variable-length records are permitted in the Card Cross-Reference Alternate Index"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Enforce Fixed Record Length for Alternate Index",
+            "Rule_Description": "Ensure all records within the Card Cross-Reference Alternate Index conform to a fixed 50-character record length, consistent with the base Card Cross-Reference file.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index has been defined with the UPGRADE attribute and is associated with the primary Card Cross-Reference VSAM file",
+                "When": "Any card record in the primary Card Cross-Reference VSAM file is added, modified, or deleted after the Alternate Index is built",
+                "Then": "The Card Cross-Reference Alternate Index must be automatically updated to reflect the change \u2014 no manual rebuild of the Alternate Index is required for incremental data changes, and the Account Number-based lookup results must always remain consistent with the current state of the primary Card Cross-Reference file"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Automatically Synchronize Alternate Index on Base File Updates",
+            "Rule_Description": "Ensure the Card Cross-Reference Alternate Index remains automatically synchronized with the primary Card Cross-Reference file whenever card records are added, updated, or deleted.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index is being defined and card volume is expected to grow over time",
+                "When": "The free space parameters are applied to the Alternate Index definition",
+                "Then": "10% of each storage block (Control Interval) and 20% of each storage extent (Control Area) within the Card Cross-Reference Alternate Index must be reserved as free space, ensuring that new Account Number index entries can be inserted without triggering immediate storage reorganization"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Reserve Growth Space in Alternate Index for Future Card Additions",
+            "Rule_Description": "Pre-allocate free space within the Card Cross-Reference Alternate Index to accommodate future card record additions without requiring immediate reorganization.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index is being defined on storage volume AWSHJ1",
+                "When": "Storage allocation parameters are applied to the Alternate Index definition",
+                "Then": "The Card Cross-Reference Alternate Index must be allocated with 5 cylinders of primary storage on volume AWSHJ1, with 1 additional cylinder allocated automatically each time the index requires expansion beyond its current capacity"
+            },
+            "Rule_Name": "STEP20 - IDCAMS - Allocate Storage for Card Cross-Reference Alternate Index",
+            "Rule_Description": "Define the initial and incremental storage allocation for the Card Cross-Reference Alternate Index to ensure sufficient capacity for Account Number index entries.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00021",
+            "Acceptance_Criteria": {
+                "Given": "The Card Cross-Reference Alternate Index (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX) has been successfully created and is available in the system",
+                "When": "A named access path (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH) is defined and registered, pointing to the Card Cross-Reference Alternate Index (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX) as its entry point",
+                "Then": "The named access path is established and available system-wide, so that any application program requiring Account Number-based lookups on the Card Cross-Reference file can reference the path by its registered name (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH) to retrieve all Card records associated with a given Account Number"
+            },
+            "Rule_Name": "STEP25 - IDCAMS - Define Named Access Path for Account Number-Based Card Lookups",
+            "Rule_Description": "This step registers a named access path that serves as the official gateway for application programs to perform Account Number-based lookups on the Card Cross-Reference file. The path permanently links to the Alternate Index, providing a stable, named entry point that decouples application programs from the internal Alternate Index structure.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-XREFFILE-jcl-00022",
+            "Acceptance_Criteria": {
+                "Given": "The primary Card Cross-Reference VSAM file (AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) has been successfully created and loaded with Card Cross-Reference records, AND the Alternate Index structure (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX) has been defined with Account Number (11 characters at position 26) as the alternate key and NONUNIQUEKEY option enabled",
+                "When": "The BLDINDEX process is executed reading all records from the Card Cross-Reference VSAM file (INDATASET: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS) and writing the resulting index entries into the Alternate Index (OUTDATASET: AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX)",
+                "Then": "1. Every Card Cross-Reference record in the primary VSAM file is scanned in full. 2. The Account Number (11-character field at position 26 of each record) is extracted from each card record. 3. An index entry mapping each Account Number to its corresponding Card Number(s) is written into the Alternate Index. 4. For Account Numbers that appear on multiple card records (one account with multiple cards), all associated Card Numbers are grouped under the same Account Number entry in the Alternate Index (consistent with NONUNIQUEKEY). 5. Upon successful completion, the Alternate Index is fully populated and operational, enabling application programs to look up all cards associated with a given Account Number via the defined Access Path (AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX.PATH). 6. If the BLDINDEX process encounters a severe error, the step fails with a return code greater than 0 and the Alternate Index remains incomplete and unusable."
+            },
+            "Rule_Name": "STEP30 - IDCAMS BLDINDEX - Build Account Number Alternate Index from Card Cross-Reference Records",
+            "Rule_Description": "This step scans all existing Card Cross-Reference records in the primary VSAM file and constructs the Alternate Index by extracting the Account Number from each record. Once built, the Alternate Index enables application programs to retrieve card records using an Account Number as the lookup key, in addition to the primary Card Number lookup.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start:\nCard Cross-Reference\nVSAM Setup]):::start\n\n    STEP05[STEP05 - IDCAMS\nDelete Existing Card Cross-Reference\nVSAM Structures]:::process\n\n    D05{Delete Completed\nwith RC \u2264 8?\nFile Not Found is Acceptable}:::decision\n\n    STEP10[STEP10 - IDCAMS\nCreate New Card Cross-Reference\nVSAM Primary File]:::process\n\n    D10{Primary File\nCreated Successfully?}:::decision\n\n    STEP15[STEP15 - IDCAMS\nLoad Card Cross-Reference\nRecords into VSAM Primary File]:::process\n\n    D15{Records Loaded\nSuccessfully?}:::decision\n\n    STEP20[STEP20 - IDCAMS\nCreate Alternate Index for\nAccount Number Lookups]:::process\n\n    D20{Alternate Index\nCreated Successfully?}:::decision\n\n    STEP25[STEP25 - IDCAMS\nDefine Access Path for\nAccount Number Lookups]:::process\n\n    D25{Access Path\nDefined Successfully?}:::decision\n\n    STEP30[STEP30 - IDCAMS\nBuild and Populate Alternate Index\nwith Account Number Keys]:::process\n\n    D30{Alternate Index\nBuilt Successfully?}:::decision\n\n    KSDS[(AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS\nCard Cross-Reference\nPrimary VSAM File)]:::datasource\n\n    AIX[(AWS.M2.CARDDEMO.CARDXREF.VSAM.AIX\nCard Cross-Reference\nAlternate Index)]:::datasource\n\n    SUCCESS([Job Completed Successfully:\nCard Cross-Reference VSAM Fully Operational\nCard Number and Account Number Lookups Enabled]):::success\n\n    ERR05([Job Failed at STEP05:\nUnable to Delete Existing VSAM Structures\nSevere Error RC greater than 8]):::error\n    ERR10([Job Failed at STEP10:\nUnable to Create Card Cross-Reference\nVSAM Primary File]):::error\n    ERR15([Job Failed at STEP15:\nUnable to Load Card Cross-Reference\nRecords into VSAM]):::error\n    ERR20([Job Failed at STEP20:\nUnable to Create Alternate Index\nfor Account Number Lookups]):::error\n    ERR25([Job Failed at STEP25:\nUnable to Define Access Path\nfor Account Number Lookups]):::error\n    ERR30([Job Failed at STEP30:\nUnable to Build Alternate Index\nwith Account Number Keys]):::error\n\n    A --> STEP05\n    STEP05 -.->|Delete Primary File| KSDS\n    STEP05 -.->|Delete Alternate Index| AIX\n    STEP05 --> D05\n    D05 -->|Yes - RC Reset to 0\nContinue Processing| STEP10\n    D05 -->|No - Severe Error\nRC greater than 8| ERR05\n\n    STEP10 -.->|Create Empty Primary File| KSDS\n    STEP10 --> D10\n    D10 -->|Yes| STEP15\n    D10 -->|No| ERR10\n\n    STEP15 -.->|Load Card-to-Account Records| KSDS\n    STEP15 --> D15\n    D15 -->|Yes| STEP20\n    D15 -->|No| ERR15\n\n    STEP20 -.->|Create Empty Alternate Index Structure| AIX\n    STEP20 --> D20\n    D20 -->|Yes| STEP25\n    D20 -->|No| ERR20\n\n    STEP25 -.->|Register Access Path Over Alternate Index| AIX\n    STEP25 --> D25\n    D25 -->|Yes| STEP30\n    D25 -->|No| ERR25\n\n    STEP30 -.->|Read All Card-to-Account Records| KSDS\n    STEP30 -.->|Populate with Account Number Keys| AIX\n    STEP30 --> D30\n    D30 -->|Yes| SUCCESS\n    D30 -->|No| ERR30\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

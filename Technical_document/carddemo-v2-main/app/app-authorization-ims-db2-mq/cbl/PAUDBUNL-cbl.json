@@ -1,0 +1,227 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "PAUDBUNL.CBL",
+        "type": "cobol"
+      },
+      "overview": "This program operates within a financial authorization processing domain, specifically handling pending authorization records stored in an IMS hierarchical database. It serves as a data unload utility, likely used for archival, reporting, or migration purposes within a batch processing workflow. The program (PAUDBUNL) reads all pending authorization records from an IMS database and unloads them into two sequential output files: one containing root-level authorization summary records and another containing child-level authorization detail records. It solves the problem of extracting IMS database content into flat files for downstream processing, reporting, or database maintenance.",
+      "key_features": [
+        {
+          "feature": "IMS Database Unload",
+          "description": "Reads all pending authorization summary (root) and detail (child) segments from an IMS hierarchical database using sequential GN and GNP calls."
+        },
+        {
+          "feature": "Dual Output File Generation",
+          "description": "Writes authorization summary records to OPFILE1 and corresponding authorization detail records to OPFILE2, preserving the parent-child relationship via a root segment key."
+        },
+        {
+          "feature": "Parent-Child Traversal",
+          "description": "For each root summary segment found, iterates through all associated child detail segments until no more children exist (GE status), ensuring complete data extraction."
+        },
+        {
+          "feature": "Record Counting",
+          "description": "Tracks counts of summary records read, detail records read, and total records written for operational reporting and reconciliation."
+        },
+        {
+          "feature": "Error Handling and Abend",
+          "description": "Detects IMS call failures and file open/close errors, displays diagnostic information including PCB status and key feedback area, and terminates with return code 16 on critical errors."
+        },
+        {
+          "feature": "End-of-Database Detection",
+          "description": "Recognizes the IMS 'GB' (end of database) status code to gracefully terminate the main processing loop after all records have been read."
+        },
+        {
+          "feature": "Numeric Account ID Validation",
+          "description": "Validates that the account ID (PA-ACCT-ID) is numeric before writing a summary record and processing its children, preventing invalid records from being unloaded."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "PAUTBPCB (IMS PCB - PAUTSUM0/PAUTDTL1)",
+        "type": "Read",
+        "description": "IMS database accessed via CBLTDLI calls. Root segment PAUTSUM0 (PENDING-AUTH-SUMMARY) is read sequentially using GN function to retrieve pending authorization summary records. Child segment PAUTDTL1 (PENDING-AUTH-DETAILS) is read using GNP function to retrieve pending authorization detail records for each summary."
+      },
+      {
+        "name": "OPFILE1",
+        "type": "Write",
+        "description": "Sequential output file (OUTFIL1) that receives the PENDING-AUTH-SUMMARY root segment records (100 bytes each). Only records where PA-ACCT-ID is numeric are written."
+      },
+      {
+        "name": "OPFILE2",
+        "type": "Write",
+        "description": "Sequential output file (OUTFIL2) that receives the PENDING-AUTH-DETAILS child segment records. Each record contains a ROOT-SEG-KEY (S9(11) COMP-3) and CHILD-SEG-REC (200 bytes) holding the authorization detail data."
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Accepts current date and Julian date from system, opens two sequential output files (OPFILE1 and OPFILE2). Abends if either file fails to open.",
+          "records": [
+            "CURRENT-DATE",
+            "CURRENT-YYDDD",
+            "WS-OUTFL1-STATUS",
+            "WS-OUTFL2-STATUS"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Root (Summary) IMS Segment",
+          "description": "Issues a GN (Get Next) call via CBLTDLI to the IMS database using the unqualified SSA for segment PAUTSUM0, retrieving the next PENDING-AUTH-SUMMARY root segment. Increments summary read and processed counters.",
+          "records": [
+            "PENDING-AUTH-SUMMARY",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB",
+            "WS-NO-SUMRY-READ",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "ROOT-UNQUAL-SSA"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Validate and Write Summary Record to OPFILE1",
+          "description": "If the IMS GN call succeeds (status = spaces), moves PENDING-AUTH-SUMMARY to OPFIL1-REC and writes it to OPFILE1, but only if PA-ACCT-ID is numeric. Also sets ROOT-SEG-KEY from PA-ACCT-ID for use in OPFIL2-REC.",
+          "records": [
+            "OPFIL1-REC",
+            "PA-ACCT-ID",
+            "ROOT-SEG-KEY",
+            "WS-OUTFL1-STATUS"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Child (Detail) IMS Segment",
+          "description": "Issues a GNP (Get Next within Parent) call via CBLTDLI using the unqualified SSA for segment PAUTDTL1, retrieving child PENDING-AUTH-DETAILS segments under the current root. Increments summary read and processed counters for each child found.",
+          "records": [
+            "PENDING-AUTH-DETAILS",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB",
+            "WS-NO-SUMRY-READ",
+            "WS-AUTH-SMRY-PROC-CNT",
+            "CHILD-UNQUAL-SSA"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Write Detail Record to OPFILE2",
+          "description": "If the GNP call succeeds (status = spaces), moves PENDING-AUTH-DETAILS to CHILD-SEG-REC within OPFIL2-REC and writes the record to OPFILE2. The record includes ROOT-SEG-KEY (parent key) and CHILD-SEG-REC (detail data).",
+          "records": [
+            "OPFIL2-REC",
+            "ROOT-SEG-KEY",
+            "CHILD-SEG-REC",
+            "WS-OUTFL2-STATUS"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Detect End of Child Segments",
+          "description": "If GNP returns status 'GE' (segment not found), sets WS-END-OF-CHILD-SEG to 'Y', terminating the child read loop for the current root segment and returning control to the root read loop.",
+          "records": [
+            "PAUT-PCB-STATUS",
+            "WS-END-OF-CHILD-SEG"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Detect End of IMS Database",
+          "description": "If GN returns status 'GB' (end of database), sets WS-END-OF-ROOT-SEG to 'Y', terminating the outer root segment read loop and proceeding to file close.",
+          "records": [
+            "PAUT-PCB-STATUS",
+            "WS-END-OF-ROOT-SEG",
+            "WS-END-OF-AUTHDB-FLAG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Close Output Files",
+          "description": "Closes both OPFILE1 and OPFILE2 sequentially. Displays an error message if either file close returns a non-zero status, but does not abend on close errors.",
+          "records": [
+            "WS-OUTFL1-STATUS",
+            "WS-OUTFL2-STATUS"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Abend Handling",
+          "description": "If any unexpected IMS status code is returned from GN or GNP calls, or if output files fail to open, sets RETURN-CODE to 16 and issues GOBACK to terminate the program abnormally.",
+          "records": [
+            "RETURN-CODE",
+            "PAUT-PCB-STATUS",
+            "PAUT-KEYFB"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "IMS PCB Scheduling (PAUTBPCB)",
+          "description": "The program depends on the IMS PSB being successfully scheduled before any CBLTDLI calls are made. The PCB mask PAUTBPCB is passed via the ENTRY 'DLITCBL' linkage and must be valid for all IMS database calls. If the PSB cannot be scheduled (status 'TE') or is scheduled more than once ('TC'), the program will encounter unexpected behavior."
+        },
+        {
+          "dependency": "Root-before-Child Segment Read Order",
+          "description": "The GNP call in paragraph 3000-FIND-NEXT-AUTH-DTL is strictly dependent on a successful prior GN call in 2000-FIND-NEXT-AUTH-SUMMARY establishing parentage. GNP retrieves child segments (PAUTDTL1) only within the context of the last successfully retrieved root segment (PAUTSUM0). Out-of-order calls would result in 'GP' (wrong parentage) errors."
+        },
+        {
+          "dependency": "PA-ACCT-ID Numeric Validation Gate",
+          "description": "Writing to OPFILE1 and initiating the child segment read loop are both conditionally gated on PA-ACCT-ID being numeric. If PA-ACCT-ID is non-numeric, neither the root record is written nor are child records retrieved or written for that root segment, creating a silent data skip dependency."
+        },
+        {
+          "dependency": "OPFILE1 Must Be Open Before Write",
+          "description": "OPFILE1 must be successfully opened in 1000-INITIALIZE before any WRITE to OPFIL1-REC in paragraph 2000. The program abends during initialization if the open fails, ensuring this dependency is enforced."
+        },
+        {
+          "dependency": "OPFILE2 Must Be Open Before Write",
+          "description": "OPFILE2 must be successfully opened in 1000-INITIALIZE before any WRITE to OPFIL2-REC in paragraph 3000. The program abends during initialization if the open fails, ensuring this dependency is enforced."
+        },
+        {
+          "dependency": "ROOT-SEG-KEY Set Before Child Write",
+          "description": "ROOT-SEG-KEY in OPFIL2-REC is populated from PA-ACCT-ID of the current root segment before the child read loop begins. All child records written to OPFILE2 carry this key, linking them to their parent. This key must be correctly set in step 3 before step 5 executes."
+        },
+        {
+          "dependency": "WS-END-OF-CHILD-SEG Reset Per Root Iteration",
+          "description": "WS-END-OF-CHILD-SEG is initialized (INITIALIZE) before each child read loop invocation within the root segment processing block. If not reset, a prior 'GE' condition would prevent child records from being read for subsequent root segments."
+        },
+        {
+          "dependency": "PAUT-PCB-STATUS Reset After Child Read",
+          "description": "PAUT-PCB-STATUS is explicitly initialized (INITIALIZE PAUT-PCB-STATUS) at the end of paragraph 3000 and at the start of paragraph 2000. This prevents stale IMS status codes from incorrectly influencing subsequent conditional logic."
+        },
+        {
+          "dependency": "Copybook Field Availability (CIPAUSMY, CIPAUDTY)",
+          "description": "The program depends on PA-ACCT-ID being defined within the CIPAUSMY copybook (used in PENDING-AUTH-SUMMARY) and on PENDING-AUTH-DETAILS fields being defined in CIPAUDTY. The correctness of field mappings to ROOT-SEG-KEY and CHILD-SEG-REC depends entirely on these copybook layouts."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM IMS (Information Management System)",
+          "type": "Hierarchical Database",
+          "purpose": "Primary data source. The program reads all PAUTSUM0 (Pending Authorization Summary) root segments and their PAUTDTL1 (Pending Authorization Detail) child segments from the IMS database using CBLTDLI calls (GN and GNP functions) via the PSB defined in PAUTBPCB, unloading the data to sequential flat files."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Operation Errors",
+        "description": "File status codes are checked after OPEN operations for OPFILE1 and OPFILE2. If the status is not SPACES or '00', an error message is displayed showing the file name and status code, then 9999-ABEND is invoked. On CLOSE, status is checked similarly but only a warning message is displayed without triggering an abend, allowing the program to continue closing remaining files."
+      },
+      {
+        "category": "IMS Database Call Errors - Root Segment (GN)",
+        "description": "After each GN (Get Next) call on the root segment PAUTSUM0, the PCB status is evaluated. A status of SPACES indicates success and processing continues. A status of 'GB' (end of database) sets the WS-END-OF-ROOT-SEG flag to 'Y' to terminate the main loop. Any other unexpected status triggers a DISPLAY of the PCB status and key feedback area (PAUT-KEYFB), followed by a call to 9999-ABEND."
+      },
+      {
+        "category": "IMS Database Call Errors - Child Segment (GNP)",
+        "description": "After each GNP (Get Next within Parent) call on the child segment PAUTDTL1, the PCB status is evaluated. A status of SPACES indicates success and the child record is written to OPFILE2. A status of 'GE' (segment not found / no more children) sets WS-END-OF-CHILD-SEG to 'Y' and displays a diagnostic message to terminate the child loop. Any other unexpected status triggers a DISPLAY of the PCB status and key feedback area, followed by a call to 9999-ABEND. The PCB status is also re-initialized after each GNP call."
+      },
+      {
+        "category": "Data Validation Errors",
+        "description": "A basic numeric check is performed on the PA-ACCT-ID field before writing the root segment record to OPFILE1 and before initiating child segment processing. If PA-ACCT-ID is not numeric, the write and child processing are skipped silently with no error message or abend, representing a passive data filtering approach."
+      },
+      {
+        "category": "Abend / Fatal Error Handling",
+        "description": "The centralized 9999-ABEND paragraph handles all fatal errors. It displays the message 'IMSUNLOD ABENDING ...', sets RETURN-CODE to 16 to signal a severe failure to the calling environment or job scheduler, and then executes GOBACK to terminate the program. No rollback or cleanup of open files is performed before termination."
+      }
+    ]
+  }
+}

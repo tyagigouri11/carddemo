@@ -1,0 +1,77 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "READCUST.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **READCUST**, is designed to read customer master data stored in a VSAM Key-Sequenced Data Set (KSDS). It executes the program **CBCUS01C**, which processes the customer data file (**AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS**) as part of the CardDemo application, a credit card management system. The job's primary business purpose is to retrieve and process customer records from the master file, with all output directed to the system output for logging and reporting.",
+      "parameters": [
+        {
+          "name": "JOB NAME",
+          "value": "READCUST",
+          "description": "The name assigned to the job, used to identify the job in the system and in job logs. It must be unique within the JES spool."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'Read Customer Data file'",
+          "description": "A positional parameter providing accounting or descriptive information for the job. This string is used for job identification and billing purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input class) that determines which initiator will pick up and execute the job. Class A typically represents a general-purpose job class with standard priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log (JES message log), which includes JCL statements, allocation/deallocation messages, and job completion information. Class 0 directs the job log to a specific output destination defined by the installation."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYUID is automatically resolved to the submitting user's TSO ID, so that user receives a notification message upon job completion or failure."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Reads the Customer Master VSAM KSDS file (AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS) as part of the CardDemo application. The program CBCUS01C processes customer data records from the VSAM dataset.",
+        "programs": "CBCUS01C",
+        "inputs": "CUSTFILE: AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+        "outputs": "SYSOUT (console output), SYSPRINT (print output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Load library accessed to load the CBCUS01C program executable for execution"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CUSTDATA.VSAM.KSDS",
+        "operations": "READ",
+        "description": "Customer master VSAM KSDS file opened and read by program CBCUS01C via the CUSTFILE DD statement"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "Program output written to system output via SYSOUT DD statement"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSPRINT",
+        "operations": "WRITE",
+        "description": "Program print output written to system output via SYSPRINT DD statement"
+      }
+    ]
+  }
+}

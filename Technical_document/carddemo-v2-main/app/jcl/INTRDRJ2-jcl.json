@@ -1,0 +1,78 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "INTRDRJ2.JCL",
+        "type": "jcl"
+      },
+      "overview": "This JCL job is designed to create physical VSAM files for an IMS database (DEMODB) and its associated index (DEMODX) as part of a COBOL-based Car Demo application. It utilizes the IDCAMS utility to execute a REPRO command, which copies data from a source dataset (AWS.M2.CARDEMO.FTP.TEST.BKUP) to a target dataset (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR). The job essentially serves as a data migration or backup restoration step, transferring records between two pre-existing shared datasets to support the IMS database infrastructure.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "INTRDRJ2",
+          "description": "The JOB statement marks the beginning of a job and assigns the job name INTRDRJ2, which uniquely identifies this job to the system."
+        },
+        {
+          "name": "ACCT",
+          "value": "COBOL",
+          "description": "The accounting information parameter used for job accounting and billing purposes, here set to COBOL to categorize the job under a specific account."
+        },
+        {
+          "name": "PROGRAMMER",
+          "value": "KSSOMAS",
+          "description": "Identifies the programmer or user responsible for the job, used for informational and notification purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class A, which determines the job entry subsystem (JES) input queue the job is placed in, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "H",
+          "description": "Specifies the output class H for the job log and system messages, determining where the job's message output (JES job log) is routed."
+        },
+        {
+          "name": "MSGLEVEL",
+          "value": "(1,1)",
+          "description": "Controls the level of messages printed in the job log. The first value 1 prints all JCL statements including those from procedures, and the second value 1 prints all system and operator messages including allocation/termination messages."
+        },
+        {
+          "name": "REGION",
+          "value": "5M",
+          "description": "Specifies the maximum amount of virtual storage (5 megabytes) available to all steps in the job, controlling memory allocation for the entire job execution."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies that a notification message is sent to the submitting user (resolved from the system symbolic &SYSUID) upon job completion or abnormal termination."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "IDCAMS",
+        "purpose": "Copies data from the source dataset AWS.M2.CARDEMO.FTP.TEST.BKUP to the target dataset AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR using the IDCAMS REPRO command. This step is part of creating physical VSAM files for IMS DEMODB and index DEMODX.",
+        "programs": "IDCAMS*",
+        "inputs": "IN (AWS.M2.CARDEMO.FTP.TEST.BKUP), SYSIN (REPRO command)",
+        "outputs": "OUT (AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR); SYSPRINT"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "IDCAMS",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDEMO.FTP.TEST.BKUP",
+        "operations": "READ",
+        "description": "IDCAMS REPRO reads input dataset AWS.M2.CARDEMO.FTP.TEST.BKUP via DD name IN"
+      },
+      {
+        "step": "IDCAMS",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR",
+        "operations": "WRITE",
+        "description": "IDCAMS REPRO writes copied records to output dataset AWS.M2.CARDEMO.FTP.TEST.BKUP.INTRDR via DD name OUT"
+      }
+    ]
+  }
+}

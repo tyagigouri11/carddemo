@@ -1,0 +1,306 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBACT04C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBACT04C is a batch interest calculation program within the CardDemo credit card management application. It operates as part of the end-of-cycle billing workflow, processing transaction category balances across all accounts to compute and post monthly interest charges. The program reads transaction category balance records sequentially, looks up applicable interest rates based on account group and transaction type, computes monthly interest using an annualized rate divided by 1200, and writes interest charge transactions back to the transaction file while updating account balances. It solves the business need to automate periodic interest accrual across a credit card portfolio without manual intervention.",
+      "key_features": [
+        {
+          "feature": "Sequential Account Processing",
+          "description": "Reads transaction category balance records sequentially, grouping and processing all categories per account before moving to the next account."
+        },
+        {
+          "feature": "Interest Rate Lookup",
+          "description": "Retrieves applicable interest rates from a disclosure group file based on the account's group ID, transaction type, and transaction category code."
+        },
+        {
+          "feature": "Default Rate Fallback",
+          "description": "If no specific disclosure group rate is found for an account, the program falls back to a 'DEFAULT' group interest rate to ensure all balances are charged."
+        },
+        {
+          "feature": "Monthly Interest Computation",
+          "description": "Calculates monthly interest by applying the annual interest rate divided by 1200 to the transaction category balance, accumulating totals per account."
+        },
+        {
+          "feature": "Interest Transaction Writing",
+          "description": "Generates and writes a formal interest charge transaction record to the transaction file for each category balance where interest applies, with a system-generated transaction ID."
+        },
+        {
+          "feature": "Account Balance Update",
+          "description": "After processing all transaction categories for an account, updates the account master record by adding total interest to the current balance and resetting cycle credit and debit fields."
+        },
+        {
+          "feature": "Cross-Reference Lookup",
+          "description": "Uses a card-to-account cross-reference file to associate the correct card number with each interest transaction record written."
+        },
+        {
+          "feature": "Error Handling and Abend",
+          "description": "Checks file status codes after every I/O operation and abends the program with a system call to CEE3ABD if any unexpected errors occur, ensuring data integrity."
+        },
+        {
+          "feature": "Fee Calculation Placeholder",
+          "description": "Contains a stub paragraph (1400-COMPUTE-FEES) reserved for future implementation of fee calculations alongside interest charges."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "TCATBAL-FILE",
+        "type": "Read",
+        "description": "Transaction Category Balance file (TCATBALF) - sequentially read to retrieve transaction category balance records containing account ID, transaction type code, transaction category code, and balance amounts used as the primary driver for interest calculations"
+      },
+      {
+        "name": "XREF-FILE",
+        "type": "Read",
+        "description": "Card Cross-Reference file (XREFFILE) - randomly read by account ID to retrieve the card number associated with each account, used to populate transaction records written to the output transaction file"
+      },
+      {
+        "name": "DISCGRP-FILE",
+        "type": "Read",
+        "description": "Disclosure Group file (DISCGRP) - randomly read by account group ID, transaction type code, and transaction category code to retrieve the applicable interest rate for each transaction category; falls back to a DEFAULT group record if the specific group is not found"
+      },
+      {
+        "name": "ACCOUNT-FILE",
+        "type": "Read/Write",
+        "description": "Account Master file (ACCTFILE) - randomly read to retrieve account details including current balance, credit limits, and account group ID; updated (rewritten) at the end of each account group to add computed total interest charges to the current balance and reset cycle credit/debit accumulators"
+      },
+      {
+        "name": "TRANSACT-FILE",
+        "type": "Write",
+        "description": "Transaction file (TRANSACT) - sequentially written with new interest charge transaction records generated for each transaction category that has a non-zero interest rate, capturing transaction ID, type, category, source, description, interest amount, card number, and timestamps"
+      },
+      {
+        "name": "EXTERNAL-PARMS",
+        "type": "Read",
+        "description": "Linkage section parameter passed to the program at execution time containing a date value (PARM-DATE) used as a prefix when constructing unique transaction IDs for the interest charge transaction records written to the output file"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Receives external parameter containing a processing date (PARM-DATE) via LINKAGE SECTION, then opens all required files: TCATBAL-FILE (input/sequential), XREF-FILE (input/random), DISCGRP-FILE (input/random), ACCOUNT-FILE (I-O/random), and TRANSACT-FILE (output/sequential). Any file open failure triggers an immediate abend.",
+          "records": [
+            "PARM-DATE",
+            "PARM-LENGTH"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Read Transaction Category Balance Record",
+          "description": "Sequentially reads the next record from TCATBAL-FILE into TRAN-CAT-BAL-RECORD. Sets END-OF-FILE flag to 'Y' on EOF condition. Any non-EOF read error triggers an abend. Increments WS-RECORD-COUNT for each successful read.",
+          "records": [
+            "FD-TRAN-CAT-KEY",
+            "FD-TRANCAT-ACCT-ID",
+            "FD-TRANCAT-TYPE-CD",
+            "FD-TRANCAT-CD",
+            "FD-FD-TRAN-CAT-DATA",
+            "TRAN-CAT-BAL-RECORD",
+            "WS-RECORD-COUNT"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Account Change Detection and Prior Account Update",
+          "description": "Compares TRANCAT-ACCT-ID from the current record against WS-LAST-ACCT-NUM. If a new account is detected and it is not the very first record (WS-FIRST-TIME = 'N'), triggers 1050-UPDATE-ACCOUNT to persist the accumulated interest for the prior account before switching context. On first record, sets WS-FIRST-TIME to 'N'. Resets WS-TOTAL-INT to zero for the new account.",
+          "records": [
+            "TRANCAT-ACCT-ID",
+            "WS-LAST-ACCT-NUM",
+            "WS-FIRST-TIME",
+            "WS-TOTAL-INT"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Retrieve Account Master Data",
+          "description": "When a new account is encountered, moves TRANCAT-ACCT-ID to FD-ACCT-ID and performs a random READ on ACCOUNT-FILE into ACCOUNT-RECORD. Retrieves account details including ACCT-CURR-BAL, ACCT-GROUP-ID, ACCT-CURR-CYC-CREDIT, ACCT-CURR-CYC-DEBIT, and ACCT-ID. Abends if account is not found or read error occurs.",
+          "records": [
+            "FD-ACCT-ID",
+            "ACCOUNT-RECORD",
+            "ACCT-CURR-BAL",
+            "ACCT-GROUP-ID",
+            "ACCT-ID",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Retrieve Card Cross-Reference Data",
+          "description": "When a new account is encountered, moves TRANCAT-ACCT-ID to FD-XREF-ACCT-ID and performs a random READ on XREF-FILE using the alternate key FD-XREF-ACCT-ID into CARD-XREF-RECORD. Retrieves the card number (XREF-CARD-NUM) associated with the account, which is later used when writing interest transactions.",
+          "records": [
+            "FD-XREF-ACCT-ID",
+            "CARD-XREF-RECORD",
+            "XREF-CARD-NUM",
+            "FD-XREF-CARD-NUM",
+            "FD-XREF-CUST-NUM"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Retrieve Interest Rate from Disclosure Group",
+          "description": "Moves ACCT-GROUP-ID, TRANCAT-CD, and TRANCAT-TYPE-CD into the DISCGRP-FILE key fields (FD-DIS-ACCT-GROUP-ID, FD-DIS-TRAN-CAT-CD, FD-DIS-TRAN-TYPE-CD) and performs a random READ on DISCGRP-FILE into DIS-GROUP-RECORD. If the specific group record is not found (status '23'), falls back to reading a 'DEFAULT' group record via 1200-A-GET-DEFAULT-INT-RATE. Retrieves DIS-INT-RATE for the interest calculation.",
+          "records": [
+            "FD-DIS-ACCT-GROUP-ID",
+            "FD-DIS-TRAN-TYPE-CD",
+            "FD-DIS-TRAN-CAT-CD",
+            "DIS-GROUP-RECORD",
+            "DIS-INT-RATE",
+            "ACCT-GROUP-ID",
+            "TRANCAT-CD",
+            "TRANCAT-TYPE-CD"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Compute Monthly Interest",
+          "description": "If DIS-INT-RATE is non-zero, computes monthly interest as (TRAN-CAT-BAL * DIS-INT-RATE) / 1200 and stores the result in WS-MONTHLY-INT. Accumulates WS-MONTHLY-INT into WS-TOTAL-INT for the current account across all transaction categories.",
+          "records": [
+            "TRAN-CAT-BAL",
+            "DIS-INT-RATE",
+            "WS-MONTHLY-INT",
+            "WS-TOTAL-INT"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Write Interest Transaction Record",
+          "description": "Constructs a new transaction record (TRAN-RECORD) representing the computed interest charge. Generates a unique TRAN-ID by concatenating PARM-DATE and an incrementing WS-TRANID-SUFFIX. Populates transaction fields including type '01', category '05', source 'System', description with account ID, amount from WS-MONTHLY-INT, card number from XREF-CARD-NUM, and timestamps from the current system date/time. Writes the record sequentially to TRANSACT-FILE.",
+          "records": [
+            "TRAN-ID",
+            "TRAN-TYPE-CD",
+            "TRAN-CAT-CD",
+            "TRAN-SOURCE",
+            "TRAN-DESC",
+            "TRAN-AMT",
+            "TRAN-MERCHANT-ID",
+            "TRAN-MERCHANT-NAME",
+            "TRAN-MERCHANT-CITY",
+            "TRAN-MERCHANT-ZIP",
+            "TRAN-CARD-NUM",
+            "TRAN-ORIG-TS",
+            "TRAN-PROC-TS",
+            "TRAN-RECORD",
+            "WS-TRANID-SUFFIX",
+            "DB2-FORMAT-TS"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Compute Fees (Stub)",
+          "description": "Paragraph 1400-COMPUTE-FEES is called after interest computation when DIS-INT-RATE is non-zero, but contains only an EXIT statement. Fee calculation logic is not yet implemented.",
+          "records": []
+        },
+        {
+          "step": 10,
+          "process": "Update Account Balance on EOF",
+          "description": "When END-OF-FILE is detected, the main loop performs one final 1050-UPDATE-ACCOUNT to persist the accumulated interest for the last account processed. Adds WS-TOTAL-INT to ACCT-CURR-BAL, resets ACCT-CURR-CYC-CREDIT and ACCT-CURR-CYC-DEBIT to zero, and REWRITEs the ACCOUNT-FILE record. Abends on rewrite failure.",
+          "records": [
+            "WS-TOTAL-INT",
+            "ACCT-CURR-BAL",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "FD-ACCTFILE-REC",
+            "ACCOUNT-RECORD"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Program Termination",
+          "description": "Closes all five files in sequence: TCATBAL-FILE, XREF-FILE, DISCGRP-FILE, ACCOUNT-FILE, and TRANSACT-FILE. Any close failure triggers an abend. Displays end-of-execution message and returns control via GOBACK.",
+          "records": [
+            "TCATBALF-STATUS",
+            "XREFFILE-STATUS",
+            "DISCGRP-STATUS",
+            "ACCTFILE-STATUS",
+            "TRANFILE-STATUS"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Sequential ordering of TCATBAL-FILE by account ID",
+          "description": "The program's account-change detection logic (comparing TRANCAT-ACCT-ID to WS-LAST-ACCT-NUM) relies entirely on TCATBAL-FILE being physically sorted by account ID. If records for the same account are not contiguous, the account update (1050-UPDATE-ACCOUNT) will be triggered prematurely, resulting in partial interest accumulation and incorrect balance updates."
+        },
+        {
+          "dependency": "ACCOUNT-FILE must be opened I-O before processing begins",
+          "description": "ACCOUNT-FILE is opened in I-O mode (paragraph 0300-ACCTFILE-OPEN) to support both READ (1100-GET-ACCT-DATA) and REWRITE (1050-UPDATE-ACCOUNT) operations. The account data read in step 4 populates ACCOUNT-RECORD, which is then modified and rewritten in step 10. The in-memory ACCOUNT-RECORD must remain intact between these two operations for the correct record to be rewritten."
+        },
+        {
+          "dependency": "XREF-FILE lookup must succeed before transaction write",
+          "description": "XREF-CARD-NUM retrieved from XREF-FILE in paragraph 1110-GET-XREF-DATA is used to populate TRAN-CARD-NUM in every interest transaction written to TRANSACT-FILE. If the cross-reference lookup fails, the card number field in the output transaction will be incorrect or blank."
+        },
+        {
+          "dependency": "DISCGRP-FILE fallback to DEFAULT group",
+          "description": "Paragraph 1200-GET-INTEREST-RATE first attempts to read the disclosure group record using the account's specific ACCT-GROUP-ID. If not found (status '23'), it falls back to reading a record keyed with 'DEFAULT' as the group ID. If neither the specific nor the DEFAULT record exists, the program abends. The fallback logic depends on a 'DEFAULT' keyed record being present in DISCGRP-FILE."
+        },
+        {
+          "dependency": "WS-FIRST-TIME flag controls initial account update suppression",
+          "description": "WS-FIRST-TIME is initialized to 'Y' and set to 'N' only when the first account change is detected. This prevents 1050-UPDATE-ACCOUNT from being called before any account data has been loaded into ACCOUNT-RECORD, which would cause a rewrite of an uninitialized or stale record."
+        },
+        {
+          "dependency": "WS-TOTAL-INT accumulation scope per account",
+          "description": "WS-TOTAL-INT is reset to zero only when a new account ID is detected. It accumulates interest across all transaction category balance records for the same account. The final accumulated value is written to ACCT-CURR-BAL during 1050-UPDATE-ACCOUNT. Any interruption or reordering of records within an account group will produce an incorrect total."
+        },
+        {
+          "dependency": "PARM-DATE required for unique transaction ID generation",
+          "description": "The TRAN-ID for each interest transaction is constructed by concatenating PARM-DATE (from the LINKAGE SECTION) with WS-TRANID-SUFFIX. If PARM-DATE is not supplied or is blank, all generated transaction IDs will be malformed, potentially causing duplicate key issues if the output file is later loaded into an indexed structure."
+        },
+        {
+          "dependency": "TRANSACT-FILE opened as OUTPUT (not EXTEND)",
+          "description": "TRANSACT-FILE is opened with OUTPUT mode, which will overwrite any existing file content each run. This means the program is not designed to append to an existing transaction file; each execution produces a fresh output file containing only the interest transactions for that run."
+        },
+        {
+          "dependency": "Timestamp dependency on system clock",
+          "description": "Paragraph Z-GET-DB2-FORMAT-TIMESTAMP uses FUNCTION CURRENT-DATE to populate both TRAN-ORIG-TS and TRAN-PROC-TS for each written transaction. Both timestamps will reflect the actual wall-clock time at the moment of writing, meaning they are not derived from PARM-DATE and may differ from the intended processing date."
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "Each of the five files (TCATBAL, XREF, DISCGRP, ACCOUNT, TRANSACT) has a dedicated open paragraph. After each OPEN, the file status is checked against '00'. If not successful, APPL-RESULT is set to 12, a descriptive DISPLAY message is issued, IO-STATUS is populated, 9910-DISPLAY-IO-STATUS is called to format and display the status code, and 9999-ABEND-PROGRAM is called to terminate the program abnormally via CEE3ABD."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "Sequential reads on TCATBAL-FILE distinguish between normal (status '00', APPL-RESULT=0), end-of-file (status '10', APPL-RESULT=16 triggering END-OF-FILE='Y'), and hard errors (any other status, APPL-RESULT=12 triggering abend). Random reads on ACCOUNT-FILE and XREF-FILE use INVALID KEY clauses to display a 'NOT FOUND' message, then check file status; non-zero status triggers display, IO-STATUS formatting, and program abend."
+      },
+      {
+        "category": "Disclosure Group (Interest Rate) Lookup Errors",
+        "description": "When reading DISCGRP-FILE, both status '00' (found) and '23' (not found / key not present) are treated as acceptable outcomes (APPL-RESULT=0). A status of '23' triggers a fallback: the account group ID is replaced with 'DEFAULT' and paragraph 1200-A-GET-DEFAULT-INT-RATE is performed to retry the read. Any other non-zero status causes an abend. If the default group read also fails, the program abends."
+      },
+      {
+        "category": "File Write Errors",
+        "description": "After writing each interest transaction record to TRANSACT-FILE in paragraph 1300-B-WRITE-TX, the file status is checked. A status of '00' sets APPL-RESULT=0; any other status sets APPL-RESULT=12, displays 'ERROR WRITING TRANSACTION RECORD', formats and displays the IO-STATUS via 9910-DISPLAY-IO-STATUS, and calls 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "File Rewrite Errors",
+        "description": "In paragraph 1050-UPDATE-ACCOUNT, after the REWRITE of the account record, the ACCTFILE-STATUS is checked. A non-zero status sets APPL-RESULT=12, displays 'ERROR RE-WRITING ACCOUNT FILE', formats the IO-STATUS, and triggers an abend. There is no partial-update recovery; any rewrite failure immediately terminates the program."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "Each of the five files has a dedicated close paragraph (9000–9400). After each CLOSE, the file status is checked against '00'. A non-zero status sets APPL-RESULT=12, displays a file-specific error message, formats and displays IO-STATUS via 9910-DISPLAY-IO-STATUS, and calls 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "IO Status Formatting and Display",
+        "description": "Paragraph 9910-DISPLAY-IO-STATUS provides centralized formatting of file status codes. It handles both numeric and non-numeric (platform/system, e.g., status starting with '9') status values. For system statuses, it converts the second byte to a binary integer for display. For standard statuses, it formats them into a four-digit display field. This paragraph is always called before abending to provide diagnostic detail."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "Paragraph 9999-ABEND-PROGRAM provides a single centralized abend mechanism. It displays 'ABENDING PROGRAM', sets TIMING=0 and ABCODE=999, then calls the IBM LE routine 'CEE3ABD' to force an abnormal termination with a user abend code. This ensures the batch job fails visibly with a non-zero return code rather than completing silently with bad data."
+      },
+      {
+        "category": "End-of-File Handling",
+        "description": "End-of-file on the primary sequential input file (TCATBAL-FILE) is treated as a controlled, non-error condition. When status '10' is detected, END-OF-FILE is set to 'Y'. The main processing loop detects this flag and performs a final 1050-UPDATE-ACCOUNT for the last account group before exiting the loop, ensuring no pending account update is lost at end of input."
+      },
+      {
+        "category": "Missing or Incomplete Error Handling",
+        "description": "Paragraph 1400-COMPUTE-FEES is a stub containing only EXIT, meaning fee computation is unimplemented with no error handling. Additionally, when an account or XREF record is not found via INVALID KEY, only a DISPLAY message is issued and processing continues without abending, which could result in downstream calculations using stale or zeroed working-storage data rather than valid account information."
+      }
+    ]
+  }
+}

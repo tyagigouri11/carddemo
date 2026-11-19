@@ -1,0 +1,637 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COACTUPC.cbl",
+        "type": "cobol",
+        "transaction_id": "CAUP"
+      },
+      "overview": "COACTUPC is a business logic component within a CICS-based credit card management system, operating as part of an interactive mainframe application that manages credit card accounts and associated customer data. It serves as the account update transaction (CAUP), sitting between the main menu and other card management screens in the application workflow. The program accepts user input from a formatted screen, validates all account and customer fields, detects changes against previously fetched data, and commits approved updates to the account master (ACCTDAT) and customer master (CUSTDAT) files, ensuring data integrity through optimistic locking and change detection before any write operations are performed.",
+      "key_features": [
+        {
+          "feature": "Account Data Retrieval",
+          "description": "Looks up account information by account ID, cross-referencing the card cross-reference file (CXACAIX), account master file (ACCTDAT), and customer master file (CUSTDAT) to populate the update screen with current values."
+        },
+        {
+          "feature": "Comprehensive Input Validation",
+          "description": "Validates all editable fields including account status (Y/N), financial amounts (credit limit, cash limit, balances, cycle credits/debits), dates (open, expiry, reissue, date of birth), US SSN format, FICO score range (300-850), names, addresses, US state codes, zip codes, and US phone numbers with area code validation."
+        },
+        {
+          "feature": "Change Detection",
+          "description": "Compares all new user-entered values against the originally fetched old values to determine if any actual changes were made, preventing unnecessary database writes and prompting the user only when real modifications are detected."
+        },
+        {
+          "feature": "Two-Step Confirmation Workflow",
+          "description": "Implements a confirm-before-save pattern where validated changes are presented back to the user for review, requiring an explicit PF5 keypress to commit, reducing accidental updates to account and customer records."
+        },
+        {
+          "feature": "Optimistic Locking and Concurrency Control",
+          "description": "Before writing updates, re-reads both account and customer records with an UPDATE lock and compares current file values against the originally fetched snapshot to detect concurrent modifications by other users, preventing overwrite conflicts."
+        },
+        {
+          "feature": "Dual-Record Update",
+          "description": "Atomically updates both the account master record and the customer master record within the same transaction, with rollback capability if the customer record update fails after the account record has already been rewritten."
+        },
+        {
+          "feature": "Dynamic Screen Attribute Management",
+          "description": "Controls field-level screen attributes (protected/unprotected, color highlighting, cursor positioning) based on the current processing state, highlighting fields in error in red and positioning the cursor at the first invalid field to guide the user."
+        },
+        {
+          "feature": "PF Key Navigation",
+          "description": "Supports PF3 to exit back to the calling program or main menu, PF5 to confirm and save validated changes, and PF12 to cancel pending edits and refresh the screen with the original fetched data."
+        },
+        {
+          "feature": "Abend Handling",
+          "description": "Includes a structured abend routine that captures unexpected errors, displays diagnostic information to the user, and terminates the transaction with a defined abend code (9999) to support problem diagnosis."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "ACCTDAT",
+        "type": "Read/Write",
+        "description": "Account master file - read to retrieve account details for display and locked/updated when saving account changes"
+      },
+      {
+        "name": "CUSTDAT",
+        "type": "Read/Write",
+        "description": "Customer master file - read to retrieve customer details associated with an account and locked/updated when saving customer changes"
+      },
+      {
+        "name": "CXACAIX",
+        "type": "Read",
+        "description": "Card cross-reference alternate index file accessed by account ID - used to look up card number and customer ID associated with a given account"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and COMMAREA Initialization",
+          "description": "Program receives control via CICS. If first entry or coming from menu, initializes CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA. Otherwise restores state from DFHCOMMAREA passed by caller. Sets transaction ID to 'CAUP'.",
+          "records": [
+            "DFHCOMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-REENTER",
+            "ACUP-CHANGE-ACTION"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "PF Key Capture and Validation",
+          "description": "Stores the AID key pressed by the user (Enter, PF03, PF05, PF12) via CSSTRPFY copybook routine. Validates that the key is appropriate for the current program state. Invalid keys are remapped to Enter.",
+          "records": [
+            "CCARD-AID-ENTER",
+            "CCARD-AID-PFK03",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "WS-PFK-FLAG"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Main Action Routing",
+          "description": "EVALUATE TRUE block routes processing based on current state: PF03 exits to calling program or menu via XCTL; fresh entry sends blank map; completed or failed updates reset state and re-prompt; all other states proceed to input processing.",
+          "records": [
+            "ACUP-CHANGE-ACTION",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-TO-PROGRAM",
+            "LIT-MENUTRANID",
+            "LIT-MENUPGM"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "PF03 Exit - Transfer Control to Calling Program",
+          "description": "When PF03 is pressed, issues CICS SYNCPOINT then XCTL to the calling program (or main menu COMEN01C if no caller). Passes CARDDEMO-COMMAREA with updated from/to program and transaction identifiers.",
+          "records": [
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CARDDEMO-COMMAREA",
+            "LIT-THISMAPSET",
+            "LIT-THISMAP"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Receive Map Input from Terminal",
+          "description": "Issues CICS RECEIVE MAP for map CACTUPA in mapset COACTUP to capture user-entered data into CACTUPAI. Maps all screen fields to ACUP-NEW-DETAILS working storage, handling asterisk and space as LOW-VALUES. Numeric currency fields are converted using NUMVAL-C.",
+          "records": [
+            "CACTUPAI",
+            "ACUP-NEW-ACCT-ID-X",
+            "ACUP-NEW-ACTIVE-STATUS",
+            "ACUP-NEW-CREDIT-LIMIT-X",
+            "ACUP-NEW-CASH-CREDIT-LIMIT-X",
+            "ACUP-NEW-CURR-BAL-X",
+            "ACUP-NEW-CURR-CYC-CREDIT-X",
+            "ACUP-NEW-CURR-CYC-DEBIT-X",
+            "ACUP-NEW-OPEN-DATE",
+            "ACUP-NEW-EXPIRAION-DATE",
+            "ACUP-NEW-REISSUE-DATE",
+            "ACUP-NEW-GROUP-ID",
+            "ACUP-NEW-CUST-ID-X",
+            "ACUP-NEW-CUST-SSN-1",
+            "ACUP-NEW-CUST-SSN-2",
+            "ACUP-NEW-CUST-SSN-3",
+            "ACUP-NEW-CUST-DOB-YYYY-MM-DD",
+            "ACUP-NEW-CUST-FICO-SCORE-X",
+            "ACUP-NEW-CUST-FIRST-NAME",
+            "ACUP-NEW-CUST-MIDDLE-NAME",
+            "ACUP-NEW-CUST-LAST-NAME",
+            "ACUP-NEW-CUST-ADDR-LINE-1",
+            "ACUP-NEW-CUST-ADDR-LINE-2",
+            "ACUP-NEW-CUST-ADDR-LINE-3",
+            "ACUP-NEW-CUST-ADDR-STATE-CD",
+            "ACUP-NEW-CUST-ADDR-COUNTRY-CD",
+            "ACUP-NEW-CUST-ADDR-ZIP",
+            "ACUP-NEW-CUST-PHONE-NUM-1",
+            "ACUP-NEW-CUST-PHONE-NUM-2",
+            "ACUP-NEW-CUST-GOVT-ISSUED-ID",
+            "ACUP-NEW-CUST-EFT-ACCOUNT-ID",
+            "ACUP-NEW-CUST-PRI-HOLDER-IND"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Account ID Search Key Validation",
+          "description": "When no details have been fetched yet, validates the account ID entered: checks for blank/low-values, numeric format, and non-zero value. Sets FLG-ACCTFILTER flags and CDEMO-ACCT-ID accordingly. Stops further editing if search key is invalid.",
+          "records": [
+            "CC-ACCT-ID",
+            "ACUP-NEW-ACCT-ID",
+            "CDEMO-ACCT-ID",
+            "FLG-ACCTFILTER-ISVALID",
+            "FLG-ACCTFILTER-NOT-OK",
+            "FLG-ACCTFILTER-BLANK",
+            "WS-INPUT-FLAG"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Old vs New Data Comparison",
+          "description": "When details have already been fetched, compares all ACUP-NEW fields against ACUP-OLD fields for both account and customer data using case-insensitive UPPER-CASE and TRIM comparisons. Sets NO-CHANGES-FOUND or CHANGE-HAS-OCCURRED flag.",
+          "records": [
+            "ACUP-NEW-ACCT-DATA",
+            "ACUP-OLD-ACCT-DATA",
+            "ACUP-NEW-CUST-DATA",
+            "ACUP-OLD-CUST-DATA",
+            "WS-DATACHANGED-FLAG"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Field-Level Input Validation",
+          "description": "Validates all editable fields when changes are detected: account status (Y/N), dates (open/expiry/reissue/DOB) via EDIT-DATE-CCYYMMDD, numeric currency fields via 1250-EDIT-SIGNED-9V2, SSN parts via 1265-EDIT-US-SSN, FICO score range (300-850), names (alpha only), address fields, US state code, zip code, phone numbers (area code via CSLKPCDY lookup), EFT account ID, and primary cardholder flag. Cross-field edit validates state/zip combination.",
+          "records": [
+            "ACUP-NEW-ACTIVE-STATUS",
+            "ACUP-NEW-OPEN-DATE",
+            "ACUP-NEW-EXPIRAION-DATE",
+            "ACUP-NEW-REISSUE-DATE",
+            "ACUP-NEW-CREDIT-LIMIT-X",
+            "ACUP-NEW-CASH-CREDIT-LIMIT-X",
+            "ACUP-NEW-CURR-BAL-X",
+            "ACUP-NEW-CURR-CYC-CREDIT-X",
+            "ACUP-NEW-CURR-CYC-DEBIT-X",
+            "ACUP-NEW-CUST-SSN-1",
+            "ACUP-NEW-CUST-SSN-2",
+            "ACUP-NEW-CUST-SSN-3",
+            "ACUP-NEW-CUST-DOB-YYYY-MM-DD",
+            "ACUP-NEW-CUST-FICO-SCORE-X",
+            "ACUP-NEW-CUST-FIRST-NAME",
+            "ACUP-NEW-CUST-LAST-NAME",
+            "ACUP-NEW-CUST-ADDR-STATE-CD",
+            "ACUP-NEW-CUST-ADDR-ZIP",
+            "ACUP-NEW-CUST-PHONE-NUM-1",
+            "ACUP-NEW-CUST-PHONE-NUM-2",
+            "ACUP-NEW-CUST-EFT-ACCOUNT-ID",
+            "ACUP-NEW-CUST-PRI-HOLDER-IND",
+            "WS-NON-KEY-FLAGS"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Action Decision Logic",
+          "description": "Based on current ACUP-CHANGE-ACTION state and input results: if no details fetched or PF12 pressed, reads account data from files; if details shown and no errors, promotes to ACUP-CHANGES-OK-NOT-CONFIRMED; if PF05 pressed with confirmed changes, triggers write processing; handles lock errors, update failures, and concurrent modification detection.",
+          "records": [
+            "ACUP-CHANGE-ACTION",
+            "WS-INPUT-FLAG",
+            "WS-DATACHANGED-FLAG",
+            "CCARD-AID-PFK05",
+            "CCARD-AID-PFK12",
+            "FLG-ACCTFILTER-ISVALID"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Read Card Cross-Reference by Account ID",
+          "description": "Reads CXACAIX (card cross-reference alternate index by account ID) using WS-CARD-RID-ACCT-ID-X as key. On success, extracts XREF-CUST-ID into CDEMO-CUST-ID and XREF-CARD-NUM into CDEMO-CARD-NUM. On NOTFND or error, sets INPUT-ERROR and FLG-ACCTFILTER-NOT-OK.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "CARD-XREF-RECORD",
+            "XREF-CUST-ID",
+            "XREF-CARD-NUM",
+            "CDEMO-CUST-ID",
+            "CDEMO-CARD-NUM",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Read Account Master Record",
+          "description": "Reads ACCTDAT file using WS-CARD-RID-ACCT-ID-X as key into ACCOUNT-RECORD. On success sets FOUND-ACCT-IN-MASTER. On NOTFND or error, sets INPUT-ERROR and FLG-ACCTFILTER-NOT-OK with descriptive message.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "ACCT-ID",
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-GROUP-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Read Customer Master Record",
+          "description": "Reads CUSTDAT file using WS-CARD-RID-CUST-ID-X (derived from CDEMO-CUST-ID) as key into CUSTOMER-RECORD. On success sets FOUND-CUST-IN-MASTER. On NOTFND or error, sets INPUT-ERROR and FLG-CUSTFILTER-NOT-OK.",
+          "records": [
+            "WS-CARD-RID-CUST-ID-X",
+            "CUSTOMER-RECORD",
+            "CUST-ID",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-SSN",
+            "CUST-DOB-YYYY-MM-DD",
+            "CUST-FICO-CREDIT-SCORE",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-PHONE-NUM-1",
+            "CUST-PHONE-NUM-2",
+            "CUST-GOVT-ISSUED-ID",
+            "CUST-EFT-ACCOUNT-ID",
+            "CUST-PRI-CARD-HOLDER-IND",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Store Fetched Data as Old Baseline",
+          "description": "Copies all fields from ACCOUNT-RECORD and CUSTOMER-RECORD into ACUP-OLD-DETAILS (both ACUP-OLD-ACCT-DATA and ACUP-OLD-CUST-DATA). Also updates CARDDEMO-COMMAREA context fields. This baseline is used for change detection and optimistic concurrency checking.",
+          "records": [
+            "ACCT-ID",
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-GROUP-ID",
+            "CUST-ID",
+            "CUST-SSN",
+            "CUST-DOB-YYYY-MM-DD",
+            "CUST-FICO-CREDIT-SCORE",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-PHONE-NUM-1",
+            "CUST-PHONE-NUM-2",
+            "CUST-GOVT-ISSUED-ID",
+            "CUST-EFT-ACCOUNT-ID",
+            "CUST-PRI-CARD-HOLDER-IND",
+            "ACUP-OLD-ACCT-DATA",
+            "ACUP-OLD-CUST-DATA",
+            "CDEMO-ACCT-ID",
+            "CDEMO-CUST-ID",
+            "CDEMO-CUST-FNAME",
+            "CDEMO-CUST-MNAME",
+            "CDEMO-CUST-LNAME",
+            "CDEMO-ACCT-STATUS",
+            "CDEMO-CARD-NUM"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Lock Account Record for Update",
+          "description": "Issues CICS READ with UPDATE option on ACCTDAT file to obtain exclusive lock on the account record. If lock fails (non-NORMAL response), sets COULD-NOT-LOCK-ACCT-FOR-UPDATE and exits write processing.",
+          "records": [
+            "WS-CARD-RID-ACCT-ID-X",
+            "ACCOUNT-RECORD",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "Lock Customer Record for Update",
+          "description": "Issues CICS READ with UPDATE option on CUSTDAT file to obtain exclusive lock on the customer record. If lock fails, sets COULD-NOT-LOCK-CUST-FOR-UPDATE and exits write processing.",
+          "records": [
+            "WS-CARD-RID-CUST-ID-X",
+            "CUSTOMER-RECORD",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-RETURN-MSG"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Concurrent Modification Check",
+          "description": "Compares freshly locked ACCOUNT-RECORD and CUSTOMER-RECORD fields against the ACUP-OLD baseline stored in COMMAREA. If any field differs, sets DATA-WAS-CHANGED-BEFORE-UPDATE and aborts the update, forcing user to review current data.",
+          "records": [
+            "ACCT-ACTIVE-STATUS",
+            "ACCT-CURR-BAL",
+            "ACCT-CREDIT-LIMIT",
+            "ACCT-CASH-CREDIT-LIMIT",
+            "ACCT-CURR-CYC-CREDIT",
+            "ACCT-CURR-CYC-DEBIT",
+            "ACCT-OPEN-DATE",
+            "ACCT-EXPIRAION-DATE",
+            "ACCT-REISSUE-DATE",
+            "ACCT-GROUP-ID",
+            "CUST-FIRST-NAME",
+            "CUST-MIDDLE-NAME",
+            "CUST-LAST-NAME",
+            "CUST-ADDR-LINE-1",
+            "CUST-ADDR-LINE-2",
+            "CUST-ADDR-LINE-3",
+            "CUST-ADDR-STATE-CD",
+            "CUST-ADDR-COUNTRY-CD",
+            "CUST-ADDR-ZIP",
+            "CUST-PHONE-NUM-1",
+            "CUST-PHONE-NUM-2",
+            "CUST-SSN",
+            "CUST-GOVT-ISSUED-ID",
+            "CUST-DOB-YYYY-MM-DD",
+            "CUST-EFT-ACCOUNT-ID",
+            "CUST-PRI-CARD-HOLDER-IND",
+            "CUST-FICO-CREDIT-SCORE",
+            "ACUP-OLD-ACCT-DATA",
+            "ACUP-OLD-CUST-DATA"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Prepare and Write Account Update Record",
+          "description": "Builds ACCT-UPDATE-RECORD from ACUP-NEW-ACCT-DATA fields, formatting dates as YYYY-MM-DD strings. Issues CICS REWRITE to ACCTDAT. If REWRITE fails, sets LOCKED-BUT-UPDATE-FAILED and exits.",
+          "records": [
+            "ACCT-UPDATE-RECORD",
+            "ACCT-UPDATE-ID",
+            "ACCT-UPDATE-ACTIVE-STATUS",
+            "ACCT-UPDATE-CURR-BAL",
+            "ACCT-UPDATE-CREDIT-LIMIT",
+            "ACCT-UPDATE-CASH-CREDIT-LIMIT",
+            "ACCT-UPDATE-CURR-CYC-CREDIT",
+            "ACCT-UPDATE-CURR-CYC-DEBIT",
+            "ACCT-UPDATE-OPEN-DATE",
+            "ACCT-UPDATE-EXPIRAION-DATE",
+            "ACCT-UPDATE-REISSUE-DATE",
+            "ACCT-UPDATE-GROUP-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Prepare and Write Customer Update Record",
+          "description": "Builds CUST-UPDATE-RECORD from ACUP-NEW-CUST-DATA fields, formatting phone numbers as (NNN)NNN-NNNN and DOB as YYYY-MM-DD. Issues CICS REWRITE to CUSTDAT. If REWRITE fails, sets LOCKED-BUT-UPDATE-FAILED and issues SYNCPOINT ROLLBACK to undo account update.",
+          "records": [
+            "CUST-UPDATE-RECORD",
+            "CUST-UPDATE-ID",
+            "CUST-UPDATE-FIRST-NAME",
+            "CUST-UPDATE-MIDDLE-NAME",
+            "CUST-UPDATE-LAST-NAME",
+            "CUST-UPDATE-ADDR-LINE-1",
+            "CUST-UPDATE-ADDR-LINE-2",
+            "CUST-UPDATE-ADDR-LINE-3",
+            "CUST-UPDATE-ADDR-STATE-CD",
+            "CUST-UPDATE-ADDR-COUNTRY-CD",
+            "CUST-UPDATE-ADDR-ZIP",
+            "CUST-UPDATE-PHONE-NUM-1",
+            "CUST-UPDATE-PHONE-NUM-2",
+            "CUST-UPDATE-SSN",
+            "CUST-UPDATE-GOVT-ISSUED-ID",
+            "CUST-UPDATE-DOB-YYYY-MM-DD",
+            "CUST-UPDATE-EFT-ACCOUNT-ID",
+            "CUST-UPDATE-PRI-CARD-IND",
+            "CUST-UPDATE-FICO-CREDIT-SCORE",
+            "WS-RESP-CD",
+            "WS-REAS-CD"
+          ]
+        },
+        {
+          "step": 19,
+          "process": "Screen Initialization and Output Preparation",
+          "description": "Initializes CACTUPAO output map with LOW-VALUES, populates screen header fields (title, transaction ID, program name, current date/time from FUNCTION CURRENT-DATE). Selects which values to display: initial blanks, original fetched values, or updated values based on program state.",
+          "records": [
+            "CACTUPAO",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-CURDATE-DATA",
+            "WS-CURTIME-HH-MM-SS",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO"
+          ]
+        },
+        {
+          "step": 20,
+          "process": "Screen Attribute Setup and Field Protection",
+          "description": "First protects all screen fields using DFHBMPRF. Then selectively unprotects editable fields based on program state using DFHBMFSE. Sets cursor position to first field in error. Sets field colors (DFHRED for errors, DFHDFCOL for normal). Uses CSSETATY copybook for standardized attribute setting per field.",
+          "records": [
+            "CACTUPAI",
+            "ACCTSIDA",
+            "ACSTTUSA",
+            "ACRDLIMA",
+            "ACSHLIMA",
+            "ACURBALA",
+            "ACRCYCRA",
+            "ACRCYDBA",
+            "OPNYEARA",
+            "EXPYEARA",
+            "RISYEARA",
+            "DOBYEARA",
+            "ACTSSN1A",
+            "ACTSSN2A",
+            "ACTSSN3A",
+            "ACSTFCOA",
+            "ACSFNAMA",
+            "ACSMNAMA",
+            "ACSLNAMA",
+            "ACSADL1A",
+            "ACSSTTEA",
+            "ACSZIPCA",
+            "ACSCITYA",
+            "ACSCTRYA",
+            "ACSPH1AA",
+            "ACSPH2AA",
+            "ACSEFTCA",
+            "ACSPFLGA",
+            "INFOMSGA",
+            "FKEY05A",
+            "FKEY12A"
+          ]
+        },
+        {
+          "step": 21,
+          "process": "Send Screen to Terminal",
+          "description": "Issues CICS SEND MAP with CURSOR, ERASE, and FREEKB options to display CACTUPAO output map to the user terminal. Sets CCARD-NEXT-MAPSET and CCARD-NEXT-MAP before sending.",
+          "records": [
+            "CCARD-NEXT-MAP",
+            "CCARD-NEXT-MAPSET",
+            "CACTUPAO",
+            "WS-RESP-CD"
+          ]
+        },
+        {
+          "step": 22,
+          "process": "Return to CICS with COMMAREA",
+          "description": "Moves WS-RETURN-MSG to CCARD-ERROR-MSG, assembles WS-COMMAREA from CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA, then issues CICS RETURN with transaction ID 'CAUP' and the combined COMMAREA to await next user interaction.",
+          "records": [
+            "WS-RETURN-MSG",
+            "CCARD-ERROR-MSG",
+            "WS-COMMAREA",
+            "CARDDEMO-COMMAREA",
+            "WS-THIS-PROGCOMMAREA",
+            "LIT-THISTRANID"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "Card cross-reference must be read before account master",
+          "description": "The CXACAIX alternate index read (9200-GETCARDXREF-BYACCT) must succeed first to obtain CDEMO-CUST-ID, which is then used as the key to read CUSTDAT. Without the cross-reference, the customer ID is unknown and customer data cannot be retrieved."
+        },
+        {
+          "dependency": "Account master must be found before customer lookup",
+          "description": "In 9000-READ-ACCT, if ACCTDAT read (9300-GETACCTDATA-BYACCT) fails, processing exits immediately and the customer read is never attempted. Account existence is a prerequisite for customer data retrieval."
+        },
+        {
+          "dependency": "File locking order: account before customer",
+          "description": "In 9600-WRITE-PROCESSING, the account record (ACCTDAT) is locked with READ UPDATE before the customer record (CUSTDAT). This ordering must be consistent across all programs to prevent deadlocks. If account lock fails, customer lock is never attempted."
+        },
+        {
+          "dependency": "Concurrent modification check requires both locks held",
+          "description": "9700-CHECK-CHANGE-IN-REC compares live locked records against the ACUP-OLD baseline. Both account and customer records must be locked before this check runs. If data has changed, both locks are released without update."
+        },
+        {
+          "dependency": "Customer update rollback depends on account update success",
+          "description": "If the CICS REWRITE to CUSTDAT fails after ACCTDAT has already been rewritten, a SYNCPOINT ROLLBACK is issued to undo the account update. This two-phase approach means customer update failure triggers full rollback of both changes."
+        },
+        {
+          "dependency": "ACUP-OLD-DETAILS baseline must be populated before change comparison",
+          "description": "The 1205-COMPARE-OLD-NEW and 9700-CHECK-CHANGE-IN-REC routines depend on ACUP-OLD-DETAILS being populated by 9500-STORE-FETCHED-DATA from a prior program invocation. This data is persisted across CICS pseudo-conversational returns via COMMAREA."
+        },
+        {
+          "dependency": "ACUP-CHANGE-ACTION state machine governs all processing paths",
+          "description": "The entire program flow is controlled by the ACUP-CHANGE-ACTION flag in WS-THIS-PROGCOMMAREA. Valid state transitions are: NOT-FETCHED -> SHOW-DETAILS -> CHANGES-NOT-OK or CHANGES-OK-NOT-CONFIRMED -> CHANGES-OKAYED-AND-DONE or CHANGES-FAILED. Invalid states trigger ABEND."
+        },
+        {
+          "dependency": "Input validation flags must be set before action decision",
+          "description": "The 2000-DECIDE-ACTION paragraph depends on WS-INPUT-FLAG (INPUT-OK or INPUT-ERROR), WS-NON-KEY-FLAGS, and WS-DATACHANGED-FLAG all being correctly set by 1200-EDIT-MAP-INPUTS before it executes. Incorrect flag state leads to wrong action routing."
+        },
+        {
+          "dependency": "State/zip cross-field validation depends on individual field validations passing",
+          "description": "The 1280-EDIT-US-STATE-ZIP-CD cross-field edit is only performed when both FLG-STATE-ISVALID and FLG-ZIPCODE-ISVALID are set, creating a dependency on the individual state code (1270) and zip code (1245) validations completing successfully first."
+        },
+        {
+          "dependency": "FICO score range validation depends on numeric format validation",
+          "description": "1275-EDIT-FICO-SCORE (range 300-850 check) is only called if FLG-FICO-SCORE-ISVALID is already set by 1245-EDIT-NUM-REQD. The range check depends on the field being confirmed numeric and non-zero first."
+        },
+        {
+          "dependency": "Phone area code lookup depends on numeric format validation",
+          "description": "The VALID-GENERAL-PURP-CODE check against CSLKPCDY lookup table in EDIT-AREA-CODE is only reached after the area code passes numeric and non-zero checks. The lookup table dependency is conditional on prior format validation."
+        },
+        {
+          "dependency": "COMMAREA size constraint limits state persistence",
+          "description": "WS-COMMAREA is defined as PIC X(2000). CARDDEMO-COMMAREA and WS-THIS-PROGCOMMAREA are concatenated within this 2000-byte limit. Overflow would silently truncate state data passed between pseudo-conversational invocations."
+        },
+        {
+          "dependency": "PF05 confirmation only valid when ACUP-CHANGES-OK-NOT-CONFIRMED",
+          "description": "The save operation (9600-WRITE-PROCESSING) is only triggered when both CCARD-AID-PFK05 is pressed AND ACUP-CHANGES-OK-NOT-CONFIRMED is true. PF05 at any other state is ignored, enforcing the two-step validate-then-confirm workflow."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Online Transaction Processing (OLTP) middleware",
+          "purpose": "Provides the entire runtime environment: pseudo-conversational transaction management (RETURN/TRANSID), terminal I/O (SEND MAP, RECEIVE MAP), VSAM file I/O (READ, READ UPDATE, REWRITE), program transfer (XCTL), syncpoint/rollback for two-phase commit, abend handling (HANDLE ABEND, ABEND), and EIB communication area (EIBCALEN, DFHCOMMAREA) for state persistence across screen interactions."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COMEN01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "CSUTLDTC.cbl",
+          "purpose": ""
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Comprehensive field-level validation using 88-level flag variables (FLG-*-NOT-OK, FLG-*-BLANK, FLG-*-ISVALID). Each field sets INPUT-ERROR flag and populates WS-RETURN-MSG with a descriptive message only if WS-RETURN-MSG-OFF is true (first error wins). Validation covers: mandatory presence checks, numeric-only checks, alpha-only checks, alphanumeric checks, signed numeric format, Yes/No values, US phone number format with area code lookup, SSN format with invalid range checks (000, 666, 900-999), date validity, FICO score range (300-850), US state code lookup, and state/zip code cross-field validation. Cursor is repositioned to the first failing field on the screen."
+      },
+      {
+        "category": "File Operation Errors - Read",
+        "description": "All CICS READ operations capture RESP and RESP2 codes. Results are evaluated using DFHRESP(NORMAL) and DFHRESP(NOTFND). NOTFND produces a user-friendly STRING message including the key value, file name, and response codes. Any other response populates WS-FILE-ERROR-MESSAGE with operation name, file name, RESP, and RESP2 codes. INPUT-ERROR and the relevant filter flag (FLG-ACCTFILTER-NOT-OK or FLG-CUSTFILTER-NOT-OK) are set. Processing continues to next step or exits the paragraph via GO TO."
+      },
+      {
+        "category": "File Operation Errors - Update (Lock Acquisition)",
+        "description": "CICS READ with UPDATE is used to lock account and customer records before rewrite. If the lock READ returns anything other than DFHRESP(NORMAL), INPUT-ERROR is set, COULD-NOT-LOCK-ACCT-FOR-UPDATE or COULD-NOT-LOCK-CUST-FOR-UPDATE message flag is set, and processing exits 9600-WRITE-PROCESSING via GO TO without attempting the rewrite. The action decision logic in 2000-DECIDE-ACTION maps these flags to ACUP-CHANGES-OKAYED-LOCK-ERROR state."
+      },
+      {
+        "category": "File Operation Errors - Rewrite",
+        "description": "After successful lock acquisition, CICS REWRITE is performed for both account and customer records. If the account rewrite fails, LOCKED-BUT-UPDATE-FAILED is set and processing exits. If the customer rewrite fails, LOCKED-BUT-UPDATE-FAILED is set and a CICS SYNCPOINT ROLLBACK is issued to undo the account rewrite before exiting. This ensures transactional consistency between the two file updates."
+      },
+      {
+        "category": "Concurrent Modification (Lost Update) Detection",
+        "description": "Before performing the rewrite, paragraph 9700-CHECK-CHANGE-IN-REC compares all fields of the freshly locked records against the original values stored in ACUP-OLD-DETAILS at fetch time. If any field differs, DATA-WAS-CHANGED-BEFORE-UPDATE is set and processing exits 9600-WRITE-PROCESSING without updating. The screen is re-displayed with the refreshed data and a warning message prompting the user to review, preventing lost updates."
+      },
+      {
+        "category": "No-Change Detection",
+        "description": "Paragraph 1205-COMPARE-OLD-NEW performs a full field-by-field comparison of new versus old values for both account and customer data using FUNCTION UPPER-CASE and FUNCTION TRIM for case/space-insensitive comparison. If no differences are found, NO-CHANGES-DETECTED message is set and validation of individual fields is skipped, preventing unnecessary error messages and prompting the user that no changes were detected."
+      },
+      {
+        "category": "Invalid PF Key Handling",
+        "description": "PF key validity is checked at program entry. Only ENTER, PF03, PF05 (when changes are confirmed), and PF12 (when details are fetched) are accepted. Any other AID key is silently remapped to ENTER (SET CCARD-AID-ENTER TO TRUE), effectively ignoring unsupported keys and re-presenting the current screen state without error."
+      },
+      {
+        "category": "Unexpected Program State / Abend Handling",
+        "description": "A CICS HANDLE ABEND pointing to ABEND-ROUTINE is registered at program entry to catch unexpected abends. The ABEND-ROUTINE sends abend data to the screen, cancels the abend handler, and issues CICS ABEND with code '9999'. Within 2000-DECIDE-ACTION, an WHEN OTHER clause explicitly invokes ABEND-ROUTINE with culprit, code '0001', and message 'UNEXPECTED DATA SCENARIO' for unrecognized program states, ensuring controlled termination with diagnostic information."
+      },
+      {
+        "category": "User Navigation / Exit Handling",
+        "description": "PF03 triggers a controlled exit: a CICS SYNCPOINT is issued to commit any pending work, then CICS XCTL transfers control to the calling program or main menu using values from CDEMO-FROM-PROGRAM/TRANID, defaulting to LIT-MENUPGM if not set. This ensures clean session state handoff rather than abrupt termination."
+      }
+    ]
+  }
+}

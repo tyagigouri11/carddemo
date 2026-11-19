@@ -1,0 +1,296 @@
+{
+    "created_on": "2026-11-05",
+    "name": "IMSMQCMP.jcl",
+    "file_path": "carddemo-v2-main/samples/jcl/IMSMQCMP.jcl",
+    "type": "jcl",
+    "description": "This JCL job (IMSMQCMP) automates the full build pipeline for a CICS/IMS/MQ-integrated COBOL program (IMSMQPGM), performing CICS translation, COBOL compilation, and link-editing to produce a deployable load module. The job takes COBOL source code that integrates CICS transaction processing, IMS database access, and IBM MQ messaging, and produces a ready-to-execute load module stored in the CICS load library.Key Functionalities:\nTranslates the COBOL source program (IMSMQPGM) using the CICS preprocessor (DFHECP1$) with CICS, DLI (IMS), and COBOL3 options, converting CICS and IMS API calls into standard COBOL statements\nCompiles the translated COBOL source using the IBM Enterprise COBOL compiler (IGYCRCTL) with options for non-dynamic linking, object code generation, re-entrant code, and cross-reference/map listings\nPrepares the IMS entry point control card (ENTRY IMSMQPGM / NAME IMSMQPGM(R)) for inclusion during the link-edit step\nPrepares the CICS language interface stub (DFHELII) link-edit control card to enable CICS runtime communication\nPrepares the IBM MQ stub (CSQCSTUB from CSQSTUB) link-edit control card to enable MQ runtime communication\nLink-edits all compiled object modules together with the CICS stub (DFHELII), MQ stub (CSQCSTUB), IMS entry point definition, and required system libraries to produce the final executable load module\nStores the final linked load module into the CICS load library (AWS.M2.CICSLOAD) as member IMSMQPGM, making it available for execution under CICS with IMS and MQ connectivity",
+    "rules": [
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00001",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM source program is submitted for translation",
+                "When": "The CICS/IMS Translator reads the source program with CICS, DLI, and COBOL3 modes specified",
+                "Then": "The program is recognized and processed as a COBOL program that contains both embedded CICS transaction commands and embedded IMS DL/I database access calls"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Define IMSMQPGM as a Multi-Technology COBOL Program",
+            "Rule_Description": "IMSMQPGM is defined as a COBOL program that integrates CICS transaction processing commands and IMS DL/I database access calls, requiring specialized translation before it can be compiled.",
+            "Rule_Type": "Definitional Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00002",
+            "Acceptance_Criteria": {
+                "Given": "The build process for IMSMQPGM is initiated",
+                "When": "The TRN step is triggered",
+                "Then": "Translation executes unconditionally as the first step with no conditions or dependencies on prior steps, ensuring the source is always translated before compilation begins"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Enforce Translation as Mandatory First Step in Build Process",
+            "Rule_Description": "Translation of the IMSMQPGM source program is the unconditional first step in the build pipeline \u2014 it must always execute before any compilation or packaging steps, with no dependency on prior conditions.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00003",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM source program contains embedded CICS transaction processing commands",
+                "When": "The translator processes the source with the CICS translation mode enabled",
+                "Then": "All embedded CICS commands are converted into equivalent standard COBOL statements that can be processed by the COBOL compiler in the subsequent compilation step"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Translate Embedded CICS Transaction Commands to Standard COBOL",
+            "Rule_Description": "All CICS transaction processing commands embedded in the IMSMQPGM source must be converted into standard COBOL statements so the program can be processed by the COBOL compiler in the subsequent step.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00004",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM source program contains embedded IMS DL/I database access calls",
+                "When": "The translator processes the source with the DLI translation mode enabled",
+                "Then": "All embedded IMS DL/I calls are converted into equivalent standard COBOL statements that can be processed by the COBOL compiler in the subsequent compilation step"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Translate Embedded IMS DL/I Database Access Calls to Standard COBOL",
+            "Rule_Description": "All IMS DL/I database access calls embedded in the IMSMQPGM source must be converted into standard COBOL statements so the program can be processed by the COBOL compiler in the subsequent step.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00005",
+            "Acceptance_Criteria": {
+                "Given": "The translation of IMSMQPGM completes and produces a translated COBOL source",
+                "When": "The translated source file (&&SYSCIN) is created",
+                "Then": "The translated source is stored as a temporary file, automatically passed forward to the compilation step for further processing, and permanently discarded after the compilation step consumes it \u2014 it is never retained in any permanent application library"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Manage Translated Source as Temporary Intermediate Artifact",
+            "Rule_Description": "The translated COBOL source produced by the TRN step is a temporary intermediate artifact that is automatically passed to the compilation step and is never permanently stored in any application library.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00006",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM source program resides in the application source library (AWS.M2.COBOL.SRC)",
+                "When": "The translation step accesses the source program",
+                "Then": "The source program is read in shared, read-only mode \u2014 the original source remains completely unmodified, and other processes may simultaneously access the same source library during translation"
+            },
+            "Rule_Name": "TRN - DFHECP1$ - Preserve Source Program Integrity During Translation",
+            "Rule_Description": "The original IMSMQPGM source program must be accessed in shared read-only mode during translation to ensure the source is not modified and remains simultaneously available to other processes.",
+            "Rule_Type": "Validation Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00007",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM program has completed the prior translation step (TRN)",
+                "When": "The return code from any prior step is evaluated before the COBOL compilation step begins",
+                "Then": "If the return code from any prior step is greater than 4 (indicating a failure), the COBOL compilation step is skipped entirely and no compiled object module is produced; If the return code from all prior steps is 4 or less (indicating success), the COBOL compilation step proceeds and compiles the translated IMSMQPGM source program"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Conditional COBOL Compilation Execution",
+            "Rule_Description": "The COBOL compilation step executes conditionally based on the outcome of the prior translation step (TRN). If translation failed, compilation is bypassed to prevent processing invalid source code.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00008",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM program is being compiled for deployment in the CICS transaction processing environment",
+                "When": "The COBOL compiler processes any CALL statements found within the IMSMQPGM source program",
+                "Then": "All CALL statements must be statically bound and resolved at compile time (NODYNAM), ensuring that all called programs are identified and linked before the program is deployed to CICS \u2014 dynamic resolution of calls at runtime is not permitted"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Static Program Call Binding for CICS Deployment",
+            "Rule_Description": "All program-to-program calls within IMSMQPGM must be statically resolved at compile time, which is a mandatory requirement for programs deployed and executed within the CICS transaction processing environment.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00009",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM program is being compiled for the CICS multi-user transaction processing environment where multiple transactions may invoke the same program simultaneously",
+                "When": "The COBOL compiler compiles the IMSMQPGM source program",
+                "Then": "The program must be compiled with the re-entrant option (RENT), producing an executable that is safe for concurrent use by multiple CICS transactions sharing the same program copy in memory at the same time"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Re-entrant Compilation for Concurrent CICS Transaction Support",
+            "Rule_Description": "The IMSMQPGM program must be compiled as re-entrant to allow multiple concurrent CICS transactions to share the same copy of the program in memory simultaneously without data corruption.",
+            "Rule_Type": "Policy Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00010",
+            "Acceptance_Criteria": {
+                "Given": "The COBOL compiler encounters a COPY statement while compiling the IMSMQPGM source program",
+                "When": "The compiler searches for the referenced copybook member to resolve the business data structure definition",
+                "Then": "The copybook libraries must be searched in the following strict priority order \u2014 first: Language Environment library (CEE.SCEESAMP); second: CICS copybook library (CICSTS.CICS.SDFHCOB) containing CICS interface data structures; third: IBM MQ copybook library (MQ.SCSQCOBC) containing IBM MQ message queue data structures; fourth and last: Application business copybook library (AWS.M2.COBCOPY) containing application-specific business record layouts and data definitions \u2014 the first library in which the copybook member is found is used, and the remaining libraries are not searched for that member"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Business Copybook Library Resolution Priority Order",
+            "Rule_Description": "When the COBOL compiler resolves business data structure definitions (copybooks) referenced in IMSMQPGM, it must search the designated copybook libraries in a strict, predefined priority order to ensure the correct version of each data structure is used.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00011",
+            "Acceptance_Criteria": {
+                "Given": "The translated COBOL source file (&&SYSCIN), produced by the prior TRN translation step, is available as input to the COBOL compilation step",
+                "When": "The COBOL compilation step completes processing of the translated source file",
+                "Then": "The translated source file (&&SYSCIN) is permanently deleted and is no longer available for any subsequent step or process \u2014 it is a single-use intermediate artifact"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Translated Source File Disposal After Compilation",
+            "Rule_Description": "The translated COBOL source file produced by the prior translation step (TRN) is consumed as input to compilation and must be permanently deleted afterward, as it is an intermediate artifact with no further use.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00012",
+            "Acceptance_Criteria": {
+                "Given": "The COBOL compiler has successfully compiled the IMSMQPGM source program",
+                "When": "The compilation step produces the compiled object module",
+                "Then": "The compiled object module (&&LOADSET) is retained and passed forward to the link-edit step (LKED), where it will be combined with the CICS runtime interface, IBM MQ messaging interface, and IMS database runtime support to produce the final deployable CICS executable"
+            },
+            "Rule_Name": "COBOL - IGYCRCTL - Compiled Object Module Handoff to Link-Edit Step",
+            "Rule_Description": "Upon successful compilation, the compiled object module representing the IMSMQPGM business logic must be retained and passed forward to the link-edit step (LKED) for assembly into the final deployable executable.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00013",
+            "Acceptance_Criteria": {
+                "Given": "The COPYIMS step is reached in the build pipeline after the translation step (TRN) and the compilation step (COBOL) have been executed",
+                "When": "Any prior step has completed with a return code greater than 4, indicating a failure in translation or compilation",
+                "Then": "The COPYIMS step is skipped entirely \u2014 no IMS entry point or module name instructions are created, and the build pipeline does not proceed with packaging"
+            },
+            "Rule_Name": "COPYIMS - IEBGENER - Conditional Execution of IMS Packaging Step",
+            "Rule_Description": "The COPYIMS step is governed by a conditional gate that ensures IMS packaging instructions are only prepared when all prior build steps (translation and compilation) have completed without errors. If any prior step failed, this step is bypassed entirely.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00014",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps (translation and compilation) have completed successfully with a return code of 4 or less, and the COPYIMS step is executing",
+                "When": "The IEBGENER utility copies the inline instruction data to the output instruction file",
+                "Then": "The directive 'ENTRY IMSMQPGM' is written to the link-edit instruction file (&&COPYIMS), designating IMSMQPGM as the single entry point where execution of the business application begins when it is invoked by CICS"
+            },
+            "Rule_Name": "COPYIMS - IEBGENER - Define Executable Entry Point for IMSMQPGM",
+            "Rule_Description": "Prepares the link-edit directive that designates IMSMQPGM as the starting point of execution. This ensures that when the CICS transaction processing environment invokes the business application, execution begins at the correct and intended entry point.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00015",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps (translation and compilation) have completed successfully with a return code of 4 or less, and the COPYIMS step is executing",
+                "When": "The IEBGENER utility copies the inline instruction data to the output instruction file",
+                "Then": "The directive 'NAME IMSMQPGM(R)' is written to the link-edit instruction file (&&COPYIMS), naming the final executable 'IMSMQPGM' and instructing the link-edit step to replace any previously deployed version of IMSMQPGM that already exists in the CICS load library (AWS.M2.CICSLOAD)"
+            },
+            "Rule_Name": "COPYIMS - IEBGENER - Name Load Module and Replace Existing Deployed Version",
+            "Rule_Description": "Prepares the link-edit directive that assigns the official name to the final executable and enforces a replacement policy \u2014 ensuring the newly built version always supersedes any previously deployed version of the program in the CICS load library.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00016",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps (translation and compilation) have completed successfully with a return code of 4 or less, and both the 'ENTRY IMSMQPGM' and 'NAME IMSMQPGM(R)' directives are defined as inline input data",
+                "When": "The IEBGENER utility executes and copies the inline directives to the output dataset",
+                "Then": "A temporary instruction file (&&COPYIMS) is created with fixed-block record format (record length 80 bytes, block size 400 bytes), containing both the entry point directive and the module name/replacement directive, and is passed forward exclusively to the link-edit step (LKED) for use in assembling the final deployable IMSMQPGM executable; the file is automatically discarded after the link-edit step consumes it"
+            },
+            "Rule_Name": "COPYIMS - IEBGENER - Create and Forward Link-Edit Instruction File to Deployment Step",
+            "Rule_Description": "Packages both the entry point directive and the module name directive into a single temporary instruction file and forwards it to the link-edit step. This instruction file is a required input for the final build and deployment step (LKED) to correctly assemble and deploy the IMSMQPGM executable.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00017",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM build pipeline is in progress and the COPYLINK step is about to be initiated",
+                "When": "Any prior build step \u2014 translation (TRN), compilation (COBOL), or IMS instruction preparation (COPYIMS) \u2014 has completed with an error code greater than 4",
+                "Then": "The COPYLINK step is skipped entirely, no CICS Language Interface instruction file is created, and the build pipeline proceeds to evaluate the next step under the same condition"
+            },
+            "Rule_Name": "COPYLINK - IEBGENER - Conditional Execution of CICS Interface Instruction Preparation",
+            "Rule_Description": "This rule governs whether the COPYLINK step is allowed to execute based on the cumulative success of all prior build steps in the IMSMQPGM build pipeline. It acts as a gate to prevent unnecessary processing when earlier steps have already failed.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00018",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps \u2014 translation (TRN), compilation (COBOL), and IMS instruction preparation (COPYIMS) \u2014 have completed successfully with return codes of 4 or less",
+                "When": "The COPYLINK step executes using the IEBGENER file copy utility",
+                "Then": "A CICS Language Interface inclusion instruction \u2014 specifically 'INCLUDE SYSLIB(DFHELII)' \u2014 is written into a new temporary instruction file named &&COPYLINK, and that file is passed forward to the link-edit step (LKED) so that the CICS Language Interface module (DFHELII) is bound into the final IMSMQPGM executable, enabling the program to issue CICS commands at runtime"
+            },
+            "Rule_Name": "COPYLINK - IEBGENER - CICS Language Interface Instruction File Creation and Forwarding",
+            "Rule_Description": "This rule defines the creation of the CICS Language Interface (DFHELII) inclusion instruction file. The DFHELII module is mandatory for the IMSMQPGM program to communicate with the CICS transaction processing environment at runtime. The instruction file is created as a temporary file and forwarded to the link-edit step (LKED) for binding into the final executable.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00019",
+            "Acceptance_Criteria": {
+                "Given": "The IMSMQPGM application build pipeline is executing and the COPYMQ step is reached",
+                "When": "Any prior build step in the pipeline (TRN, COBOL, COPYIMS, or COPYLINK) has returned an error code greater than 4",
+                "Then": "The IBM MQ CICS Stub interface preparation step (COPYMQ) is automatically skipped entirely, preventing the creation of incomplete or invalid IBM MQ interface instructions for the link-edit step"
+            },
+            "Rule_Name": "COPYMQ - IEBGENER - IBM MQ Interface Preparation Conditional Execution",
+            "Rule_Description": "Controls whether the IBM MQ CICS Stub interface preparation step executes based on the success of all prior build steps in the IMSMQPGM build pipeline.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00020",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps (TRN, COBOL, COPYIMS, COPYLINK) have completed successfully with a return code of 4 or less, and the COPYMQ step is authorized to execute",
+                "When": "The COPYMQ step executes using the IEBGENER file copy utility with no additional transformation instructions (SYSIN is DUMMY \u2014 straight copy only)",
+                "Then": "The IBM MQ CICS Stub include directive \u2014 specifically the instruction to include the CSQCSTUB module from the CSQSTUB library \u2014 is written to a new temporary instruction file (&&COPYMQ) and passed forward to the link-edit step (LKED), so that the IBM MQ messaging interface is bound into the final IMSMQPGM executable, enabling the business application to send and receive messages through IBM MQ queues within the CICS transaction processing environment"
+            },
+            "Rule_Name": "COPYMQ - IEBGENER - IBM MQ CICS Stub Include Directive Generation",
+            "Rule_Description": "Creates and forwards the IBM MQ CICS Stub include directive to the link-edit step, ensuring the IBM MQ messaging interface module (CSQCSTUB) is bound into the final IMSMQPGM executable.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00021",
+            "Acceptance_Criteria": {
+                "Given": "The build pipeline has executed all prior steps: source translation (TRN), COBOL compilation (COBOL), IMS packaging preparation (COPYIMS), CICS interface preparation (COPYLINK), and IBM MQ interface preparation (COPYMQ)",
+                "When": "Any one of the prior steps returns a return code greater than 4, indicating a failure or error condition",
+                "Then": "The link-edit step is skipped entirely \u2014 no executable load module is assembled or deployed, and the CICS load library remains unchanged"
+            },
+            "Rule_Name": "LKED - IEWL - Conditional Execution of Link-Edit Step",
+            "Rule_Description": "The link-edit step that assembles the final deployable executable must only execute when all prior build steps have completed without errors. This ensures a broken or incomplete build is never deployed to the CICS environment.",
+            "Rule_Type": "Decision Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00022",
+            "Acceptance_Criteria": {
+                "Given": "All prior build steps (TRN, COBOL, COPYIMS, COPYLINK, COPYMQ) have completed successfully with a return code of 4 or less, and all four temporary component files are available for processing",
+                "When": "The link-edit step executes to assemble the final IMSMQPGM executable",
+                "Then": "The components are assembled in the following strict sequence: (1) the CICS Language Interface module (DFHELII) is included first to establish CICS transaction processing connectivity, (2) the IBM MQ CICS Stub module (CSQCSTUB) is included second to establish IBM MQ message queue connectivity, (3) the compiled COBOL business logic object module is processed third as the core application, and (4) the entry point declaration (ENTRY IMSMQPGM) and module name directive (NAME IMSMQPGM with replace flag) are applied last to finalize the executable identity"
+            },
+            "Rule_Name": "LKED - IEWL - Component Assembly Sequence for Executable Build",
+            "Rule_Description": "The final IMSMQPGM executable must be assembled by processing its components in a strict, predefined sequence. The order ensures that the CICS and IBM MQ runtime interfaces are bound before the business logic, and that the entry point and module identity are applied last.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00023",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit step is assembling the IMSMQPGM executable and encounters external runtime module references that must be resolved from system libraries",
+                "When": "The linkage editor searches for any external module reference not already included via the SYSLIN input stream",
+                "Then": "The system libraries are searched in the following strict priority order \u2014 stopping at the first library where the module is found: (1) IBM MQ runtime library (MQ.SCSQLOAD) is searched first, (2) z/OS core system library (SYS1.LINKLIB) is searched second, (3) Language Environment runtime library (CEE.SCEELKED) is searched third, (4) CICS system load library (CICSTS.CICS.SDFHLOAD) is searched fourth, and (5) IMS system resident library (IMS.SDFSRESL) is searched last"
+            },
+            "Rule_Name": "LKED - IEWL - External Runtime Reference Resolution Priority",
+            "Rule_Description": "When assembling the IMSMQPGM executable, all external runtime module references must be resolved by searching a defined set of system libraries in a strict priority order. This ensures that the correct version of each runtime module is selected when the same module name may exist in multiple libraries.",
+            "Rule_Type": "Process Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00024",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit step is processing the IBM MQ include directive (INCLUDE CSQSTUB(CSQCSTUB)) from the COPYMQ temporary input file",
+                "When": "The linkage editor needs to locate and bind the CSQCSTUB module into the IMSMQPGM executable",
+                "Then": "The IBM MQ stub library (MQ.SCSQLOAD) is explicitly referenced as the named source library CSQSTUB, ensuring the correct IBM MQ CICS messaging interface module (CSQCSTUB) is located from this dedicated library and permanently bound into the IMSMQPGM executable \u2014 enabling IBM MQ message queue operations at runtime within the CICS environment"
+            },
+            "Rule_Name": "LKED - IEWL - IBM MQ Messaging Interface Explicit Binding",
+            "Rule_Description": "The IBM MQ CICS Stub module (CSQCSTUB) must be explicitly sourced from a dedicated IBM MQ stub library during the link-edit step. This ensures the correct IBM MQ messaging interface is bound into the IMSMQPGM executable, enabling the business application to send and receive messages through IBM MQ queues while operating within the CICS environment.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00025",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit step has successfully assembled all components \u2014 CICS Language Interface, IBM MQ CICS Stub, compiled COBOL business logic, and entry point/module name directives \u2014 into a complete executable",
+                "When": "The link-edit step completes the assembly of the IMSMQPGM executable",
+                "Then": "The final executable load module named IMSMQPGM is written to the CICS load library (AWS.M2.CICSLOAD) as member IMSMQPGM, any previously deployed version of IMSMQPGM in that library is replaced, the CICS load library remains accessible to other users and jobs during this write operation (shared access), and the newly deployed IMSMQPGM program is immediately available for invocation as a CICS transaction"
+            },
+            "Rule_Name": "LKED - IEWL - Business Application Deployment to CICS Load Library",
+            "Rule_Description": "Upon successful assembly of all components, the final IMSMQPGM executable must be written directly to the CICS load library, replacing any previously deployed version. This makes the latest version of the business application immediately available for CICS transaction execution without any additional deployment steps.",
+            "Rule_Type": "Action Rules"
+        },
+        {
+            "Rule_Id": "R-IMSMQCMP-jcl-00026",
+            "Acceptance_Criteria": {
+                "Given": "The link-edit step has been provided four temporary input files: the CICS interface directive file (&&COPYLINK), the IBM MQ interface directive file (&&COPYMQ), the compiled business logic object module (&&LOADSET), and the IMS entry point directive file (&&COPYIMS)",
+                "When": "The link-edit step reads and processes each temporary input file from the SYSLIN input stream",
+                "Then": "Each temporary file is permanently deleted immediately after it is consumed \u2014 the CICS interface directive file (&&COPYLINK) is deleted, the IBM MQ interface directive file (&&COPYMQ) is deleted, the compiled business logic object module (&&LOADSET) is deleted, and the IMS entry point directive file (&&COPYIMS) is deleted \u2014 none of these intermediate build artifacts are retained after the final executable has been successfully assembled"
+            },
+            "Rule_Name": "LKED - IEWL - Temporary Build Artifact Cleanup",
+            "Rule_Description": "All temporary intermediate files created during the build pipeline must be permanently deleted once the link-edit step has consumed them. This ensures that stale or partial build artifacts from a previous run do not interfere with future builds.",
+            "Rule_Type": "Process Rules"
+        }
+    ],
+    "flow_diagram_code": "flowchart TD\n    A([Job Start\nBuild and Deploy IMSMQPGM\nBusiness Application]):::start\n\n    SRC[(COBOL Source Program\nIMSMQPGM\nHLQ.COBOL.SRC)]:::datasource\n\n    TRN[TRN - DFHECP1$\nTranslate COBOL Source Program\nContaining Embedded CICS Transaction\nand IMS Database Commands]:::process\n\n    D1{Translation\nSuccessful?\nRC \u2264 4}:::decision\n\n    COBOL[COBOL - IGYCRCTL\nCompile Translated Business Application\nProgram IMSMQPGM with CICS, IMS\nand IBM MQ Copybook Libraries]:::process\n\n    D2{Compilation\nSuccessful?\nRC \u2264 4}:::decision\n\n    COPYIMS[COPYIMS - IEBGENER\nPrepare IMS Entry Point and\nModule Name Build Instructions\nfor IMSMQPGM]:::process\n\n    COPYLINK[COPYLINK - IEBGENER\nPrepare CICS Language Interface\nBuild Instructions for\nTransaction Processing]:::process\n\n    COPYMQ[COPYMQ - IEBGENER\nPrepare IBM MQ Messaging\nStub Interface Build Instructions\nfor Queue Operations]:::process\n\n    D3{Build Instructions\nPrepared Successfully?\nRC \u2264 4}:::decision\n\n    LKED[LKED - IEWL\nLink-Edit and Package All Components\ninto Final Executable Load Module\nIMSMQPGM with CICS, IMS and IBM MQ\nRuntime Interfaces Bound In]:::process\n\n    CICSLOAD[(CICS Load Library\nIMSMQPGM\nHLQ.CICSLOAD)]:::datasource\n\n    SUCCESS([Build Completed Successfully\nIMSMQPGM Deployed to CICS Load Library\nand Ready for CICS Transaction Execution]):::success\n\n    ERROR([Build Failed - Job Terminated\nReview Error Listing for Details]):::error\n\n    A --> TRN\n    SRC -.->|Read COBOL Source Program| TRN\n    TRN --> D1\n    D1 -->|Yes - Proceed to Compile| COBOL\n    D1 -->|No - Translation Error| ERROR\n    COBOL --> D2\n    D2 -->|Yes - Proceed to Prepare Build Instructions| COPYIMS\n    D2 -->|No - Compilation Error| ERROR\n    COPYIMS --> COPYLINK\n    COPYLINK --> COPYMQ\n    COPYMQ --> D3\n    D3 -->|Yes - Proceed to Link-Edit| LKED\n    D3 -->|No - Build Instruction Preparation Error| ERROR\n    LKED --> CICSLOAD\n    CICSLOAD -.->|Write Final Executable Load Module| SUCCESS\n\n    classDef start fill:#ff6666\n    classDef process fill:#6699ff\n    classDef decision fill:#ffcc00\n    classDef datasource fill:#66ff66\n    classDef final fill:#ae74de\n    classDef success fill:#22c55e\n    classDef error fill:#ef4444"
+}

@@ -1,0 +1,186 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "CBACT02C.cbl",
+        "type": "cobol"
+      },
+      "overview": "CBACT02C is a batch program within the CardDemo application, a credit card account management system. It operates as a reporting/audit utility in the batch processing workflow, designed to enumerate and display all credit card records stored in the system. The program reads sequentially through an indexed VSAM KSDS (Key-Sequenced Data Set) file containing credit card account data and prints each record to the output, effectively providing a full dump or listing of all card records. This solves the operational need to review, audit, or verify the contents of the card data file in bulk without online interaction.",
+      "key_features": [
+        {
+          "feature": "Sequential Card File Read",
+          "description": "Reads all credit card records sequentially from an indexed VSAM file, processing each record from start to end of file."
+        },
+        {
+          "feature": "Card Record Display",
+          "description": "Prints each card record (including card number and associated card data) to the system output for review or audit purposes."
+        },
+        {
+          "feature": "File Open/Close Management",
+          "description": "Handles structured opening and closing of the card file with proper status checking to ensure file integrity throughout processing."
+        },
+        {
+          "feature": "Error Handling and Abend",
+          "description": "Detects and reports I/O errors during file open, read, and close operations, and triggers a controlled program abend via CEE3ABD if a critical error occurs."
+        },
+        {
+          "feature": "I/O Status Reporting",
+          "description": "Translates and displays detailed file status codes to aid in diagnosing file access issues during batch execution."
+        },
+        {
+          "feature": "End-of-File Detection",
+          "description": "Gracefully detects and handles the end-of-file condition to terminate record processing cleanly without errors."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "CARDFILE",
+        "type": "Read",
+        "description": "Indexed VSAM KSDS card data file - sequentially reads all card records containing card number, account ID, CVV code, embossed name, expiration date, and active status, then displays each record to standard output"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Initialization",
+          "description": "Program starts execution, displays start message, and initiates the card file open sequence",
+          "records": [
+            "END-OF-FILE",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Open Card File",
+          "description": "Opens CARDFILE-FILE (VSAM KSDS) in sequential input mode. Checks file status code '00' for success. On failure, displays error, logs IO status, and abends the program",
+          "records": [
+            "CARDFILE-STATUS",
+            "APPL-RESULT",
+            "IO-STATUS"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "Sequential Card Record Read Loop",
+          "description": "Iterates through all records in the VSAM KSDS file sequentially until end-of-file is reached. Controls loop via END-OF-FILE flag",
+          "records": [
+            "END-OF-FILE",
+            "APPL-RESULT"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Read Next Card Record",
+          "description": "Reads the next sequential record from CARDFILE-FILE into CARD-RECORD (defined in CVACT02Y copybook). Evaluates file status: '00' = success, '10' = end-of-file, other = error",
+          "records": [
+            "FD-CARD-NUM",
+            "FD-CARD-DATA",
+            "CARD-RECORD",
+            "CARDFILE-STATUS",
+            "APPL-RESULT",
+            "END-OF-FILE"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "Display Card Record",
+          "description": "If a valid record was read (END-OF-FILE still 'N'), displays the full CARD-RECORD contents to standard output (SYSOUT)",
+          "records": [
+            "CARD-RECORD",
+            "END-OF-FILE"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Error Handling and IO Status Display",
+          "description": "On any non-EOF read error, moves CARDFILE-STATUS to IO-STATUS, formats and displays the 4-character IO status code, then triggers program abend via CEE3ABD",
+          "records": [
+            "IO-STATUS",
+            "IO-STAT1",
+            "IO-STAT2",
+            "IO-STATUS-04",
+            "IO-STATUS-0401",
+            "IO-STATUS-0403",
+            "TWO-BYTES-BINARY",
+            "TWO-BYTES-RIGHT"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Close Card File",
+          "description": "Closes CARDFILE-FILE after all records are processed. Checks file status for successful close. On failure, displays error and abends",
+          "records": [
+            "CARDFILE-STATUS",
+            "APPL-RESULT",
+            "IO-STATUS"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Program Termination",
+          "description": "Displays end-of-execution message and returns control to the calling environment via GOBACK",
+          "records": []
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "CARDFILE-FILE Open Before Read",
+          "description": "The VSAM KSDS file CARDFILE-FILE must be successfully opened (step 0000-CARDFILE-OPEN) before any sequential read operations can be performed. Failure to open causes immediate abend"
+        },
+        {
+          "dependency": "CVACT02Y Copybook Record Layout",
+          "description": "The CARD-RECORD structure used to receive data from READ INTO is entirely defined by the CVACT02Y copybook. The program depends on this layout for correct field mapping of card account data"
+        },
+        {
+          "dependency": "END-OF-FILE Flag State",
+          "description": "The main processing loop depends on the END-OF-FILE flag being initialized to 'N' and only set to 'Y' upon receiving file status '10' (end-of-file). Incorrect initialization would cause the loop to skip or not terminate"
+        },
+        {
+          "dependency": "CARDFILE-STATUS Evaluation Order",
+          "description": "The file status check in 1000-CARDFILE-GET-NEXT must evaluate '00' before '10' before other codes to correctly set APPL-RESULT. The subsequent APPL-AOK and APPL-EOF condition checks depend on this ordered evaluation"
+        },
+        {
+          "dependency": "APPL-RESULT Condition Name Binding",
+          "description": "Control flow throughout the program relies on the 88-level condition names APPL-AOK (value 0) and APPL-EOF (value 16) bound to APPL-RESULT. Any incorrect MOVE to APPL-RESULT will misdirect open, read, and close error handling"
+        },
+        {
+          "dependency": "Sequential Access Mode Constraint",
+          "description": "CARDFILE-FILE is defined with ACCESS MODE IS SEQUENTIAL. All reads must proceed in key order from the beginning of the file; random or dynamic access is not supported in this program"
+        },
+        {
+          "dependency": "CEE3ABD Abend Dependency",
+          "description": "The abend routine 9999-ABEND-PROGRAM depends on the LE (Language Environment) runtime routine CEE3ABD being available. TIMING must be set to 0 and ABCODE to 999 before the CALL to produce a controlled abend dump"
+        },
+        {
+          "dependency": "IO-STATUS TWO-BYTES-BINARY Redefine",
+          "description": "The 9910-DISPLAY-IO-STATUS routine depends on the REDEFINES relationship between TWO-BYTES-BINARY and TWO-BYTES-ALPHA to convert a non-numeric IO-STAT2 byte into a numeric representation for display"
+        }
+      ],
+      "called_programs": []
+    },
+    "error_handling": [
+      {
+        "category": "File Open Errors",
+        "description": "In 0000-CARDFILE-OPEN, after attempting to open CARDFILE-FILE, the FILE STATUS is checked. A status of '00' sets APPL-RESULT to 0 (AOK); any other status sets it to 12. If not AOK, an error message is displayed, the I/O status is passed to 9910-DISPLAY-IO-STATUS for formatted output, and 9999-ABEND-PROGRAM is called to terminate the program abnormally."
+      },
+      {
+        "category": "File Read Errors",
+        "description": "In 1000-CARDFILE-GET-NEXT, after each READ, FILE STATUS is evaluated: '00' maps to APPL-RESULT=0 (AOK), '10' (end-of-file) maps to APPL-RESULT=16 (EOF), and any other status maps to APPL-RESULT=12 (error). EOF sets END-OF-FILE flag to 'Y' to gracefully exit the read loop. Any other non-AOK condition displays an error message, invokes 9910-DISPLAY-IO-STATUS, and calls 9999-ABEND-PROGRAM."
+      },
+      {
+        "category": "File Close Errors",
+        "description": "In 9000-CARDFILE-CLOSE, after CLOSE CARDFILE-FILE, FILE STATUS '00' resets APPL-RESULT to 0; any other status sets it to 12. If not AOK, an error message is displayed, 9910-DISPLAY-IO-STATUS is called for formatted status output, and 9999-ABEND-PROGRAM is invoked to force an abnormal termination."
+      },
+      {
+        "category": "I/O Status Display and Formatting",
+        "description": "9910-DISPLAY-IO-STATUS provides structured formatting of file status codes. It distinguishes between non-numeric or vendor-specific status codes (IO-STAT1='9'), where it converts the binary second byte via TWO-BYTES-BINARY for accurate display, versus standard numeric codes, which are moved directly into IO-STATUS-04 for display. This ensures meaningful diagnostic output regardless of status code type."
+      },
+      {
+        "category": "Program Abend Handling",
+        "description": "9999-ABEND-PROGRAM provides a centralized abnormal termination routine. It displays 'ABENDING PROGRAM', sets TIMING to 0 and ABCODE to 999, then calls the IBM Language Environment routine 'CEE3ABD' to force a controlled program abend. This ensures the program terminates with a recognizable abend code rather than continuing in an undefined state after a fatal error."
+      }
+    ]
+  }
+}

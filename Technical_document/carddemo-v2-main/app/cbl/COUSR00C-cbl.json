@@ -1,0 +1,423 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "COUSR00C.cbl",
+        "type": "cobol",
+        "transaction_id": "CU00"
+      },
+      "overview": "COUSR00C is part of the CardDemo application, a credit card management system that includes administrative functions for managing user accounts and access. This program serves as the user administration list screen, providing administrators with a paginated view of all users registered in the system's security file (USRSEC). It acts as a navigation hub within the user management workflow, allowing administrators to browse all system users and initiate update or delete operations on selected user records.",
+      "key_features": [
+        {
+          "feature": "Paginated User Listing",
+          "description": "Displays up to 10 users per page from the USRSEC security file, showing each user's ID, first name, last name, and user type."
+        },
+        {
+          "feature": "Forward/Backward Page Navigation",
+          "description": "Supports PF7 (page backward) and PF8 (page forward) keys to scroll through the full list of system users across multiple pages."
+        },
+        {
+          "feature": "User Selection for Actions",
+          "description": "Allows administrators to select a user from the list and specify an action code — 'U' to update or 'D' to delete — which transfers control to the appropriate program (COUSR02C or COUSR03C)."
+        },
+        {
+          "feature": "User ID Search/Filter",
+          "description": "Accepts a User ID input to start the browse from a specific position in the file, enabling quick navigation to a particular user."
+        },
+        {
+          "feature": "VSAM File Browsing",
+          "description": "Uses CICS STARTBR, READNEXT, READPREV, and ENDBR commands to efficiently browse the USRSEC VSAM file in both forward and backward directions."
+        },
+        {
+          "feature": "Session State Management",
+          "description": "Maintains pagination state (current page number, first and last user IDs on the page, next-page availability) across interactions using the CICS COMMAREA."
+        },
+        {
+          "feature": "Navigation to Admin Menu",
+          "description": "PF3 key returns the user to the administration menu (COADM01C), and unauthenticated or initial sessions are redirected to the sign-on screen (COSGN00C)."
+        },
+        {
+          "feature": "Error Handling and User Feedback",
+          "description": "Provides informative messages for boundary conditions (top/bottom of list), invalid key presses, invalid selection codes, and file access errors."
+        }
+      ]
+    },
+    "input_output": [
+      {
+        "name": "USRSEC",
+        "type": "Read",
+        "description": "User security file - browsed sequentially (forward and backward) to retrieve user records including user ID, first name, last name, and user type for paginated display on the user list screen"
+      }
+    ],
+    "data_flow_and_dependencies": {
+      "data_flow": [
+        {
+          "step": 1,
+          "process": "Program Entry and Initialization",
+          "description": "Program initializes flags (ERR-FLG-OFF, USER-SEC-NOT-EOF, NEXT-PAGE-NO, SEND-ERASE-YES), clears message fields, and checks EIBCALEN to determine if this is a fresh invocation or a re-entry.",
+          "records": [
+            "WS-ERR-FLG",
+            "WS-USER-SEC-EOF",
+            "WS-SEND-ERASE-FLG",
+            "EIBCALEN",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 2,
+          "process": "Communication Area Validation",
+          "description": "If EIBCALEN is zero (no commarea), the program transfers control to the sign-on screen COSGN00C. Otherwise, the commarea is copied into CARDDEMO-COMMAREA for processing.",
+          "records": [
+            "EIBCALEN",
+            "CDEMO-TO-PROGRAM",
+            "CARDDEMO-COMMAREA",
+            "DFHCOMMAREA"
+          ]
+        },
+        {
+          "step": 3,
+          "process": "First-Time Entry Processing",
+          "description": "If the program is not flagged as re-entered (CDEMO-PGM-REENTER is false), the flag is set to TRUE, the output map is cleared with LOW-VALUES, and the program proceeds to process the Enter key and send the user list screen.",
+          "records": [
+            "CDEMO-PGM-REENTER",
+            "COUSR0AO",
+            "CDEMO-CU00-PAGE-NUM"
+          ]
+        },
+        {
+          "step": 4,
+          "process": "Receive User List Screen Input",
+          "description": "On re-entry, the BMS map COUSR0A from mapset COUSR00 is received into COUSR0AI, capturing user selection flags and search input from the terminal.",
+          "records": [
+            "COUSR0AI",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "SEL0001I-SEL0010I",
+            "USRID01I-USRID10I",
+            "USRIDINI"
+          ]
+        },
+        {
+          "step": 5,
+          "process": "AID Key Evaluation and Routing",
+          "description": "The EIBAID value is evaluated to route processing: ENTER triggers user selection or page load, PF3 returns to COADM01C, PF7 pages backward, PF8 pages forward, and any other key sets an invalid key error message.",
+          "records": [
+            "EIBAID",
+            "CDEMO-TO-PROGRAM",
+            "WS-MESSAGE",
+            "WS-ERR-FLG"
+          ]
+        },
+        {
+          "step": 6,
+          "process": "Process Enter Key - User Selection Detection",
+          "description": "Evaluates each of the 10 selection fields (SEL0001I through SEL0010I) on the screen. If a non-space/non-low-value selection is found, the corresponding user ID is captured into CDEMO-CU00-USR-SELECTED and the selection flag into CDEMO-CU00-USR-SEL-FLG.",
+          "records": [
+            "SEL0001I-SEL0010I",
+            "USRID01I-USRID10I",
+            "CDEMO-CU00-USR-SEL-FLG",
+            "CDEMO-CU00-USR-SELECTED"
+          ]
+        },
+        {
+          "step": 7,
+          "process": "Process Enter Key - Action Dispatch on Selection",
+          "description": "If a valid user is selected, the selection flag is evaluated: 'U' or 'u' transfers control to COUSR02C (update user), 'D' or 'd' transfers control to COUSR03C (delete user). Invalid flags produce an error message. Transfer is via CICS XCTL with the commarea.",
+          "records": [
+            "CDEMO-CU00-USR-SEL-FLG",
+            "CDEMO-CU00-USR-SELECTED",
+            "CDEMO-TO-PROGRAM",
+            "CDEMO-FROM-TRANID",
+            "CDEMO-FROM-PROGRAM",
+            "CDEMO-PGM-CONTEXT",
+            "CARDDEMO-COMMAREA"
+          ]
+        },
+        {
+          "step": 8,
+          "process": "Process Enter Key - Search Key Setup",
+          "description": "The user ID search input (USRIDINI) is moved to SEC-USR-ID as the VSAM browse start key. If blank, LOW-VALUES is used to start from the beginning of the file. Page number is reset to 0 before forward paging.",
+          "records": [
+            "USRIDINI",
+            "SEC-USR-ID",
+            "CDEMO-CU00-PAGE-NUM"
+          ]
+        },
+        {
+          "step": 9,
+          "process": "Process PF7 Key - Backward Page Setup",
+          "description": "Sets SEC-USR-ID to CDEMO-CU00-USRID-FIRST (first user ID on current page) as the browse start key. If page number is greater than 1, backward paging is initiated; otherwise an 'already at top' message is displayed.",
+          "records": [
+            "CDEMO-CU00-USRID-FIRST",
+            "SEC-USR-ID",
+            "CDEMO-CU00-PAGE-NUM",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 10,
+          "process": "Process PF8 Key - Forward Page Setup",
+          "description": "Sets SEC-USR-ID to CDEMO-CU00-USRID-LAST (last user ID on current page) as the browse start key. If NEXT-PAGE-YES is set, forward paging proceeds; otherwise an 'already at bottom' message is displayed.",
+          "records": [
+            "CDEMO-CU00-USRID-LAST",
+            "SEC-USR-ID",
+            "NEXT-PAGE-YES",
+            "WS-MESSAGE"
+          ]
+        },
+        {
+          "step": 11,
+          "process": "Start Browse on USRSEC File",
+          "description": "Issues a CICS STARTBR against the USRSEC VSAM dataset using SEC-USR-ID as the RIDFLD. NOTFND response sets EOF flag and sends a top-of-page message. Other errors set ERR-FLG-ON and send an error message.",
+          "records": [
+            "WS-USRSEC-FILE",
+            "SEC-USR-ID",
+            "WS-RESP-CD",
+            "WS-REAS-CD",
+            "WS-USER-SEC-EOF",
+            "WS-ERR-FLG"
+          ]
+        },
+        {
+          "step": 12,
+          "process": "Forward Page - Read Next Records from USRSEC",
+          "description": "Initializes all 10 display slots to spaces, then iteratively calls READNEXT to read up to 10 user records from USRSEC into SEC-USER-DATA. Each record is populated into the corresponding screen map slot via POPULATE-USER-DATA. An extra READNEXT is performed to determine if a next page exists.",
+          "records": [
+            "SEC-USER-DATA",
+            "SEC-USR-ID",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-TYPE",
+            "WS-IDX",
+            "CDEMO-CU00-PAGE-NUM",
+            "NEXT-PAGE-YES",
+            "WS-USER-SEC-EOF"
+          ]
+        },
+        {
+          "step": 13,
+          "process": "Backward Page - Read Previous Records from USRSEC",
+          "description": "Initializes all 10 display slots to spaces, then iteratively calls READPREV to read up to 10 user records backward from USRSEC. Records are populated in reverse order (WS-IDX from 10 down to 1). Page number is decremented accordingly.",
+          "records": [
+            "SEC-USER-DATA",
+            "SEC-USR-ID",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-TYPE",
+            "WS-IDX",
+            "CDEMO-CU00-PAGE-NUM",
+            "WS-USER-SEC-EOF"
+          ]
+        },
+        {
+          "step": 14,
+          "process": "Populate User Data into Screen Map",
+          "description": "Maps SEC-USER-DATA fields (SEC-USR-ID, SEC-USR-FNAME, SEC-USR-LNAME, SEC-USR-TYPE) into the corresponding numbered screen input fields (USRID01I-USRID10I, FNAME01I-FNAME10I, LNAME01I-LNAME10I, UTYPE01I-UTYPE10I). First and last user IDs are also saved to CDEMO-CU00-USRID-FIRST and CDEMO-CU00-USRID-LAST.",
+          "records": [
+            "SEC-USR-ID",
+            "SEC-USR-FNAME",
+            "SEC-USR-LNAME",
+            "SEC-USR-TYPE",
+            "USRID01I-USRID10I",
+            "FNAME01I-FNAME10I",
+            "LNAME01I-LNAME10I",
+            "UTYPE01I-UTYPE10I",
+            "CDEMO-CU00-USRID-FIRST",
+            "CDEMO-CU00-USRID-LAST"
+          ]
+        },
+        {
+          "step": 15,
+          "process": "End Browse on USRSEC File",
+          "description": "Issues CICS ENDBR to terminate the browse cursor on the USRSEC dataset after all required records have been read.",
+          "records": [
+            "WS-USRSEC-FILE"
+          ]
+        },
+        {
+          "step": 16,
+          "process": "Populate Screen Header Information",
+          "description": "Retrieves the current date and time using FUNCTION CURRENT-DATE. Formats and moves title lines, transaction ID, program name, formatted date (MM-DD-YY), and formatted time (HH-MM-SS) into the output map header fields.",
+          "records": [
+            "WS-CURDATE-DATA",
+            "CCDA-TITLE01",
+            "CCDA-TITLE02",
+            "WS-TRANID",
+            "WS-PGMNAME",
+            "TRNNAMEO",
+            "PGMNAMEO",
+            "CURDATEO",
+            "CURTIMEO",
+            "TITLE01O",
+            "TITLE02O"
+          ]
+        },
+        {
+          "step": 17,
+          "process": "Send User List Screen",
+          "description": "Moves WS-MESSAGE to ERRMSGO and sends the BMS map COUSR0A from mapset COUSR00 to the terminal. If SEND-ERASE-YES, the screen is sent with ERASE; otherwise it is sent without ERASE (retaining existing screen content). CURSOR option is always specified.",
+          "records": [
+            "WS-MESSAGE",
+            "ERRMSGO",
+            "COUSR0AO",
+            "WS-SEND-ERASE-FLG"
+          ]
+        },
+        {
+          "step": 18,
+          "process": "Return to CICS with Transaction ID",
+          "description": "Issues CICS RETURN with TRANSID CU00 and the updated CARDDEMO-COMMAREA, suspending the program and waiting for the next terminal input under transaction CU00.",
+          "records": [
+            "WS-TRANID",
+            "CARDDEMO-COMMAREA",
+            "CDEMO-CU00-USRID-FIRST",
+            "CDEMO-CU00-USRID-LAST",
+            "CDEMO-CU00-PAGE-NUM",
+            "CDEMO-CU00-NEXT-PAGE-FLG",
+            "CDEMO-CU00-USR-SEL-FLG",
+            "CDEMO-CU00-USR-SELECTED"
+          ]
+        }
+      ],
+      "data_dependencies": [
+        {
+          "dependency": "EIBCALEN commarea presence",
+          "description": "The program requires a non-zero EIBCALEN to proceed with normal processing. A zero EIBCALEN unconditionally redirects to COSGN00C, making the commarea a hard prerequisite for all downstream logic."
+        },
+        {
+          "dependency": "CDEMO-PGM-REENTER state flag",
+          "description": "The re-entry flag in the commarea distinguishes first-time entry (triggers immediate page load and screen send) from subsequent entries (triggers screen receive first). Incorrect state causes either a missed screen receive or a double-send."
+        },
+        {
+          "dependency": "STARTBR must precede READNEXT/READPREV",
+          "description": "READNEXT-USER-SEC-FILE and READPREV-USER-SEC-FILE depend on a successful STARTBR-USER-SEC-FILE having established a browse cursor on USRSEC. ERR-FLG-ON from STARTBR gates all subsequent read operations."
+        },
+        {
+          "dependency": "ENDBR must follow all READNEXT/READPREV operations",
+          "description": "ENDBR-USER-SEC-FILE must be called after all browse reads are complete to release the VSAM browse cursor. Failure to call ENDBR would leave an open browse cursor, potentially causing resource contention."
+        },
+        {
+          "dependency": "SEC-USR-ID as browse positioning key",
+          "description": "The VSAM browse start position is entirely determined by SEC-USR-ID at the time STARTBR is called. This value is sourced from USRIDINI (Enter key), CDEMO-CU00-USRID-FIRST (PF7), or CDEMO-CU00-USRID-LAST (PF8), making correct commarea state critical for accurate pagination."
+        },
+        {
+          "dependency": "CDEMO-CU00-USRID-FIRST and CDEMO-CU00-USRID-LAST commarea fields",
+          "description": "PF7 backward paging depends on CDEMO-CU00-USRID-FIRST being correctly populated from the previous forward page load (set at WS-IDX=1 in POPULATE-USER-DATA). PF8 forward paging depends on CDEMO-CU00-USRID-LAST (set at WS-IDX=10). Stale or blank values cause incorrect page positioning."
+        },
+        {
+          "dependency": "CDEMO-CU00-PAGE-NUM for boundary detection",
+          "description": "PF7 processing checks CDEMO-CU00-PAGE-NUM > 1 before attempting backward paging. This counter is incremented on each forward page and decremented on backward page, and must be accurately maintained across pseudo-conversational cycles via the commarea."
+        },
+        {
+          "dependency": "NEXT-PAGE-YES flag for PF8 boundary detection",
+          "description": "PF8 processing checks NEXT-PAGE-YES before attempting forward paging. This flag is set by an extra READNEXT after filling the 10-record page. It is persisted in the commarea (CDEMO-CU00-NEXT-PAGE-FLG) across pseudo-conversational cycles."
+        },
+        {
+          "dependency": "WS-ERR-FLG gates screen send after file errors",
+          "description": "ERR-FLG-ON is set on unexpected CICS file I/O responses. Multiple paragraphs check ERR-FLG-OFF before proceeding with data population and screen send, preventing display of partial or corrupt data after a file error."
+        },
+        {
+          "dependency": "USER-SEC-EOF flag gates read loop termination",
+          "description": "The READNEXT and READPREV loops depend on USER-SEC-EOF being set correctly on DFHRESP(ENDFILE) to terminate iteration. Premature or missed setting of this flag would cause incorrect record counts or infinite loops."
+        },
+        {
+          "dependency": "XCTL commarea state for downstream programs",
+          "description": "When transferring to COUSR02C (update) or COUSR03C (delete), CDEMO-CU00-USR-SELECTED must contain the correct user ID and CDEMO-FROM-PROGRAM/CDEMO-FROM-TRANID must be set so the downstream program can return correctly. These are set immediately before XCTL."
+        },
+        {
+          "dependency": "BMS map receive before field inspection",
+          "description": "PROCESS-ENTER-KEY, PROCESS-PF7-KEY, and PROCESS-PF8-KEY all inspect fields from COUSR0AI. These fields are only valid after RECEIVE-USRLST-SCREEN has been performed, which only occurs on re-entry (CDEMO-PGM-REENTER true)."
+        }
+      ],
+      "external_system_integrations": [
+        {
+          "system": "IBM CICS",
+          "type": "Transaction processing monitor",
+          "purpose": "Provides the pseudo-conversational execution environment. Used for BMS map SEND and RECEIVE for terminal I/O (COUSR0A/COUSR00), VSAM file browse operations (STARTBR, READNEXT, READPREV, ENDBR) against the USRSEC dataset, program transfer via XCTL to COUSR02C, COUSR03C, COADM01C, and COSGN00C, and pseudo-conversational RETURN with TRANSID CU00 and COMMAREA."
+        }
+      ],
+      "called_programs": [
+        {
+          "name": "COADM01C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COSGN00C.cbl",
+          "purpose": ""
+        },
+        {
+          "name": "COUSR02C.cbl",
+          "purpose": "COUSR02C is part of the CardDemo application, a credit card management system that handles administrative functions including user account management. This program operates within the administrative workflow, allowing authorized personnel to look up and modify existing user records in the security file. The program provides a CICS interactive screen (transaction CU02) that enables administrators to update user profile information — including first name, last name, password, and user type — stored in the USRSEC security file, ensuring user credentials and roles remain current and accurate."
+        },
+        {
+          "name": "COUSR03C.cbl",
+          "purpose": "COUSR03C is part of the CardDemo application, a credit card management system, and operates within the administrative user management workflow. It serves as the user deletion screen handler, allowing administrators to remove user records from the system's security file (USRSEC). The program manages the full lifecycle of a user deletion request — from displaying the deletion confirmation screen, looking up the user record, and executing the delete — ensuring that only valid, existing users are removed and that the administrator is informed of the outcome at each step."
+        }
+      ]
+    },
+    "error_handling": [
+      {
+        "category": "Input Validation Errors",
+        "description": "Validates user selection flags against allowed values ('U','u' for update, 'D','d' for delete). Invalid selections result in an inline error message ('Invalid selection. Valid values are U and D') stored in WS-MESSAGE and displayed on the screen. Cursor is repositioned to the user ID input field via USRIDINL set to -1. No error flag is raised; the screen is simply redisplayed."
+      },
+      {
+        "category": "Invalid Key / Unsupported PF Key Errors",
+        "description": "Unrecognized AID keys (not ENTER, PF3, PF7, PF8) are caught in the EVALUATE EIBAID WHEN OTHER branch. WS-ERR-FLG is set to 'Y', a standard invalid key message (CCDA-MSG-INVALID-KEY) is moved to WS-MESSAGE, cursor is repositioned, and the user list screen is re-sent without erasing."
+      },
+      {
+        "category": "File Browse Start Errors (STARTBR)",
+        "description": "CICS RESP codes are evaluated after STARTBR. DFHRESP(NORMAL) continues silently. DFHRESP(NOTFND) sets USER-SEC-EOF to TRUE and displays an informational message ('You are at the top of the page...'). Any other response sets WS-ERR-FLG to 'Y', logs RESP and REAS codes via DISPLAY to SYSOUT, sets a generic error message ('Unable to lookup User...'), and redisplays the screen. Subsequent processing is guarded by IF NOT ERR-FLG-ON checks."
+      },
+      {
+        "category": "File Read Forward Errors (READNEXT)",
+        "description": "CICS RESP codes are evaluated after READNEXT. DFHRESP(NORMAL) continues silently. DFHRESP(ENDFILE) sets USER-SEC-EOF to TRUE and displays an informational boundary message ('You have reached the bottom of the page...'). Any other response sets WS-ERR-FLG to 'Y', emits a DISPLAY of RESP/REAS codes, sets a generic error message, and redisplays the screen. Loop processing is halted via the ERR-FLG-ON condition check."
+      },
+      {
+        "category": "File Read Backward Errors (READPREV)",
+        "description": "Mirrors READNEXT error handling. DFHRESP(ENDFILE) sets USER-SEC-EOF to TRUE with a top-of-file boundary message ('You have reached the top of the page...'). Any other unexpected response sets WS-ERR-FLG to 'Y', logs RESP/REAS codes via DISPLAY, sets a generic error message, and redisplays the screen. Backward pagination loop is terminated via ERR-FLG-ON."
+      },
+      {
+        "category": "Pagination Boundary Errors",
+        "description": "Logical boundary conditions are handled as informational messages rather than hard errors. Attempting PF7 (page back) on page 1 displays 'You are already at the top of the page...' and redisplays the screen with SEND-ERASE-NO. Attempting PF8 (page forward) when NEXT-PAGE-NO is set displays 'You are already at the bottom of the page...' similarly. No error flag is raised; these are treated as user guidance messages."
+      },
+      {
+        "category": "Session / Communication Area Errors",
+        "description": "If EIBCALEN is zero (no communication area present), the program treats this as an uninitialized session and immediately transfers control to the sign-on program (COSGN00C) via XCTL rather than raising an error. This is a defensive redirect rather than an explicit error condition."
+      },
+      {
+        "category": "CICS RECEIVE Map Errors",
+        "description": "The RECEIVE MAP command captures RESP and REAS codes into WS-RESP-CD and WS-REAS-CD, but no explicit EVALUATE or error handling logic follows the RECEIVE in RECEIVE-USRLST-SCREEN. Errors from the map receive are silently absorbed; there is no recovery or user notification for map receive failures."
+      },
+      {
+        "category": "ENDBR File Errors",
+        "description": "The ENDBR command in ENDBR-USER-SEC-FILE does not capture or evaluate RESP/REAS codes. Errors during browse termination are completely unhandled and silently ignored."
+      }
+    ],
+    "screen_interface": {
+      "overview": {
+        "mapset_name": "COUSR00",
+        "map_name": "COUSR0A",
+        "business_function": "Provides a paginated list interface for viewing all users from the USRSEC security file in the CardDemo application. Allows administrators to search for users by User ID, and select individual users for update (U) or delete (D) operations. Supports forward and backward pagination displaying up to 10 users per page, showing each user's ID, first name, last name, and user type."
+      },
+      "user_input_interface": "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>COUSR00 - List Users</title><style>body{background-color:#000;margin:0;padding:20px;font-family:'Courier New',Courier,monospace;}  .terminal{background-color:#000;color:#fff;width:80ch;padding:10px;border:1px solid #444;font-size:14px;line-height:1.5;} .blue{color:#5555ff;} .yellow{color:#ffff00;} .green{color:#00ff00;} .red{color:#ff5555;} .turquoise{color:#00ffff;} .neutral{color:#aaaaaa;} .white{color:#ffffff;} .bright{font-weight:bold;} .underline{text-decoration:underline;} .input-field{background-color:#000;border-bottom:1px solid #00ff00;color:#00ff00;display:inline-block;} .row{white-space:pre;height:1.5em;display:block;}</style></head><body><div class='terminal'><span class='row'><span class='blue'>Tran: </span><span class='blue'>CU00</span>              <span class='yellow bright'>CardDemo - User Management         </span>  <span class='blue'>Date: </span><span class='blue'>07/19/22</span></span><span class='row'><span class='blue'>Prog: </span><span class='blue'>COUSR00C</span>          <span class='yellow bright'>        List Users                 </span>  <span class='blue'>Time: </span><span class='blue'>23:12:34</span></span><span class='row'>&nbsp;</span><span class='row'>                                   <span class='white bright'>List Users</span>                <span class='turquoise bright'>Page: </span><span class='blue'>       1</span></span><span class='row'>&nbsp;</span><span class='row'>    <span class='neutral'>Search User ID: </span><span class='green underline input-field'>        </span></span><span class='row'>&nbsp;</span><span class='row'>    <span class='neutral'>Sel</span>        <span class='neutral'>User ID </span>           <span class='neutral'>     First Name     </span>       <span class='neutral'>     Last Name      </span>  <span class='neutral'>Type</span></span><span class='row'>    <span class='neutral'>---</span>        <span class='neutral'>--------</span>           <span class='neutral'>--------------------</span>       <span class='neutral'>--------------------</span>  <span class='neutral'>----</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0001</span>           <span class='blue'>John                </span>       <span class='blue'>Smith               </span>  <span class='blue'>A</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0002</span>           <span class='blue'>Jane                </span>       <span class='blue'>Doe                 </span>  <span class='blue'>U</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0003</span>           <span class='blue'>Robert              </span>       <span class='blue'>Johnson             </span>  <span class='blue'>A</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0004</span>           <span class='blue'>Mary                </span>       <span class='blue'>Williams            </span>  <span class='blue'>U</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0005</span>           <span class='blue'>Michael             </span>       <span class='blue'>Brown               </span>  <span class='blue'>U</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0006</span>           <span class='blue'>Patricia            </span>       <span class='blue'>Jones               </span>  <span class='blue'>A</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0007</span>           <span class='blue'>James               </span>       <span class='blue'>Garcia              </span>  <span class='blue'>U</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0008</span>           <span class='blue'>Linda               </span>       <span class='blue'>Martinez            </span>  <span class='blue'>U</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0009</span>           <span class='blue'>David               </span>       <span class='blue'>Anderson            </span>  <span class='blue'>A</span></span><span class='row'>     <span class='green underline input-field'> </span>  <span class='blue'>USER0010</span>           <span class='blue'>Barbara             </span>       <span class='blue'>Taylor              </span>  <span class='blue'>U</span></span><span class='row'>&nbsp;</span><span class='row'>           <span class='neutral bright'>Type 'U' to Update or 'D' to Delete a User from the list</span></span><span class='row'>&nbsp;</span><span class='row'><span class='red bright'>                                                                              </span></span><span class='row'><span class='yellow'>ENTER=Continue  F3=Back  F7=Backward  F8=Forward</span></span></div></body></html>",
+      "pf_keys": [
+        {
+          "key": "ENTER",
+          "action": "Process the current screen input. If a user row has a selection value entered (U or D), transfer control to the appropriate update (COUSR02C) or delete (COUSR03C) program. If a Search User ID is entered, re-query the USRSEC file starting from that user ID."
+        },
+        {
+          "key": "F3",
+          "action": "Return to the previous screen / Admin menu (transfers control to COADM01C)."
+        },
+        {
+          "key": "F7",
+          "action": "Page backward through the user list, displaying the previous 10 users. Displays message 'You are already at the top of the page...' if already on page 1."
+        },
+        {
+          "key": "F8",
+          "action": "Page forward through the user list, displaying the next 10 users. Displays message 'You are already at the bottom of the page...' if no more records exist."
+        }
+      ]
+    }
+  }
+}

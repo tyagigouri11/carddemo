@@ -1,0 +1,77 @@
+{
+  "documentation": {
+    "high_level_overview": {
+      "program_information": {
+        "name": "READXREF.jcl",
+        "type": "jcl"
+      },
+      "overview": "This JCL job, named **READXREF**, is designed to read a Cross-Reference (XREF) master file as part of the CardDemo application. It executes the program **CBACT03C**, which processes a VSAM Key-Sequenced Data Set (KSDS) containing card cross-reference data stored in **AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS**. The job's business purpose is to retrieve and report on credit card cross-reference records, likely linking card numbers to account or customer data, with all output directed to the system output log.",
+      "parameters": [
+        {
+          "name": "JOB",
+          "value": "READXREF",
+          "description": "The job name that uniquely identifies this job to the system. It is used for tracking, scheduling, and referencing the job in the JES spool and system logs."
+        },
+        {
+          "name": "ACCOUNTING INFORMATION",
+          "value": "'Read Cross Ref file'",
+          "description": "The accounting information or job description string passed to the installation's accounting routines. It is used for job identification and billing/tracking purposes."
+        },
+        {
+          "name": "CLASS",
+          "value": "A",
+          "description": "Specifies the job class (input class) that determines which job queue the job is placed in. Class A typically represents a general-purpose execution class, affecting scheduling priority and resource allocation."
+        },
+        {
+          "name": "MSGCLASS",
+          "value": "0",
+          "description": "Specifies the output class for the job log and system messages (JES message log). It determines where the job's system output messages are routed after job completion."
+        },
+        {
+          "name": "NOTIFY",
+          "value": "&SYSUID",
+          "description": "Specifies the TSO user ID to be notified when the job completes. The symbolic parameter &SYSUID resolves to the user ID of the person who submitted the job, sending them a completion notification message."
+        }
+      ]
+    },
+    "job_details": [
+      {
+        "step": "STEP05",
+        "purpose": "Reads the Cross-Reference (XREF) master VSAM KSDS file using the customer application program CBACT03C. This step retrieves and processes card cross-reference data stored in the VSAM dataset.",
+        "programs": "CBACT03C",
+        "inputs": "XREFFILE: AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS (VSAM KSDS cross-reference master file)",
+        "outputs": "SYSOUT (standard output), SYSPRINT (print output)"
+      }
+    ],
+    "data_operations": [
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.LOADLIB",
+        "operations": "READ",
+        "description": "Load library accessed to load and execute program CBACT03C"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "AWS.M2.CARDDEMO.CARDXREF.VSAM.KSDS",
+        "operations": "READ",
+        "description": "VSAM KSDS cross-reference master file opened for reading by program CBACT03C via DD name XREFFILE"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSOUT",
+        "operations": "WRITE",
+        "description": "Program output written to system output via SYSOUT DD"
+      },
+      {
+        "step": "STEP05",
+        "type": "Dataset",
+        "objects": "SYSPRINT",
+        "operations": "WRITE",
+        "description": "Program print output written to system output via SYSPRINT DD"
+      }
+    ]
+  }
+}
