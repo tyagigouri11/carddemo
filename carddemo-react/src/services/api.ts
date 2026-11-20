@@ -52,8 +52,10 @@ const retryWithBackoff = async (
  * Create Axios instance with global configuration
  */
 const createApiInstance = (): AxiosInstance => {
+  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  
   const instance = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+    baseURL: baseURL,
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
@@ -61,12 +63,13 @@ const createApiInstance = (): AxiosInstance => {
   })
 
   /**
-   * Request interceptor: Add auth token and prepare request
+   * Request interceptor: Add JWT token and prepare request
    */
   instance.interceptors.request.use(
     async (config) => {
-      // Add auth token from localStorage (placeholder for future OAuth2)
-      const token = localStorage.getItem('authToken')
+      // Add JWT token from localStorage
+      const token = localStorage.getItem('jwt_token')
+      
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -82,10 +85,20 @@ const createApiInstance = (): AxiosInstance => {
    * Response interceptor: Handle errors and map to user-friendly messages
    */
   instance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      return response
+    },
     async (error: AxiosError) => {
       const status = error.response?.status || 500
       const data = error.response?.data as Record<string, unknown> | undefined
+
+      // Handle 401 Unauthorized - redirect to login
+      if (status === 401) {
+        console.warn('[API] 401 Unauthorized - redirecting to login')
+        localStorage.removeItem('jwt_token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
 
       // Retry logic for 5xx errors and timeouts
       if ((status >= 500 || error.code === 'ECONNABORTED') && error.config) {

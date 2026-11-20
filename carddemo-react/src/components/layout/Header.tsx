@@ -1,7 +1,8 @@
 import React from 'react'
 import { Menu, LogOut } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useUiStore } from '@/store/uiStore'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuthStore } from '@/store/authStore'
 
 interface HeaderProps {
   title?: string
@@ -9,7 +10,14 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ title = 'CardDemo' }) => {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar)
-  const { logout } = useAuth()
+  const logout = useAuthStore((state) => state.logout)
+  const user = useAuthStore((state) => state.user)
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <header className="bg-white dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700 sticky top-0 z-40">
@@ -26,12 +34,21 @@ export const Header: React.FC<HeaderProps> = ({ title = 'CardDemo' }) => {
           <h1 className="text-xl font-bold text-neutral-900 dark:text-white">{title}</h1>
         </div>
 
-        {/* Right: User info */}
+        {/* Right: User info + Logout */}
         <div className="flex items-center gap-4">
+          {user && (
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-semibold text-neutral-900 dark:text-white">{user.username}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">{user.email}</p>
+              </div>
+            </div>
+          )}
           <button
-            onClick={logout}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors"
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-red-300 rounded-lg transition-colors"
             aria-label="Logout"
+            title="Logout"
           >
             <LogOut size={18} />
             <span className="hidden sm:inline">Logout</span>

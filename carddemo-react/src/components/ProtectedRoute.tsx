@@ -1,13 +1,18 @@
-import React from 'react'
+/**
+ * ProtectedRoute.tsx - Route guard for authenticated routes
+ * Redirects to login if user is not authenticated
+ */
+
+import { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuthStore } from '@/store/authStore'
 
 interface ProtectedRouteProps {
-  children: React.ReactNode
+  children: ReactNode
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated } = useAuth()
+export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

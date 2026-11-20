@@ -41,3 +41,7 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
     use-root-path: true
+
+app:
+  jwtSecret: carddemoSecretKeyThatIsAtLeast64CharactersLongForHS512Algorithm123456789
+  jwtExpirationInMs: 86400000  # 24 hours

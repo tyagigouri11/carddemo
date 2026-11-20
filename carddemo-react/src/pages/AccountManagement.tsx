@@ -13,12 +13,25 @@ export const AccountManagement: React.FC = () => {
     const fetchAccounts = async () => {
       try {
         setLoading(true)
-        const data = await accountService.getAccounts()
-        setAccounts(data)
         setError(null)
+        console.log('[AccountManagement] Fetching accounts...')
+        
+        const data = await accountService.getAccounts()
+        console.log('[AccountManagement] Accounts fetched:', data)
+        console.log('[AccountManagement] Accounts type:', typeof data)
+        console.log('[AccountManagement] Accounts length:', Array.isArray(data) ? data.length : 'not an array')
+        
+        // Ensure data is an array
+        const accountsArray = Array.isArray(data) ? data : (data?.data || [])
+        console.log('[AccountManagement] Setting accounts:', accountsArray)
+        
+        setAccounts(accountsArray)
       } catch (err) {
-        setError('Failed to load accounts')
-        console.error(err)
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error('[AccountManagement] Error fetching accounts:', err)
+        console.error('[AccountManagement] Error details:', errorMessage)
+        setError(`Failed to load accounts: ${errorMessage}`)
+        setAccounts([])
       } finally {
         setLoading(false)
       }
@@ -35,8 +48,8 @@ export const AccountManagement: React.FC = () => {
         </CardHeader>
         <CardBody>
           {loading && <p className="text-neutral-600 dark:text-neutral-400">Loading accounts...</p>}
-          {error && <p className="text-red-600 dark:text-red-400">{error}</p>}
-          {!loading && accounts.length === 0 && (
+          {error && <p className="text-red-600 dark:text-red-400 font-semibold">{error}</p>}
+          {!loading && !error && accounts.length === 0 && (
             <p className="text-neutral-600 dark:text-neutral-400">No accounts found.</p>
           )}
           {!loading && accounts.length > 0 && (
